@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nhiệt kế thị trường</title>
+<meta name="description" content="Theo dõi sức khỏe thị trường Mỹ theo phương pháp Martin Luk, Qullamaggie, Minervini, O'Neil, Stockbee">
+<meta name="theme-color" content="#0f1a17">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-in">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" class="logo" aria-hidden="true"><rect x="10" y="2" width="4" height="14" rx="2"/><circle cx="12" cy="18" r="4"/></svg>
+      <div>
+        <h1>Nhiệt kế thị trường</h1>
+        <p class="sub" id="asof">Đang tải dữ liệu…</p>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Các trang">
+      <button role="tab" data-tab="overview" aria-selected="true">Tổng quan</button>
+      <button role="tab" data-tab="basket">Top 100</button>
+      <button role="tab" data-tab="breadth">Độ rộng</button>
+      <button role="tab" data-tab="leaders">Ngành</button>
+      <button role="tab" data-tab="patterns">Mẫu hình</button>
+      <button role="tab" data-tab="setups">Setup hôm nay</button>
+      <button role="tab" data-tab="screener">Lọc siêu cổ</button>
+      <button role="tab" data-tab="search">Tìm mã</button>
+      <button role="tab" data-tab="journal">Nhật ký</button>
+      <button role="tab" data-tab="guide">Hướng dẫn</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="demo-banner" class="banner" hidden>Đang hiển thị <b>dữ liệu giả lập</b> để xem thử giao diện. Sau lần chạy tự động đầu tiên trên GitHub, trang sẽ dùng dữ liệu thật.</div>
+  <div id="stale-banner" class="banner warn" hidden></div>
+
+  <!-- TỔNG QUAN -->
+  <section id="tab-overview" class="tab" role="tabpanel">
+    <div class="hero">
+      <div class="gauge-card" id="gauge-card">
+        <div class="gauge-lbl">Điểm sức khỏe thị trường</div>
+        <div class="gauge-row">
+          <div class="gauge-num" id="score">—</div>
+          <div>
+            <div class="stance" id="stance">—</div>
+            <div class="muted small" id="score-delta"></div>
+          </div>
+        </div>
+        <div class="scale"><span style="--w:30%">Phòng thủ</span><span style="--w:20%">Thận trọng</span><span style="--w:20%">Bình thường</span><span style="--w:30%">Tấn công</span><i id="scale-dot"></i></div>
+        <p class="advice" id="advice"></p>
+      </div>
+      <div class="alert-card" id="alert-card">
+        <div class="alert-head"><span class="light" id="alert-light"></span><span>Cảnh báo thị trường: <b id="alert-level">—</b></span></div>
+        <ul id="alert-reasons"></ul>
+        <p class="muted small">Cảnh báo dựa trên hành vi của nhóm mạnh nhất, tỷ lệ breakout giữ được giá và số ngày phân phối của QQQ.</p>
+      </div>
+    </div>
+
+    <div class="grid2 ov-two">
+      <article class="card">
+        <div class="card-top"><h3>Bảng kiểm các huyền thoại</h3><span class="ck-sum" id="ck-sum"></span></div>
+        <p class="note">Mỗi người nhìn thị trường qua chỉ báo họ tin nhất. Càng nhiều chấm xanh, càng nên mua mạnh tay.</p>
+        <ul class="ck" id="ck"></ul>
+      </article>
+      <article class="card">
+        <h3>Ứng viên đáng chú ý hôm nay</h3>
+        <p class="note">Setup có stop trong mức cho phép, xếp theo số tiêu chuẩn siêu cổ đạt được: top 100 sức mạnh, ngành top 10, giai đoạn 2, doanh thu và EPS tăng mạnh, đường RS lập đỉnh. Bấm để xem biểu đồ.</p>
+        <div class="picks" id="picks"></div>
+      </article>
+    </div>
+
+    <div class="tiles" id="ov-tiles"></div>
+
+    <div class="grid2">
+      <article class="card"><h3>Điểm sức khỏe theo ngày</h3><p class="note">Đường kẻ: 30 / 50 / 70. Chấm màu: mức cảnh báo mỗi ngày.</p><div class="range" data-chart="score"></div><div class="chart" id="ch-score"></div></article>
+      <article class="card"><h3>QQQ và các đường EMA</h3><p class="note">Nền màu theo xu hướng: xanh = Tốt, vàng = Giằng co, đỏ = Xấu.</p><div class="range" data-chart="qqq"></div><div class="chart" id="ch-qqq"></div></article>
+    </div>
+  </section>
+
+  <!-- NHÓM MẠNH NHẤT -->
+  <section id="tab-basket" class="tab" role="tabpanel" hidden>
+    <div class="intro">
+      <h2><span class="bk-n">100</span> mã mạnh nhất đang làm gì?</h2>
+      <p>Mỗi ngày quét <span class="bk-n">100</span> mã có sức mạnh giá cao nhất (đủ thanh khoản) và đo xem nhóm này tăng hay giảm. Khi chính các mã khỏe nhất bắt đầu giảm đồng loạt, rời khỏi đỉnh, breakout thất bại, đó là cảnh báo sớm nhất, thường trước cả chỉ số.</p>
+    </div>
+    <div class="tiles" id="bk-period"></div>
+    <article class="card">
+      <div class="card-top"><h3>Vượt đỉnh và cách đỉnh, từng ngày</h3>
+        <div class="seg" role="group" aria-label="Phạm vi"><button type="button" id="hl-top" aria-pressed="true">Top 100</button><button type="button" id="hl-all" aria-pressed="false">Toàn thị trường</button></div></div>
+      <p class="note">Mỗi cột là một ngày. <b class="k-nh">Xanh đậm</b>: số mã vượt đỉnh 1 năm hôm đó. <b class="k-w10">Xanh nhạt</b>: cách đỉnh dưới 10%. <b class="k-w20">Vàng</b>: cách đỉnh 10–20%. Phần trống phía trên là số mã đã giảm sâu hơn 20%. Cột thấp dần là nhóm mạnh đang bị bán.</p>
+      <div class="tiles mini" id="hl-tiles"></div>
+      <div class="range" data-chart="hl"></div><div class="chart tall-ch" id="ch-hl"></div>
+    </article>
+    <article class="card notes"><h3>Nhận xét</h3><ul id="bk-notes"></ul></article>
+    <article class="card">
+      <h3>Top 100 đang ở đâu trong chu kỳ?</h3>
+      <div class="statebar" id="statebar"></div>
+    </article>
+    <div class="grid2">
+      <article class="card">
+        <h3>Breakout giữ giá bao lâu?</h3>
+        <p class="note">Mỗi khi một mã top 100 vượt đỉnh 20 phiên, theo dõi xem bao nhiêu phiên sau giá đóng cửa vẫn trên điểm breakout. Đường xanh: breakout trong 40 phiên gần đây; đường xám: 120 phiên trước đó. Đường xanh nằm trên là breakout đang bền hơn.</p>
+        <div class="tiles mini" id="bo-tiles"></div>
+        <div class="chart" id="ch-surv"></div>
+      </article>
+      <article class="card">
+        <h3>Điều chỉnh bao lâu thì lên đỉnh mới?</h3>
+        <p class="note">Mỗi nhịp điều chỉnh (giảm từ 3% so với đỉnh) của mã top 100: kéo dài bao nhiêu phiên, sâu bao nhiêu, rồi có lập đỉnh mới được không. Gãy = sâu hơn 25% hoặc 60 phiên chưa lên lại.</p>
+        <div class="tiles mini" id="pb-tiles"></div>
+        <div class="range" data-chart="pb"></div><div class="chart" id="ch-pb"></div>
+      </article>
+      <article class="card"><h3>Breakout giữ giá theo thời gian</h3><p class="note">% breakout của top 100 còn trên điểm breakout sau 5 phiên (cửa sổ 20 phiên). Trên 50% là thị trường đang thưởng cho breakout.</p><div class="range" data-chart="tbh"></div><div class="chart" id="ch-tbh"></div></article>
+    </div>
+    <div class="tiles" id="bk-tiles"></div>
+    <div class="grid2">
+      <article class="card"><h3>Xu hướng lập đỉnh của top 100</h3><p class="note">Cột: số mã lập đỉnh 1 năm. Đường xanh: số mã lập đỉnh 20 phiên; đường cam: trung bình 10 phiên của nó. Đường cam đi lên là xu hướng lập đỉnh tăng; đi xuống dù chỉ số còn tăng là dấu hiệu yếu đi.</p><div class="range" data-chart="bnh"></div><div class="chart" id="ch-bnh"></div></article>
+      
+      <article class="card"><h3>Lợi nhuận theo chu kỳ</h3><p class="note">Lợi nhuận trung bình 3 phiên, 5 phiên và 1 tháng. Nhóm được chốt từ đầu mỗi chu kỳ để không thiên lệch chọn mã đã tăng.</p><div class="range" data-chart="bret"></div><div class="chart" id="ch-bret"></div></article>
+      <article class="card"><h3>Sức bền của nhóm</h3><p class="note">% mã mạnh nhất còn trên EMA 21 và % breakout còn giữ giá sau 5 phiên.</p><div class="range" data-chart="bhold"></div><div class="chart" id="ch-bhold"></div></article>
+      <article class="card"><h3>Phiên tăng / giảm của nhóm</h3><p class="note">Cột: lợi nhuận trung bình mỗi phiên. Đỏ khi nhóm giảm từ 2% trở lên.</p><div class="range" data-chart="b1"></div><div class="chart" id="ch-b1"></div></article>
+      <article class="card"><h3>Mã tăng trung bình bao nhiêu, mã giảm bao nhiêu</h3><p class="note">Trung bình 10 phiên của mức tăng ở mã tăng và mức giảm ở mã giảm. Mức giảm sâu dần là phân phối.</p><div class="range" data-chart="bgl"></div><div class="chart" id="ch-bgl"></div></article>
+    </div>
+    <article class="card">
+      <div class="card-top"><h3>Danh sách <span class="bk-n">100</span> mã mạnh nhất hôm nay</h3><button type="button" class="btn sm ghost" id="wl-basket" title="Tải file .txt rồi nhập vào TradingView: Watchlist → Import list">Xuất watchlist TradingView</button></div>
+      <div class="tbl"><table id="tb-basket"></table></div>
+    </article>
+  </section>
+
+  <!-- ĐỘ RỘNG -->
+  <section id="tab-breadth" class="tab" role="tabpanel" hidden>
+    <div class="tiles" id="br-tiles"></div>
+    <div class="grid2">
+      <article class="card"><h3>Stockbee: mã tăng/giảm ≥ 4% kèm khối lượng</h3><p class="note">Xanh: số mã tăng ≥ 4%. Đỏ: số mã giảm ≥ 4%. Đường: tỷ lệ 10 ngày (trên 1 là bên mua mạnh hơn).</p><div class="range" data-chart="sb"></div><div class="chart" id="ch-sb"></div></article>
+      <article class="card"><h3>% cổ phiếu trên các đường trung bình</h3><p class="note">SMA 40 dưới 20% thường là vùng quá bán gần đáy; trên 70% là hưng phấn.</p><div class="range" data-chart="pct"></div><div class="chart" id="ch-pct"></div></article>
+      <article class="card"><h3>Đỉnh mới và đáy mới 52 tuần</h3><p class="note">Xanh: số mã lập đỉnh 52 tuần. Đỏ: số mã lập đáy 52 tuần.</p><div class="range" data-chart="nhnl"></div><div class="chart" id="ch-nhnl"></div></article>
+      <article class="card"><h3>Mã tăng/giảm ≥ 25% trong một quý</h3><p class="note">Xu hướng trung hạn: mã giảm vượt mã tăng là thị trường yếu.</p><div class="range" data-chart="q25"></div><div class="chart" id="ch-q25"></div></article>
+      <article class="card"><h3>Số mã có đà tăng mạnh</h3><p class="note">Cột: số mã tăng ≥ 30% trong 1, 3 hoặc 6 tháng, trên EMA 21, biên độ ≥ 4% (tiêu chí của Martin). Danh sách dài ra là thị trường tốt. Đường: % top 100 còn trên EMA 9.</p><div class="range" data-chart="lead"></div><div class="chart" id="ch-lead"></div></article>
+      <article class="card"><h3>Dao động McClellan</h3><p class="note">Dựa trên chênh lệch mã tăng và mã giảm trong danh sách. Trên 0 là động lượng tích cực.</p><div class="range" data-chart="mcc"></div><div class="chart" id="ch-mcc"></div></article>
+    </div>
+  </section>
+
+  <!-- NGÀNH & DẪN ĐẦU -->
+  <section id="tab-leaders" class="tab" role="tabpanel" hidden>
+    <article class="card">
+      <h3>Xếp hạng ngành</h3>
+      <p class="note">Xếp theo trung vị sức mạnh giá của các mã trong ngành (ngành có từ 3 mã). Hạng 1 là mạnh nhất. Cột thay đổi so với 1 tuần và 1 tháng trước cho biết ngành nào đang được dòng tiền chú ý.</p>
+      <div class="tools"><input type="search" id="q-ind" placeholder="Tìm ngành…" aria-label="Tìm ngành"><span class="muted small" id="ind-count"></span></div>
+      <div class="tbl tall"><table id="tb-ind"></table></div>
+    </article>
+    <article class="card">
+      <h3>Sức mạnh từng chủ đề</h3>
+      <p class="note">Nhóm chủ đề lớn, xếp theo số mã nằm trong top 100.</p>
+      <div class="tbl"><table id="tb-themes"></table></div>
+    </article>
+    <div class="grid2">
+      <article class="card"><h3>Mới vào top 100 (5 phiên)</h3><div class="chips" id="new-leaders"></div></article>
+      <article class="card"><h3>Vừa rời top 100 (5 phiên)</h3><div class="chips" id="lost-leaders"></div></article>
+    </div>
+  </section>
+
+  <!-- SETUP -->
+  <section id="tab-setups" class="tab" role="tabpanel" hidden>
+    <article class="card calc">
+      <h3>Thông số tài khoản</h3>
+      <div class="calc-row">
+        <label>Vốn (USD)<input type="number" id="in-cap" min="100" step="100"></label>
+        <label>Rủi ro mỗi lệnh (%)<input type="number" id="in-risk" min="0.05" max="5" step="0.05"></label>
+        <label>Stop tối đa (%)<input type="number" id="in-maxstop" min="0.5" max="20" step="0.5"></label>
+        <label>Vị thế tối đa (% vốn)<input type="number" id="in-maxpos" min="5" max="100" step="5"></label>
+      </div>
+      <p class="note" id="calc-note"></p>
+    </article>
+    <div id="setup-warning" class="banner warn" hidden></div>
+    <article class="card">
+      <h3>Setup mua hôm nay</h3>
+      <p class="note">Giá mua = đỉnh phiên vừa rồi, stop = đáy phiên. Đây là kế hoạch cho phiên tới: chỉ mua nếu giá vượt giá mua. Hàng mờ là stop rộng hơn mức tối đa.</p>
+      <div class="tools"><select id="sel-setup" aria-label="Lọc theo setup"><option value="">Tất cả setup</option></select>
+        <label class="chk"><input type="checkbox" id="only-ok" checked> Chỉ stop trong mức cho phép</label>
+        <label class="chk"><input type="checkbox" id="only-lead"> Chỉ mã top 100</label><span class="muted small" id="setup-count"></span>
+        <button type="button" class="btn sm ghost" id="wl-setups" title="Tải file .txt rồi nhập vào TradingView: Watchlist → Import list">Xuất watchlist TradingView</button></div>
+      <div class="tbl"><table id="tb-setups"></table></div>
+    </article>
+    <article class="card">
+      <h3>Mã top 100 đang quá xa EMA 9</h3>
+      <p class="note">Cách EMA 9 trên 15%. Nếu đang giữ, Martin bán bớt 10–15% vào sức mạnh; không mua đuổi.</p>
+      <div class="chips" id="extended"></div>
+    </article>
+  </section>
+
+  <!-- MẪU HÌNH -->
+  <section id="tab-patterns" class="tab" role="tabpanel" hidden>
+    <div class="intro">
+      <h2>Thị trường đang thưởng cho mẫu hình nào?</h2>
+      <p>Mỗi ngày ghi lại mọi mã (RS ≥ 70, đủ thanh khoản) vừa xuất hiện một mẫu hình mua, rồi đo kết quả sau 1, 3, 5 phiên và 1 tháng tính từ giá đóng cửa ngày tín hiệu. Mỗi ô là thống kê các tín hiệu trong 20 phiên gần nhất đã có đủ kết quả. Stop là đáy của ngày tín hiệu.</p>
+    </div>
+    <article class="card notes"><h3>Nhận xét</h3><ul id="pt-notes"></ul></article>
+    <article class="card">
+      <h3>Kết quả từng mẫu hình</h3>
+      <p class="note">Mỗi ô: % tín hiệu có lãi và lãi trung bình. "Thường" là % có lãi sau 5 phiên tính trên 120 phiên, để so hiện tại tốt hơn hay kém hơn bình thường.</p>
+      <div class="tbl"><table id="tb-pat"></table></div>
+    </article>
+    <article class="card">
+      <div class="card-top"><h3>Breakout hay mua điều chỉnh?</h3><select id="sel-pat" aria-label="Thêm một mẫu hình vào biểu đồ"><option value="">Thêm một mẫu hình…</option></select></div>
+      <p class="note">% tín hiệu có lãi sau 5 phiên (cửa sổ 20 phiên). Đường trên 50% là kiểu mua đó đang hiệu quả.</p>
+      <div class="range" data-chart="pat"></div><div class="chart" id="ch-pat"></div>
+    </article>
+    <article class="card">
+      <h3>Mã vừa có tín hiệu hôm nay</h3>
+      <div class="tools"><select id="sel-sig" aria-label="Lọc theo mẫu hình"><option value="">Mọi mẫu hình</option></select><span class="muted small" id="sig-count"></span></div>
+      <div class="tbl"><table id="tb-sig"></table></div>
+    </article>
+  </section>
+
+  <!-- LỌC SIÊU CỔ -->
+  <section id="tab-screener" class="tab" role="tabpanel" hidden>
+    <div class="intro">
+      <h2>Bộ lọc siêu cổ của bạn</h2>
+      <p>Bật hoặc tắt từng điều kiện và chỉnh ngưỡng. Thiết lập được nhớ trong trình duyệt. Bảng kết quả xếp theo số điều kiện đạt, nên bạn thấy cả mã gần đạt.</p>
+    </div>
+    <article class="card">
+      <div class="crit" id="crit"></div>
+      <div class="tools"><button type="button" class="btn sm ghost" id="crit-reset">Về mặc định</button>
+        <label class="chk"><input type="checkbox" id="crit-near"> Hiện cả mã thiếu 1 điều kiện</label>
+        <span class="muted small" id="scr-count"></span>
+        <button type="button" class="btn sm ghost" id="wl-scr" title="Tải file .txt rồi nhập vào TradingView: Watchlist → Import list">Xuất watchlist TradingView</button></div>
+      <p class="note" id="scr-note"></p>
+    </article>
+    <article class="card"><div class="tbl"><table id="tb-scr"></table></div></article>
+  </section>
+
+  <!-- TÌM MÃ -->
+  <section id="tab-search" class="tab" role="tabpanel" hidden>
+    <article class="card">
+      <div class="tools">
+        <input type="search" id="q" placeholder="Gõ mã hoặc ngành…" aria-label="Tìm mã">
+        <select id="sel-theme" aria-label="Lọc theo ngành"><option value="">Mọi ngành</option></select>
+        <label class="chk"><input type="checkbox" id="f-tt"> Đạt Trend Template</label>
+        <label class="chk"><input type="checkbox" id="f-rsnh"> Đường RS lập đỉnh</label>
+        <span class="muted small" id="search-count"></span>
+      </div>
+      <div class="tbl tall"><table id="tb-search"></table></div>
+    </article>
+  </section>
+
+  <!-- NHẬT KÝ -->
+  <section id="tab-journal" class="tab" role="tabpanel" hidden>
+    <div class="tiles" id="jr-tiles"></div>
+    <div class="grid2">
+      <article class="card">
+        <h3 id="jr-form-title">Ghi lệnh mới</h3>
+        <form id="jr-form" class="jr-form" autocomplete="off">
+          <input type="hidden" id="jr-id">
+          <label>Mã<input id="jr-t" required maxlength="8"></label>
+          <label>Setup<input id="jr-setup" list="setup-list" maxlength="40"></label>
+          <datalist id="setup-list"><option>Nền chặt</option><option>EP</option><option>VCP</option><option>EMA crossback</option><option>EMA hội tụ</option><option>Inside day</option><option>2 inside day</option><option>Lấy lại EMA 9</option><option>Lấy lại AVWAP</option><option>Pullback</option><option>Breakout</option></datalist>
+          <label>Ngày mua<input type="date" id="jr-d" required></label>
+          <label>Giá mua<input type="number" id="jr-entry" step="any" min="0" required></label>
+          <label>Stop ban đầu<input type="number" id="jr-stop" step="any" min="0" required></label>
+          <label>Số cổ phiếu<input type="number" id="jr-shares" step="1" min="1" required></label>
+          <label>Ngày bán<input type="date" id="jr-xd"></label>
+          <label>Giá bán TB<input type="number" id="jr-exit" step="any" min="0"></label>
+          <label class="wide">Ghi chú<textarea id="jr-note" rows="2" maxlength="500" placeholder="Vì sao mua, thị trường lúc đó, có theo đúng kế hoạch không…"></textarea></label>
+          <div class="wide jr-btns"><button type="submit" class="btn">Lưu lệnh</button><button type="button" class="btn ghost" id="jr-cancel" hidden>Hủy sửa</button><span class="muted small" id="jr-preview"></span></div>
+        </form>
+      </article>
+      <article class="card"><h3>Đường vốn theo R</h3><p class="note">Cộng dồn số R của các lệnh đã đóng, theo ngày bán.</p><div class="chart" id="ch-equity"></div></article>
+    </div>
+    <article class="card">
+      <h3>Danh sách lệnh</h3>
+      <div class="tools"><button type="button" class="btn ghost" id="jr-export">Xuất CSV</button><label class="btn ghost file">Nhập CSV<input type="file" id="jr-import" accept=".csv,text/csv" hidden></label><span class="muted small">Nhật ký chỉ lưu trong trình duyệt này. Nhớ xuất CSV định kỳ để sao lưu.</span></div>
+      <div class="tbl"><table id="tb-journal"></table></div>
+    </article>
+  </section>
+
+  <!-- HƯỚNG DẪN -->
+  <section id="tab-guide" class="tab guide" role="tabpanel" hidden>
+    <article class="card">
+      <h3>Đọc trang này mỗi sáng trong 3 bước</h3>
+      <ol>
+        <li><b>Tổng quan:</b> điểm sức khỏe và màu cảnh báo cho biết nên tấn công hay phòng thủ. Điểm từ 70 trở lên và cảnh báo xanh là lúc tìm điểm mua.</li>
+        <li><b>Nhóm mạnh nhất &amp; Ngành:</b> dòng tiền đang ở đâu, nhóm dẫn đầu khỏe lên hay yếu đi.</li>
+        <li><b>Setup hôm nay:</b> chỉ dùng khi thị trường thuận lợi. Đặt lệnh chờ mua tại giá mua, stop tại giá stop, số cổ phiếu theo bảng.</li>
+      </ol>
+    </article>
+    <article class="card">
+      <h3>Định nghĩa</h3>
+      <dl>
+        <dt>Điểm sức khỏe (0–100)</dt><dd>Xu hướng QQQ (20) + ngày phân phối (10) + % mã trên EMA 21 (15) + số mã có đà tăng mạnh so với 120 phiên (15) + % top 100 còn trên EMA 9 (10) + tỷ lệ Stockbee 10 ngày (15) + chênh lệch đỉnh/đáy 52 tuần (15). Từ 70: Tấn công; 50–69: Bình thường; 30–49: Thận trọng; dưới 30: Phòng thủ.</dd>
+        <dt>Xu hướng (Martin Luk)</dt><dd>Tốt: giá trên EMA 21, EMA 9 trên EMA 21 và EMA 21 dốc lên. Xấu: giá dưới EMA 50 khi EMA 21 dốc xuống, hoặc giá dưới EMA 21 khi EMA 9 dưới EMA 21 và EMA 21 dốc xuống. Còn lại: Giằng co.</dd>
+        <dt>Ngày phân phối (O'Neil)</dt><dd>Phiên QQQ giảm từ 0,2% với khối lượng cao hơn phiên trước, đếm trong 25 phiên. Từ 5 ngày trở lên: tổ chức đang bán ra.</dd>
+        <dt>Ngày xác nhận tăng (O'Neil)</dt><dd>Sau khi chỉ số điều chỉnh ít nhất 5% và tạo đáy, từ ngày thứ 4 của nhịp hồi có phiên tăng ≥ 1,25% với khối lượng lớn hơn hôm trước.</dd>
+        <dt>Giai đoạn (Weinstein)</dt><dd>Theo vị trí của QQQ so với SMA 30 tuần và độ dốc của đường này. Giai đoạn 2 là xu hướng tăng, giai đoạn 4 là xu hướng giảm.</dd>
+        <dt>Stockbee (Pradeep Bonde)</dt><dd>Số mã tăng hoặc giảm từ 4% trong phiên với khối lượng lớn hơn hôm trước. Tỷ lệ 10 ngày = tổng mã tăng ÷ tổng mã giảm trong 10 phiên.</dd>
+        <dt>Điểm RS (1–99)</dt><dd>Xếp hạng mức tăng giá 12 tháng (quý gần nhất tính hệ số gấp đôi) so với toàn bộ danh sách. 99 là mạnh nhất.</dd>
+        <dt>Trend Template (Minervini)</dt><dd>Giá trên SMA 150 và 200; SMA 150 trên SMA 200; SMA 200 dốc lên 1 tháng; SMA 50 trên SMA 150; giá trên SMA 50; cách đỉnh 52 tuần không quá 25%; cao hơn đáy 52 tuần ít nhất 30%; RS từ 70.</dd>
+        <dt>Top 100 và mã có đà tăng mạnh</dt><dd>Chỉ có một danh sách mã để theo dõi: top 100 (nhãn "Top 100"). Số "mã có đà tăng mạnh" (tăng ≥ 30% trong 1, 3 hoặc 6 tháng, trên EMA 21, biên độ ≥ 4%, theo Martin và Qullamaggie) chỉ dùng như một chỉ báo độ rộng: con số này tăng là thị trường đang tạo ra nhiều mã khỏe.</dd>
+        <dt>Breakout giữ giá</dt><dd>Breakout = mã top 100 đóng cửa vượt giá đóng cửa cao nhất 20 phiên trước. Giữ giá k phiên = trong k phiên sau, chưa phiên nào đóng cửa dưới mức đó.</dd>
+        <dt>Nhịp điều chỉnh</dt><dd>Tính từ đỉnh (khi mã đang ở top 100) tới phiên đóng cửa vượt đỉnh đó, chỉ tính nhịp giảm từ 3%. Gãy = giảm sâu hơn 25% hoặc 60 phiên chưa lên lại. Trạng thái hiện tại: sát đỉnh (cách đỉnh 60 phiên dưới 3%), điều chỉnh 1–5, 6–15, trên 15 phiên.</dd>
+        <dt>Nhóm mạnh nhất (100 mã)</dt><dd>100 mã có sức mạnh giá cao nhất trong số mã đủ thanh khoản (từ 20 triệu USD/ngày). Chọn 100 thay vì 50 vì khi quét toàn thị trường, 100 mã tương đương khoảng 3% mạnh nhất (RS từ 97), đúng vùng siêu cổ của O'Neil; mỗi mã chỉ chiếm 1% nên thống kê ổn định hơn, một mã gãy không làm méo cả nhóm, mà vẫn đủ chọn lọc để thấy dòng tiền rời nhóm dẫn đầu sớm. Muốn khác thì sửa <code>basket_size</code> trong config.json. Kết quả mỗi chu kỳ (1, 3, 5 phiên, 1 tháng) đo trên nhóm chốt từ đầu chu kỳ. Breakout = mã vừa lập đỉnh 20 phiên lần đầu; "giữ giá" = sau 5 phiên vẫn cao hơn giá breakout.</dd>
+        <dt>Bảng kiểm các huyền thoại</dt><dd>8 điều kiện thị trường: ngày phân phối và nhịp tạo đáy (O'Neil), xu hướng QQQ và số mã có đà tăng mạnh (Martin Luk), đỉnh mới so với đáy mới (Minervini), giai đoạn của QQQ (Weinstein), tỷ lệ bứt phá/sập 4% (Stockbee), nhóm mạnh và breakout (Qullamaggie). Từ 6 chấm xanh: thị trường thuận lợi; dưới 4: nên giảm tỷ trọng.</dd>
+        <dt>Mã mới niêm yết (IPO)</dt><dd>Được xếp hạng từ 1 tháng sau phiên đầu tiên. Dưới 6 tháng, sức mạnh giá tính bằng mức tăng kể từ phiên đầu tiên. Có nhãn "IPO x tháng" trong năm đầu.</dd>
+        <dt>Giai đoạn của từng mã (Weinstein)</dt><dd>So giá với SMA 150 phiên (≈ 30 tuần) và độ dốc 1 tháng của đường này. 2: giá trên đường đang dốc lên, giai đoạn duy nhất nên mua. 4: giá dưới đường đang dốc xuống. 1: tạo nền. 3: tạo đỉnh.</dd>
+        <dt>Giữ giá khi thị trường giảm</dt><dd>Trung bình chênh lệch giữa mức tăng/giảm của mã và của QQQ trong các phiên QQQ giảm từ 0,5% (50 phiên). Dương là mã khỏe hơn thị trường đúng lúc thị trường yếu, dấu hiệu Minervini và O'Neil dùng để tìm mã dẫn đầu sắp tới.</dd>
+        <dt>Ngày báo cáo (BCTC)</dt><dd>Ngày công bố kết quả kinh doanh sắp tới, từ Yahoo Finance. Nhãn vàng khi còn dưới 14 ngày, đỏ khi dưới 5 ngày. Mở vị thế mới ngay trước ngày báo cáo dễ bị gap ngược qua stop.</dd>
+        <dt>Đỉnh mới, cách đỉnh</dt><dd>Đỉnh mới = giá đóng cửa cao nhất 1 năm (hoặc từ khi niêm yết với mã mới). Cách đỉnh = % giá hiện tại thấp hơn đỉnh đó.</dd>
+        <dt>Hạng RS, hạng ngành</dt><dd>Hạng RS: thứ tự sức mạnh giá trong các mã đủ thanh khoản, 1 là mạnh nhất. Hạng ngành: các ngành (theo mã SIC khi dùng Massive, theo chủ đề khi dùng Yahoo) có từ 3 mã được xếp theo trung vị sức mạnh giá của các mã trong ngành, giống cách IBD xếp 197 nhóm ngành.</dd>
+        <dt>Thống kê mẫu hình</dt><dd><b>Breakout nền</b>: vượt đỉnh 20 phiên, khối lượng ≥ 1,5 lần, nền trước đó dao động dưới 30%. <b>Vượt đỉnh 52 tuần</b>. <b>Bứt phá 4%</b> (Stockbee): tăng ≥ 4% kèm khối lượng. <b>Inside day bứt lên</b>: vượt đỉnh của inside day. <b>Gap tăng mạnh (EP)</b>: gap ≥ 8%, khối lượng ≥ 3 lần. <b>Về EMA 21 / EMA 50 bật lên</b>: chạm đường trung bình đang dốc lên rồi đóng cửa vượt đỉnh hôm trước. <b>Lấy lại EMA 9</b>. Chỉ tính mã RS ≥ 70, đủ thanh khoản. Kết quả đo từ giá đóng cửa ngày tín hiệu, không trừ phí.</dd>
+        <dt>Số liệu cơ bản</dt><dd>Doanh thu và EPS theo quý, năm. Lấy từ Massive nếu gói có số liệu tài chính, nếu không thì từ Yahoo Finance cho khoảng 400 mã mạnh nhất và các mã có setup; làm mới hằng tuần. Tăng trưởng so với cùng kỳ năm trước; từ lỗ sang lãi tính là +100%.</dd>
+        <dt>Cảnh báo Đỏ</dt><dd>Một trong các điều kiện: nhóm mạnh nhất giảm ≥ 5% trong 5 phiên; dưới 40% nhóm còn trên EMA 21; dưới 35% breakout giữ được giá; QQQ có từ 6 ngày phân phối.</dd>
+        <dt>Cảnh báo Vàng</dt><dd>Nhóm mạnh nhất giảm trong 5 phiên; 40–60% còn trên EMA 21; 35–50% breakout giữ giá; 2 phiên giảm ≥ 2% trong 5 phiên; 4–5 ngày phân phối; hoặc QQQ ở trạng thái Xấu.</dd>
+        <dt>Setup</dt><dd><b>Nền chặt</b> (Qullamaggie): mã top 100, biên độ 5 phiên co dưới 60% bình thường, sát đỉnh 20 phiên. <b>EP</b>: gap ≥ 10% với khối lượng ≥ 3 lần. <b>VCP</b> (Minervini): ba nhịp dao động co dần, khối lượng cạn. <b>EMA crossback</b> (Oliver Kell): mã top 100 chạm lại EMA 21 rồi đóng cửa trên EMA 9. <b>EMA hội tụ</b>, <b>Inside day</b>, <b>Lấy lại EMA 9 / AVWAP</b> (Martin Luk). AVWAP neo từ đáy 52 tuần và từ cú gap lớn gần nhất.</dd>
+        <dt>Số cổ phiếu</dt><dd>= Vốn × % rủi ro ÷ (Giá mua − Stop), tối đa theo % vị thế. Ví dụ vốn 60.000 USD, rủi ro 0,5% = 300 USD mỗi lệnh.</dd>
+      </dl>
+    </article>
+    <article class="card">
+      <h3>Giới hạn</h3>
+      <p>Có khóa Massive: quét toàn bộ cổ phiếu Mỹ có giá từ 3 USD và giao dịch trung bình từ 2 triệu USD/ngày. Không có khóa: dùng Yahoo Finance (miễn phí, không chính thức) với khoảng 300 mã trong universe.csv. Nguồn đang dùng ghi ở dòng trên cùng. Giá ngày, cập nhật một lần mỗi sáng sau khi thị trường Mỹ đóng cửa; không có dữ liệu trong phiên nên stop thực tế có thể chặt hơn. Mã ngoài danh sách tự chọn được xếp ngành theo mã SIC. Đây là công cụ học tập và theo dõi, không phải khuyến nghị đầu tư.</p>
+    </article>
+  </section>
+</main>
+
+<div class="modal" id="modal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="m-title">
+    <div class="modal-head"><h3 id="m-title">—</h3><button type="button" class="x" id="m-close" aria-label="Đóng">×</button></div>
+    <div class="m-meta" id="m-meta"></div>
+    <div class="m-legend"><span><i style="background:var(--c1)"></i>EMA 9</span><span><i style="background:var(--c2)"></i>EMA 21</span><span><i style="background:var(--c3)"></i>EMA 50</span><span><i style="background:var(--c4)"></i>AVWAP từ đáy</span><span><i style="background:var(--c5)"></i>AVWAP từ gap</span></div>
+    <div class="chart big" id="ch-modal"></div>
+    <div class="m-actions" id="m-actions"></div>
+  </div>
+</div>
+
+<footer class="wrap foot">Dữ liệu: Massive hoặc Yahoo Finance · Biểu đồ: TradingView Lightweight Charts · Công cụ học tập, không phải khuyến nghị đầu tư.</footer>
+
+<script src="vendor/lightweight-charts.standalone.production.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
