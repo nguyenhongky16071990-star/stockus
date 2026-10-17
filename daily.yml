@@ -1,0 +1,70 @@
+name: Cập nhật hằng ngày
+
+on:
+  schedule:
+    # 22:15 giờ UTC thứ Hai–thứ Sáu = 7:15 sáng giờ Tokyo (5:15 giờ Việt Nam) thứ Ba–thứ Bảy, sau khi thị trường Mỹ đóng cửa
+    - cron: "15 22 * * 1-5"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180  # lần đầu với gói Massive miễn phí (5 lệnh/phút) mất khoảng 1,5–2 giờ
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+
+      - name: Cài thư viện
+        run: pip install -r pipeline/requirements.txt
+
+      # giữ lại giá các ngày đã tải để mỗi sáng chỉ tải thêm phiên mới
+      - name: Khôi phục bộ đệm dữ liệu
+        uses: actions/cache@v4
+        with:
+          path: pipeline/cache
+          key: massive-${{ github.run_id }}
+          restore-keys: massive-
+
+      - name: Tải dữ liệu và tính toán
+        env:
+          MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
+        run: python pipeline/build.py
+
+      - name: Lưu kho dữ liệu hằng ngày
+        run: |
+          git config user.name "nhiet-ke-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/data/archive
+          git add pipeline/tickers_info.json 2>/dev/null || true
+          git commit -m "Dữ liệu ngày $(date -u +%F)" || echo "Không có thay đổi"
+          git push || echo "Không đẩy được kho dữ liệu (không ảnh hưởng trang web)"
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
