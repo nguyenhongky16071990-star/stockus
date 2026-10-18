@@ -4,11 +4,15 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const LW = window.LightweightCharts;
-  const S = { latest: null, history: [], stocks: [], setups: [], extended: [], themes: [], basket: [], industries: [], patterns: null, charts: null };
+  const APP_VERSION = '2026.10.18-c'; // phải trùng với APP_VERSION trong pipeline/build.py
+  const S = { cycle: null, backtest: null, latest: null, history: [], stocks: [], setups: [], extended: [], themes: [], basket: [], industries: [], patterns: null, charts: null };
   const ranges = {};          // khoảng thời gian của từng biểu đồ
   const built = new Set();    // tab đã vẽ
   const live = {};            // biểu đồ đang hiển thị
-  let hlScope = 'top';        // biểu đồ vượt đỉnh/cách đỉnh: top 100 hay toàn thị trường
+  let hlScope = 'top';
+  let cyKey = 'qqq';
+  const PHC = { 'Tăng': '--good', 'Điều chỉnh': '--warn', 'Giằng co': '--c1', 'Giảm': '--bad' };
+  const btOn = new Set(['ml', 'qm', 'mm', 'wo', 'sw', 'pb', 'ok', 'vs']);        // biểu đồ vượt đỉnh/cách đỉnh: top 100 hay toàn thị trường
 
   // ------------------------------------------------------------ định dạng
   const nf0 = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 });
@@ -202,6 +206,28 @@
       c.addLineSeries({ color: css('--bad'), lineWidth: 2, priceScaleId: 'left', priceLineVisible: false, title: 'Độ sâu % (trung vị)' }).setData(ser(rows, 'pb_depth'));
       c.applyOptions({ leftPriceScale: { visible: true } });
     },
+    cyc(c, rows) {
+      const Y = S.cycle, X = Y[cyKey]; if (!X) return;
+      const from = rows.length ? rows[0].d : '';
+      const pts = Y.dates.map((d, i) => [d, X.close[i], X.phase[i]]).filter(([d, v]) => d >= from && isNum(v));
+      c.addLineSeries({ lineWidth: 2, priceLineVisible: false, title: cyKey === 'qqq' ? 'QQQ' : 'Top 100' })
+        .setData(pts.map(([d, v, p]) => ({ time: d, value: v, color: css(PHC[p] || '--muted') })));
+      const band = c.addHistogramSeries({ priceScaleId: 'band', priceLineVisible: false, lastValueVisible: false });
+      band.setData(pts.map(([d, , p]) => ({ time: d, value: 1, color: css(PHC[p] || '--muted') })));
+      c.priceScale('band').applyOptions({ scaleMargins: { top: 0.93, bottom: 0 }, visible: false });
+    },
+    bt(c, rows) {
+      const from = rows.length ? rows[0].d : '';
+      const B = S.backtest.strategies || {};
+      for (const L of LEGENDS) {
+        const b = B[L.id]; if (!b || !b.curve || !btOn.has(L.id)) continue;
+        const pts = b.curve.filter(([d]) => d >= from); if (!pts.length) continue;
+        const base = pts[0][1] || 0;
+        c.addLineSeries({ color: css(L.color), lineWidth: 2, priceLineVisible: false, title: L.short }).setData(pts.map(([d, v]) => ({ time: d, value: (v || 0) - base })));
+      }
+      const z = c.addLineSeries({ color: 'transparent', priceLineVisible: false, lastValueVisible: false }); z.setData(rows.length ? [{ time: rows[0].d, value: 0 }] : []);
+      z.createPriceLine({ price: 0, color: css('--muted'), lineStyle: 2, lineWidth: 1, axisLabelVisible: false });
+    },
     mcc(c, rows) {
       const s = c.addHistogramSeries({ priceLineVisible: false });
       s.setData(rows.filter((r) => isNum(r.mcclellan)).map((r) => ({ time: r.d, value: r.mcclellan, color: css(r.mcclellan >= 0 ? '--good' : '--bad') })));
@@ -285,6 +311,8 @@
     const ed = earnDays(r);
     if (ed !== null && ed <= 14) f.append(el('span', { class: 'tag ' + (ed <= 5 ? 'bad' : 'warn'), text: `BCTC sau ${ed} ngày`, title: `Báo cáo kết quả kinh doanh ngày ${fdate(r.earn)}. Minervini và O'Neil tránh mở vị thế mới ngay trước ngày này.` }));
     if (isNum(r.ipo)) f.append(el('span', { class: 'tag ipo', text: `IPO ${Math.max(1, Math.round(r.ipo / 21))} tháng`, title: 'Mới niêm yết dưới 1 năm. Nhiều siêu cổ chạy mạnh nhất trong năm đầu sau IPO.' }));
+    if (S.stocks.length && !r._nob) f.append(badges(r.t));
+    for (const v of r.vsa || []) f.append(el('span', { class: 'tag vsa', text: 'VSA: ' + v }));
     if (r.leader) f.append(el('span', { class: 'tag ld', text: 'Top 100' }));
     if (r.tt) f.append(el('span', { class: 'tag tt', text: 'Trend Template' }));
     for (const t of r.setups || []) f.append(el('span', { class: 'tag', text: t }));
@@ -326,6 +354,8 @@
       tile(T, 'Stockbee 10 ngày', n2(L.ratio10), L.ratio10 >= 1 ? 'bên mua mạnh hơn' : 'bên bán mạnh hơn', L.ratio10 >= 1 ? 'up' : 'dn');
       tile(T, 'Đạt Trend Template', pct(L.pct_tt, 0), `${L.universe} mã theo dõi`);
       tile(T, 'Setup đạt chuẩn', n0(L.n_setups), 'stop trong mức cho phép');
+      const btr = Object.entries((S.backtest || {}).strategies || {}).filter(([, v]) => v.recent && v.recent.n >= 5).sort((a, b) => (b[1].recent.exp ?? -9) - (a[1].recent.exp ?? -9))[0];
+      if (btr) { const Lg = LEGENDS.find((x) => x.id === btr[0]); tile(T, 'Hiệu quả nhất 60 phiên', Lg ? Lg.name : btr[0], `${btr[1].recent.exp > 0 ? '+' : ''}${n2(btr[1].recent.exp)}R/lệnh · thắng ${n0(btr[1].recent.win)}% · ${btr[1].recent.n} lệnh`, btr[1].recent.exp > 0 ? 'up' : 'dn'); }
       const ck = L.checklist || [];
       const dot = { good: 'Thuận lợi', warn: 'Trung tính', bad: 'Bất lợi' };
       $('#ck').replaceChildren(...ck.map((c) => el('li', { class: 'ck-' + c.state },
@@ -344,6 +374,7 @@
         return el('button', { class: 'pick', type: 'button', onclick: () => openChart(p.t, p) },
           el('div', { class: 'pick-h' }, el('span', { class: 'tk', text: p.t }), el('span', { class: 'pick-n', text: `${p._n}/6` })),
           el('div', { class: 'pick-s', text: p.setups.join(' · ') }),
+          el('div', { class: 'pick-b' }, badges(p.t)),
           el('div', { class: 'pick-m', text: `Mua ${n2(p.entry)} · stop ${n2(p.stop)} (${pct(p.stop_pct)})` }),
           el('div', { class: 'pick-c' }, ...p._c.map(([t, ok]) => el('span', { class: ok ? 'on' : 'off', text: t })),
             ed !== null && ed <= 14 ? el('span', { class: 'warnc', text: `BCTC sau ${ed} ngày` }) : null));
@@ -555,6 +586,121 @@
       drawSig();
     },
     screener() { Screener.init(); },
+    cycle() {
+      const Y = S.cycle;
+      $('#cy-notes').replaceChildren(...(Y.notes || []).map((t) => el('li', { text: t })));
+      const box = $('#cy-now'); box.replaceChildren();
+      for (const [k, nm] of [['qqq', 'QQQ'], ['top', 'Nhóm top 100']]) {
+        const c = (Y[k] || {}).current; if (!c) continue;
+        const typ = c.typical || 0, q3 = c.q3 || typ || 1;
+        const prog = Math.min(100, c.days / Math.max(q3, 1) * 100);
+        const nx = Object.entries(c.next || {}).filter(([, v]) => v).sort((a, b) => b[1] - a[1]);
+        box.append(el('article', { class: 'card phase-card', style: `--ph:var(${PHC[c.phase] || '--muted'})` },
+          el('div', { class: 'ph-top' }, el('span', { class: 'muted', text: nm }), el('span', { class: 'ph-badge', text: c.phase })),
+          el('div', { class: 'ph-big' }, el('b', { text: `${c.days} phiên` }), el('span', { class: cls(c.chg), text: ` ${spct(c.chg)} từ ${fdate(c.start)}` })),
+          el('div', { class: 'ph-prog' }, el('i', { style: `width:${prog}%` })),
+          el('p', { class: 'note', text: typ ? `Pha ${c.phase.toLowerCase()} thường kéo dài ${typ} phiên; 3/4 số lần kết thúc trong ${q3} phiên.${c.days > q3 ? ' Pha hiện tại đã dài hơn bình thường.' : ''}` : 'Chưa đủ lịch sử để so sánh.' }),
+          nx.length ? el('div', { class: 'ph-next' }, el('span', { class: 'muted small', text: 'Sau pha này thường chuyển sang:' }),
+            ...nx.map(([q, v]) => el('div', { class: 'ph-row' }, el('span', { text: q }), el('span', { class: 'ph-bar' }, el('i', { style: `width:${v}%;background:var(${PHC[q]})` })), el('b', { text: `${v}%` })))) : null));
+      }
+      const drawPh = () => {
+        const st = (Y[cyKey] || {}).stats || {};
+        table($('#tb-phase'), [
+          { k: 'p', label: 'Pha', l: true, f: (r) => el('span', { class: 'ph-badge sm', style: `--ph:var(${PHC[r.p]})`, text: r.p }) },
+          { k: 'n', label: 'Số lần', f: (r) => n0(r.n) },
+          { k: 'days', label: 'Thời gian (trung vị)', f: (r) => (isNum(r.days) ? `${r.days} phiên` : '—') },
+          { k: 'days_q3', label: '3/4 kết thúc trong', f: (r) => (isNum(r.days_q3) ? `${r.days_q3} phiên` : '—') },
+          { k: 'chg', label: 'Thay đổi (trung vị)', f: (r) => spct(r.chg), c: (r) => cls(r.chg) },
+          { k: 'best', label: 'Cao nhất trong pha', f: (r) => spct(r.best) },
+          { k: 'worst', label: 'Thấp nhất trong pha', f: (r) => spct(r.worst) },
+          { k: 'longest', label: 'Dài nhất', f: (r) => (isNum(r.longest) ? `${r.longest} phiên` : '—') },
+          { k: 'next', label: 'Sau đó chuyển sang', l: true, f: (r) => Object.entries(r.next || {}).filter(([, v]) => v).sort((a, b) => b[1] - a[1]).map(([q, v]) => `${q} ${v}%`).join(' · ') || '—', sv: (r) => r.n },
+        ], ['Tăng', 'Điều chỉnh', 'Giằng co', 'Giảm'].map((p) => Object.assign({ p }, st[p] || {})), {});
+      };
+      const setKey = (k) => { cyKey = k; $('#cy-qqq').setAttribute('aria-pressed', String(k === 'qqq')); $('#cy-top').setAttribute('aria-pressed', String(k === 'top')); drawHistChart('cyc'); drawPh(); };
+      $('#cy-qqq').addEventListener('click', () => setKey('qqq')); $('#cy-top').addEventListener('click', () => setKey('top'));
+      drawHistChart('cyc'); drawPh();
+      const R = Y.stock_recent || {}, B = Y.stock_before || {}, N = Y.stock_now || {};
+      const step = (title, main, sub, col) => el('div', { class: 'fl-step', style: `--ph:var(${col})` }, el('span', { class: 'muted small', text: title }), el('b', { text: main }), el('span', { class: 'small', text: sub }));
+      const arrow = () => el('div', { class: 'fl-arr', 'aria-hidden': 'true', text: '→' });
+      const flow = (lbl, X) => el('div', { class: 'fl' }, el('div', { class: 'fl-lbl', text: lbl }),
+        step('Breakout', `${n0(X.n)} lần`, 'vượt đỉnh 20 phiên', '--c1'), arrow(),
+        step('Tăng tiếp', isNum(X.run_days) ? `${X.run_days} phiên · ${spct(X.gain)}` : '—', isNum(X.gain10) ? `${X.gain10}% lần tăng ≥ 10%, ${X.gain20}% lần ≥ 20%` : '', '--good'), arrow(),
+        step('Điều chỉnh', isNum(X.pb_days) ? `${X.pb_days} phiên · ${spct(X.depth)}` : '—', 'trước khi lên đỉnh mới', '--warn'), arrow(),
+        step('Kết cục', isNum(X.rec_rate) ? `${X.rec_rate}% lên đỉnh mới` : '—', isNum(X.rec_rate) ? `${100 - X.rec_rate}% gãy (giảm TB ${spct(X.fail_depth)})` : '', X.rec_rate >= 70 ? '--good' : '--bad'));
+      $('#cy-flow').replaceChildren(flow('90 phiên gần đây', R), flow('Trước đó', B),
+        el('p', { class: 'note', text: `Hiện có ${n0(N['Đang tăng'])} mã top 100 đang trong nhịp tăng sau breakout và ${n0(N['Đang điều chỉnh'])} mã đang điều chỉnh.` }));
+      const Q = Y.qqq || {}, ss = Q.swing_stats || { up: {}, down: {} };
+      $('#cy-swnote').textContent = `Một sóng kết thúc khi QQQ đi ngược từ ${n0(Q.thr)}% so với đỉnh hoặc đáy gần nhất. Sóng cuối cùng đang diễn ra.`;
+      const T = $('#cy-swtiles'); T.replaceChildren();
+      tile(T, 'Sóng tăng (trung vị)', isNum(ss.up.days) ? `${ss.up.days} phiên` : '—', `${spct(ss.up.chg)} · ${n0(ss.up.n)} sóng`, 'up');
+      tile(T, 'Sóng giảm (trung vị)', isNum(ss.down.days) ? `${ss.down.days} phiên` : '—', `${spct(ss.down.chg)} · ${n0(ss.down.n)} sóng`, 'dn');
+      tile(T, 'Sóng tăng lớn nhất', isNum(ss.up.max) ? `+${n1(ss.up.max)}%` : '—', '');
+      tile(T, 'Sóng giảm lớn nhất', isNum(ss.down.max) ? `−${n1(ss.down.max)}%` : '—', '');
+      table($('#tb-swing'), [
+        { k: 'dir', label: 'Sóng', l: true, f: (r) => (r.dir === 'up' ? 'Tăng' : 'Giảm') + (r.open ? ' (đang diễn ra)' : ''), c: (r) => (r.dir === 'up' ? 'up' : 'dn') },
+        { k: 'from', label: 'Từ', f: (r) => fdate(r.from) },
+        { k: 'to', label: 'Đến', f: (r) => fdate(r.to) },
+        { k: 'days', label: 'Số phiên', f: (r) => n0(r.days) },
+        { k: 'chg', label: 'Thay đổi', f: (r) => spct(r.chg), c: (r) => cls(r.chg) },
+      ], (Q.swings || []).slice().reverse(), {});
+    },
+    backtest() {
+      const B = S.backtest, ST = B.strategies || {};
+      $('#bt-notes').replaceChildren(...(B.notes || []).map((t) => el('li', { text: t })));
+      $('#bt-range').textContent = B.from ? `Giai đoạn kiểm chứng: ${fdate(B.from)} – ${fdate(B.to)}. "60 phiên" tính các lệnh đóng từ ${fdate(B.recent_from)}. Xu hướng QQQ hiện tại: ${B.regime_now || '—'}.` : '';
+      const rows = LEGENDS.filter((L) => ST[L.id]).map((L) => Object.assign({ id: L.id, name: L.name }, ST[L.id]));
+      const rc = (x) => (isNum(x) ? (x > 0.1 ? 'up' : x < 0 ? 'dn' : '') : '');
+      const rr = (x) => (isNum(x) ? (x > 0 ? '+' : '') + n2(x) + 'R' : '—');
+      const reg = (r, g) => { const s = (r.by_reg || {})[g] || {}; return s.n ? `${rr(s.exp)} · ${s.n}` : '—'; };
+      table($('#tb-bt'), [
+        { k: 'name', label: 'Phương pháp', l: true, f: (r) => { const f = document.createDocumentFragment(); f.append(badge(r.id), ' ' + r.name); return f; } },
+        { k: 'n', label: 'Số lệnh', f: (r) => n0(r.n) },
+        { k: 'win', label: '% thắng', f: (r) => pct(r.win, 0) },
+        { k: 'avg_win', label: 'Lãi TB', f: (r) => spct(r.avg_win), c: () => 'up' },
+        { k: 'avg_loss', label: 'Lỗ TB', f: (r) => spct(r.avg_loss), c: () => 'dn' },
+        { k: 'pf', label: 'Hệ số LN', f: (r) => n2(r.pf), c: (r) => (r.pf >= 1.5 ? 'up' : r.pf < 1 ? 'dn' : ''), title: 'Tổng lãi ÷ tổng lỗ. Trên 1,5 là tốt.' },
+        { k: 'exp', label: 'Kỳ vọng', f: (r) => rr(r.exp), c: (r) => rc(r.exp), title: 'Lãi/lỗ trung bình mỗi lệnh, tính theo R (1R = số tiền rủi ro)' },
+        { k: 'total', label: 'Tổng R', f: (r) => (isNum(r.total) ? n1(r.total) : '—'), c: (r) => rc(r.total) },
+        { k: 'rexp', label: '60 phiên', f: (r) => (r.recent && r.recent.n ? `${rr(r.recent.exp)} · ${pct(r.recent.win, 0)} · ${r.recent.n}` : '—'), c: (r) => rc(r.recent && r.recent.exp), sv: (r) => (r.recent && r.recent.exp) ?? -9, title: 'Kỳ vọng · % thắng · số lệnh, các lệnh đóng trong 60 phiên gần nhất' },
+        { k: 'g1', label: 'QQQ Tốt', f: (r) => reg(r, 'Tốt'), c: (r) => rc(((r.by_reg || {})['Tốt'] || {}).exp), sv: (r) => ((r.by_reg || {})['Tốt'] || {}).exp ?? -9 },
+        { k: 'g2', label: 'Giằng co', f: (r) => reg(r, 'Giằng co'), c: (r) => rc(((r.by_reg || {})['Giằng co'] || {}).exp), sv: (r) => ((r.by_reg || {})['Giằng co'] || {}).exp ?? -9 },
+        { k: 'g3', label: 'QQQ Xấu', f: (r) => reg(r, 'Xấu'), c: (r) => rc(((r.by_reg || {})['Xấu'] || {}).exp), sv: (r) => ((r.by_reg || {})['Xấu'] || {}).exp ?? -9 },
+        { k: 'hold', label: 'Giữ TB', f: (r) => (isNum(r.hold) ? `${n1(r.hold)} phiên` : '—') },
+        { k: 'open', label: 'Đang mở', f: (r) => n0(r.open) },
+      ], rows, { sort: 'exp', empty: 'Chưa có dữ liệu kiểm chứng.' });
+      const chips = $('#bt-chips');
+      chips.replaceChildren(...LEGENDS.filter((L) => ST[L.id]).map((L) => { const b = el('button', { type: 'button', class: 'btchip', 'aria-pressed': String(btOn.has(L.id)) }, badge(L.id), ' ' + L.name);
+        b.addEventListener('click', () => { if (btOn.has(L.id)) btOn.delete(L.id); else btOn.add(L.id); b.setAttribute('aria-pressed', String(btOn.has(L.id))); drawHistChart('bt'); }); return b; }));
+      drawHistChart('bt');
+      table($('#tb-vsa'), [
+        { k: 'type', label: 'Tín hiệu VSA', l: true },
+        { k: 'n', label: 'Số lệnh', f: (r) => n0(r.n) },
+        { k: 'win', label: '% thắng', f: (r) => pct(r.win, 0) },
+        { k: 'pf', label: 'Hệ số LN', f: (r) => n2(r.pf) },
+        { k: 'exp', label: 'Kỳ vọng', f: (r) => rr(r.exp), c: (r) => rc(r.exp) },
+        { k: 'rexp', label: '60 phiên', f: (r) => (r.recent && r.recent.n ? `${rr(r.recent.exp)} · ${r.recent.n} lệnh` : '—'), c: (r) => rc(r.recent && r.recent.exp), sv: (r) => (r.recent && r.recent.exp) ?? -9 },
+        { k: 'hold', label: 'Giữ TB', f: (r) => (isNum(r.hold) ? `${n1(r.hold)} phiên` : '—') },
+      ], B.vsa_types || [], { sort: 'exp' });
+      const sel = $('#bt-sel');
+      sel.replaceChildren(...LEGENDS.filter((L) => ST[L.id]).map((L) => el('option', { value: L.id, text: L.name })));
+      const drawTr = () => {
+        const tr = (ST[sel.value] || {}).trades || [];
+        table($('#tb-bttr'), [
+          { k: 't', label: 'Mã', tk: true },
+          { k: 'in', label: 'Ngày mua', f: (r) => fdate(r.in) },
+          { k: 'entry', label: 'Giá mua', f: (r) => n2(r.entry) },
+          { k: 'stop', label: 'Stop', f: (r) => n2(r.stop) },
+          { k: 'out', label: 'Ngày bán', f: (r) => (r.open ? '—' : fdate(r.out)) },
+          { k: 'days', label: 'Số phiên', f: (r) => n0(r.days) },
+          { k: 'pct', label: 'Lãi/lỗ', f: (r) => spct(r.pct), c: (r) => cls(r.pct) },
+          { k: 'r', label: 'R', f: (r) => rr(r.r), c: (r) => cls(r.r) },
+          { k: 'why', label: 'Lý do bán', l: true, f: (r) => r.why },
+        ], tr, { sort: 'in', onRow: (r) => openChart(r.t), empty: 'Chưa có lệnh.' });
+      };
+      sel.addEventListener('input', drawTr);
+      drawTr();
+    },
     journal() { Journal.init(); },
     guide() {},
   };
@@ -583,102 +729,249 @@
     return c;
   }
 
-  // ------------------------------------------------------------ bộ lọc siêu cổ
-  const Screener = (() => {
-    const KEY = 'nk_screener_v1';
-    const has = (a) => Array.isArray(a) && a.length > 0;
-    const CRIT = [
-      { g: 'Sức mạnh giá' },
-      { id: 'top', label: 'Thuộc top', unit: 'mã mạnh nhất (xếp theo sức mạnh giá)', v: 100, step: 10, on: true, test: (s, v) => isNum(s.rs_pos) && s.rs_pos <= v },
-      { id: 'ind', label: 'Ngành nằm trong top', unit: 'ngành mạnh nhất', v: 5, step: 1, on: true, test: (s, v) => isNum(s.ind_rank) && s.ind_rank <= v },
-      { id: 'tt', label: 'Đạt Trend Template của Minervini', test: (s) => s.tt },
-      { id: 'rsnh', label: 'Đường RS lập đỉnh mới (thường báo trước giá)', test: (s) => s.rsnh },
-      { id: 'near', label: 'Cách đỉnh 1 năm không quá', unit: '%', v: 15, step: 1, test: (s, v) => isNum(s.dd) && s.dd >= -v },
-      { id: 'mom', label: 'Tăng trong 3 tháng ít nhất', unit: '%', v: 30, step: 5, test: (s, v) => isNum(s.r63) && s.r63 >= v },
-      { id: 'ema', label: 'Trên EMA 21 và EMA 21 đang dốc lên (Martin Luk)', test: (s) => s.e21up },
-      { id: 'st2', label: 'Đang ở giai đoạn 2: giá trên đường 30 tuần đang dốc lên (Weinstein)', on: false, test: (s) => s.stage === 2 },
-      { id: 'dnb', label: 'Giữ giá tốt hơn QQQ trong các phiên thị trường giảm (Minervini, O\'Neil)', test: (s) => isNum(s.dnb) && s.dnb > 0 },
-      { id: 'ipo', label: 'Mới niêm yết dưới 1 năm (siêu cổ hay xuất hiện sau IPO)', test: (s) => isNum(s.ipo) },
-      { id: 'adr', label: 'Biên độ ngày trung bình ít nhất', unit: '% (Qullamaggie thích ≥ 4%)', v: 4, step: 0.5, test: (s, v) => isNum(s.adr) && s.adr >= v },
-      { g: 'Dòng tiền' },
-      { id: 'liq', label: 'Giá trị giao dịch ít nhất', unit: 'triệu USD/ngày', v: 20, step: 5, test: (s, v) => isNum(s.dv) && s.dv >= v },
-      { id: 'udv', label: 'Khối lượng phiên tăng gấp phiên giảm ít nhất', unit: 'lần, 50 phiên (O\'Neil: tích lũy)', v: 1.2, step: 0.1, test: (s, v) => isNum(s.udv) && s.udv >= v },
-      { id: 'ep', label: 'Có cú gap tăng mạnh kèm khối lượng (EP) trong 3 tháng', test: (s) => s.ep63 },
-      { id: 'cap', label: 'Vốn hóa không quá', unit: 'tỷ USD (siêu cổ thường bắt đầu từ cỡ nhỏ và vừa)', v: 30, step: 5, test: (s, v) => isNum(s.mcap) && s.mcap <= v },
-      { g: 'Tăng trưởng' },
-      { id: 'rev', label: 'Doanh thu quý tăng so với cùng kỳ ít nhất', unit: '%', v: 20, step: 5, on: true, test: (s, v) => isNum(s.rev_yoy) && s.rev_yoy >= v },
-      { id: 'eps', label: 'EPS quý tăng so với cùng kỳ ít nhất', unit: '% (từ lỗ sang lãi tính là đạt)', v: 25, step: 5, on: true, test: (s, v) => isNum(s.eps_yoy) && s.eps_yoy >= v },
-      { id: 'revup', label: 'Doanh thu tăng liên tiếp ít nhất', unit: 'quý', v: 3, step: 1, test: (s, v) => isNum(s.rev_up) && s.rev_up >= v },
-      { id: 'accel', label: 'Doanh thu hoặc EPS đang tăng tốc', test: (s) => s.rev_accel || s.eps_accel },
-      { id: 'epsa', label: 'EPS năm tăng liên tiếp ít nhất', unit: 'năm', v: 2, step: 1, test: (s, v) => isNum(s.eps_a_up) && s.eps_a_up >= v },
-      { id: 'pos', label: 'Đang có lãi (EPS quý gần nhất dương)', test: (s) => s.eps_pos },
-      { g: 'Điểm mua' },
-      { id: 'setup', label: 'Có setup mua hôm nay', test: (s) => has(s.setups) },
-      { id: 'noearn', label: 'Không có báo cáo kết quả kinh doanh trong', unit: 'ngày tới (tránh rủi ro gap)', v: 7, step: 1, test: (s, v) => { const d = earnDays(s); return d === null || d > v; } },
-      { id: 'sig', label: 'Vừa xuất hiện mẫu hình mua hôm nay', test: (s) => has(s.sig) },
-    ];
-    const items = CRIT.filter((c) => c.id);
-    const defaults = () => Object.fromEntries(items.map((c) => [c.id, { on: !!c.on, v: c.v }]));
-    let cfg = Object.assign(defaults(), store.get(KEY, {}));
-    let last = [];
+  // ------------------------------------------------------------ bộ lọc theo huyền thoại: tiêu chí + điểm mua bán
+  const has = (a) => Array.isArray(a) && a.length > 0;
+  const anyOf = (arr, list) => (arr || []).some((x) => list.includes(x));
+  const num = (x) => isNum(x) && x > 0;
+  const mkt = () => S.latest || {};
+  const MARTIN_SETUPS = ['Lấy lại EMA 9', 'Lấy lại AVWAP', 'EMA hội tụ', 'Inside day', '2 inside day'];
+  const TIGHT = ['Nền chặt', 'VCP', 'Inside day', '2 inside day', 'EMA hội tụ'];
+  const t_rspos = (s, v) => isNum(s.rs_pos) && s.rs_pos <= v;
+  const t_adr = (s, v) => isNum(s.adr) && s.adr >= v;
+  const t_rs = (s, v) => isNum(s.rs) && s.rs >= v;
+  const t_dd = (s, v) => isNum(s.dd) && s.dd >= -v;
+  const t_dv = (s, v) => isNum(s.dv) && s.dv >= v;
+  const t_eps = (s, v) => isNum(s.eps_yoy) && s.eps_yoy >= v;
+  const t_rev = (s, v) => isNum(s.rev_yoy) && s.rev_yoy >= v;
+  const t_noearn = (s, v) => { const d = earnDays(s); return d === null || d > v; };
+  const t_indtop = (s, v) => isNum(s.ind_rank) && s.ind_rank <= v;
 
+  const LEGENDS = [
+    { id: 'ml', short: 'ML', name: 'Martin Luk', color: '--c1', style: 'Lướt sóng mã dẫn đầu quanh EMA 9/21 với rủi ro rất nhỏ (vô địch USIC 2025).',
+      conds: [
+        { id: 'top', label: 'Thuộc top', unit: 'mã mạnh nhất', v: 100, step: 10, test: t_rspos },
+        { id: 'adr', label: 'Biên độ ngày trung bình ít nhất', unit: '%', v: 4, step: 0.5, test: t_adr },
+        { id: 'ema', label: 'Giá trên EMA 21 và EMA 21 đang dốc lên', test: (s) => s.e21up },
+        { id: 'near9', label: 'Cách EMA 9 không quá', unit: '% (không mua đuổi)', v: 5, step: 1, test: (s, v) => isNum(s.d9) && Math.abs(s.d9) <= v },
+        { id: 'setup', label: 'Có setup kiểu Martin: lấy lại EMA 9 hoặc AVWAP, EMA hội tụ, inside day', test: (s) => anyOf(s.setups, MARTIN_SETUPS) },
+        { id: 'mkt', label: 'QQQ không ở xu hướng Xấu', market: true, test: () => mkt().qqq_regime !== 'Xấu' },
+      ],
+      plan: (s) => ({ buy: s.h * 1.001, stop: s.l * 0.999, how: 'Mua khi giá vượt đỉnh phiên gần nhất. Stop ngay dưới đáy phiên đó.',
+        sell: `Chốt 15% vị thế khi lãi bằng 3 lần rủi ro. Bán hết khi đóng cửa dưới EMA 9 (hiện ${n2(s.e9v)}).` }) },
+    { id: 'qm', short: 'QM', name: 'Qullamaggie', color: '--c2', style: 'Mua breakout từ nền chặt sau một nhịp tăng mạnh, hoặc mua EP (gap kèm tin tốt).',
+      conds: [
+        { id: 'mom', label: 'Tăng trong 1 hoặc 3 tháng ít nhất', unit: '%', v: 30, step: 5, test: (s, v) => s.r21 >= v || s.r63 >= v },
+        { id: 'adr', label: 'Biên độ ngày trung bình ít nhất', unit: '%', v: 4, step: 0.5, test: t_adr },
+        { id: 'liq', label: 'Giá trị giao dịch ít nhất', unit: 'triệu USD/ngày', v: 20, step: 5, test: t_dv },
+        { id: 'trend', label: 'Giá trên EMA 21', test: (s) => s.d21 > 0 },
+        { id: 'base', label: 'Đang nén chặt (nền chặt, inside day, EMA hội tụ) hoặc vừa có EP', test: (s) => anyOf(s.setups, ['Nền chặt', 'Inside day', '2 inside day', 'EMA hội tụ', 'EP']) || anyOf(s.sig, ['Gap tăng mạnh (EP)']) },
+      ],
+      plan: (s) => { const buy = s.h * 1.001; const stop = Math.max(s.l * 0.999, buy * (1 - (s.adr || 5) / 100));
+        return { buy, stop, how: 'Mua khi giá vượt đỉnh phiên (opening range high). Stop ở đáy phiên, không rộng hơn 1 lần biên độ ngày.',
+          sell: `Bán 1/3 đến 1/2 sau 3–5 phiên. Phần còn lại giữ tới khi đóng cửa dưới EMA 10 (≈ ${n2(s.e9v)}), vị thế lớn thì theo EMA 20 (${n2(s.e21v)}).` }; } },
+    { id: 'mm', short: 'MM', name: 'Mark Minervini', color: '--c3', style: 'SEPA: xu hướng chuẩn (Trend Template), nền co hẹp VCP, lợi nhuận tăng tốc.',
+      conds: [
+        { id: 'tt', label: 'Đạt đủ 8 điều kiện Trend Template', test: (s) => s.tt },
+        { id: 'rs', label: 'Điểm RS ít nhất', unit: '', v: 80, step: 5, test: t_rs },
+        { id: 'near', label: 'Cách đỉnh 1 năm không quá', unit: '%', v: 25, step: 5, test: t_dd },
+        { id: 'vcp', label: 'Đang trong nền co hẹp (VCP, nền chặt, inside day)', test: (s) => anyOf(s.setups, TIGHT) },
+        { id: 'eps', label: 'EPS quý tăng so với cùng kỳ ít nhất', unit: '%', v: 25, step: 5, test: t_eps },
+        { id: 'accel', label: 'Doanh thu hoặc EPS đang tăng tốc', on: false, test: (s) => s.rev_accel || s.eps_accel },
+        { id: 'noearn', label: 'Không có báo cáo kết quả trong', unit: 'ngày tới', v: 7, step: 1, test: t_noearn },
+      ],
+      plan: (s) => { const buy = s.piv * 1.001; const stop = Math.max(buy * 0.92, s.lo10 * 0.999);
+        return { buy, stop, how: 'Mua khi giá vượt pivot (đỉnh 20 phiên) với khối lượng lớn. Stop dưới đáy nền 10 phiên, tối đa 8%.',
+          sell: 'Bán dần vào sức mạnh khi lãi 20–25%. Khi lãi gấp 2–3 lần rủi ro, dời stop về hòa vốn.' }; } },
+    { id: 'wo', short: 'WO', name: "William O'Neil", color: '--c4', style: 'CAN SLIM: lợi nhuận tăng mạnh, sản phẩm mới, cung cầu, dẫn đầu ngành, thị trường thuận lợi.',
+      conds: [
+        { id: 'c', label: 'C · EPS quý tăng so với cùng kỳ ít nhất', unit: '%', v: 25, step: 5, test: t_eps },
+        { id: 'a', label: 'A · EPS năm tăng liên tiếp ít nhất', unit: 'năm', v: 2, step: 1, test: (s, v) => isNum(s.eps_a_up) && s.eps_a_up >= v },
+        { id: 'sales', label: 'Doanh thu quý tăng so với cùng kỳ ít nhất', unit: '%', v: 20, step: 5, test: t_rev },
+        { id: 'n', label: 'N · Cách đỉnh mới không quá', unit: '%', v: 15, step: 5, test: t_dd },
+        { id: 's', label: 'S · Khối lượng phiên tăng gấp phiên giảm ít nhất', unit: 'lần (50 phiên)', v: 1.1, step: 0.1, test: (s, v) => isNum(s.udv) && s.udv >= v },
+        { id: 'l', label: 'L · Điểm RS ít nhất', unit: '', v: 80, step: 5, test: t_rs },
+        { id: 'grp', label: 'Ngành nằm trong top', unit: '% ngành mạnh nhất', v: 20, step: 5, test: (s, v) => isNum(s.ind_rank) && s.ind_rank <= Math.max(1, Math.round((mkt().n_ind || 1) * v / 100)) },
+        { id: 'm', label: 'M · Thị trường không tạo đáy mới, QQQ dưới 6 ngày phân phối', market: true, test: () => !(mkt().ftd_status || '').includes('đáy mới') && (mkt().dd_qqq || 0) <= 5 },
+      ],
+      plan: (s) => { const buy = s.piv * 1.001; const stop = buy * 0.93;
+        return { buy, stop, how: `Mua tại pivot (đỉnh nền), không mua cao hơn pivot 5% (${n2(buy * 1.05)}). Khối lượng phiên vượt nên gấp 1,5 lần trung bình.`,
+          sell: 'Cắt lỗ cứng 7–8%. Chốt phần lớn khi lãi 20–25%; nếu tăng 20% trong 3 tuần đầu thì giữ ít nhất 8 tuần.' }; } },
+    { id: 'sw', short: 'SW', name: 'Stan Weinstein', color: '--c5', style: 'Chỉ mua cổ phiếu ở giai đoạn 2: giá trên đường 30 tuần đang dốc lên.',
+      conds: [
+        { id: 'st', label: 'Đang ở giai đoạn 2', test: (s) => s.stage === 2 },
+        { id: 'rs', label: 'Điểm RS ít nhất (mạnh hơn thị trường)', unit: '', v: 70, step: 5, test: t_rs },
+        { id: 'grp', label: 'Ngành nằm ở nửa trên bảng xếp hạng', test: (s) => isNum(s.ind_rank) && s.ind_rank <= (mkt().n_ind || 0) / 2 },
+        { id: 'vol', label: 'Khối lượng phiên tăng nhiều hơn phiên giảm', test: (s) => isNum(s.udv) && s.udv >= 1 },
+        { id: 'near', label: 'Cách đỉnh 1 năm không quá', unit: '%', v: 15, step: 5, on: false, test: t_dd },
+      ],
+      plan: (s) => { const buy = s.piv * 1.001; const stop = num(s.s150v) && s.s150v < buy ? s.s150v * 0.99 : s.lo10 * 0.999;
+        return { buy, stop, how: 'Mua khi vượt kháng cự (đỉnh 20 phiên) với khối lượng gấp đôi, hoặc khi giá điều chỉnh về gần đường 30 tuần.',
+          sell: `Bán khi đóng cửa tuần dưới đường 30 tuần (hiện ${n2(s.s150v)}), dấu hiệu sang giai đoạn 3 hoặc 4.` }; } },
+    { id: 'pb', short: 'PB', name: 'Pradeep Bonde', color: '--accent', style: 'Stockbee: mua cú bứt phá 4% (momentum burst) hoặc EP, lướt 3–5 ngày.',
+      conds: [
+        { id: 'burst', label: 'Hôm nay bứt phá từ 4% kèm khối lượng, hoặc gap EP', test: (s) => anyOf(s.sig, ['Bứt phá 4%', 'Gap tăng mạnh (EP)']) },
+        { id: 'fresh', label: 'Chưa tăng nóng: tăng trong tháng (trước hôm nay) không quá', unit: '%', v: 25, step: 5, test: (s, v) => isNum(s.r21) && s.r21 - (s.chg || 0) <= v },
+        { id: 'vol', label: 'Khối lượng hôm nay gấp trung bình 50 phiên ít nhất', unit: 'lần', v: 1.5, step: 0.5, test: (s, v) => isNum(s.vr) && s.vr >= v },
+        { id: 'liq', label: 'Giá trị giao dịch ít nhất', unit: 'triệu USD/ngày', v: 5, step: 5, test: t_dv },
+      ],
+      plan: (s) => ({ buy: s.close, stop: s.l * 0.999, how: 'Mua ngay trong ngày bứt phá hoặc đầu phiên sau. Stop dưới đáy ngày bứt phá.',
+        sell: 'Chốt sau 3–5 phiên hoặc khi lãi 8–20%. Cú bứt phá thường chỉ kéo dài vài ngày.' }) },
+    { id: 'ok', short: 'OK', name: 'Oliver Kell', color: '--warn', style: 'Chu kỳ giá: mua khi giá lấy lại EMA (crossback, wedge pop), bán khi quá đà.',
+      conds: [
+        { id: 'top', label: 'Thuộc top', unit: 'mã mạnh nhất', v: 200, step: 50, test: t_rspos },
+        { id: 'stack', label: 'Giá trên EMA 21 đang dốc lên', test: (s) => s.e21up },
+        { id: 'cross', label: 'Có tín hiệu crossback: EMA crossback, lấy lại EMA 9, về EMA 21 bật lên', test: (s) => anyOf(s.setups, ['EMA crossback', 'Lấy lại EMA 9']) || anyOf(s.sig, ['Về EMA 21 bật lên', 'Lấy lại EMA 9']) },
+        { id: 'notext', label: 'Chưa quá đà: cách EMA 9 không quá', unit: '%', v: 8, step: 1, test: (s, v) => isNum(s.d9) && s.d9 <= v },
+      ],
+      plan: (s) => { const buy = s.h * 1.001; const stop = Math.min(s.l, num(s.e21v) ? s.e21v : s.l) * 0.995;
+        return { buy, stop, how: 'Mua khi giá lấy lại EMA 10/20 và vượt đỉnh phiên. Stop dưới EMA 21 hoặc đáy phiên, chọn mức thấp hơn.',
+          sell: `Bán dần khi quá đà: cách EMA 9 trên 15–20% (khoảng ${n2(s.e9v * 1.15)}–${n2(s.e9v * 1.2)}). Thoát hết khi đóng cửa dưới EMA 21.` }; } },
+    { id: 'vs', short: 'VSA', name: 'VSA (Wyckoff, Tom Williams)', color: '--c6', style: 'Đọc dấu vết dòng tiền lớn qua giá và khối lượng: không có cung, kiểm định cung, rũ bỏ, khối lượng chặn.',
+      conds: [
+        { id: 'sig', label: 'Hôm nay có tín hiệu mua VSA', test: (s) => has(s.vsa) },
+        { id: 'ctx', label: 'Bối cảnh xu hướng tăng: giá trên EMA 50', test: (s) => isNum(s.d50) && s.d50 > 0 },
+        { id: 'rs', label: 'Điểm RS ít nhất', unit: '', v: 50, step: 5, test: t_rs },
+        { id: 'liq', label: 'Giá trị giao dịch ít nhất', unit: 'triệu USD/ngày', v: 5, step: 5, test: t_dv },
+      ],
+      plan: (s) => ({ buy: s.h * 1.001, stop: s.l * 0.995, how: `Tín hiệu: ${(s.vsa || []).join(', ') || 'chưa có'}. Mua khi phiên sau vượt đỉnh thanh tín hiệu (xác nhận cầu vào). Stop dưới đáy thanh tín hiệu.`,
+        sell: 'Bán 1/2 khi lãi 2R rồi dời stop về hòa vốn. Bán phần còn lại khi đóng cửa dưới EMA 21, hoặc khi xuất hiện thanh tăng biên độ rộng, khối lượng cực lớn nhưng đóng cửa thấp (cao trào mua, upthrust).' }) },
+    { id: 'me', short: 'TÔI', name: 'Bộ lọc của bạn', color: '--ink', style: 'Điều kiện riêng của bạn: mã mạnh nhất, ngành mạnh nhất, doanh thu và lợi nhuận tăng đều.',
+      conds: [
+        { id: 'top', label: 'Thuộc top', unit: 'mã mạnh nhất', v: 100, step: 10, test: t_rspos },
+        { id: 'ind', label: 'Ngành nằm trong top', unit: 'ngành', v: 5, step: 1, test: t_indtop },
+        { id: 'rev', label: 'Doanh thu quý tăng so với cùng kỳ ít nhất', unit: '%', v: 20, step: 5, test: t_rev },
+        { id: 'eps', label: 'EPS quý tăng so với cùng kỳ ít nhất', unit: '% (lỗ sang lãi tính là đạt)', v: 25, step: 5, test: t_eps },
+        { id: 'revup', label: 'Doanh thu tăng liên tiếp ít nhất', unit: 'quý', v: 3, step: 1, on: false, test: (s, v) => isNum(s.rev_up) && s.rev_up >= v },
+        { id: 'st2', label: 'Đang ở giai đoạn 2', on: false, test: (s) => s.stage === 2 },
+        { id: 'rsnh', label: 'Đường RS lập đỉnh mới', on: false, test: (s) => s.rsnh },
+        { id: 'dnb', label: 'Giữ giá tốt hơn QQQ khi thị trường giảm', on: false, test: (s) => isNum(s.dnb) && s.dnb > 0 },
+        { id: 'cap', label: 'Vốn hóa không quá', unit: 'tỷ USD', v: 30, step: 5, on: false, test: (s, v) => isNum(s.mcap) && s.mcap <= v },
+        { id: 'ipo', label: 'Mới niêm yết dưới 1 năm', on: false, test: (s) => isNum(s.ipo) },
+        { id: 'noearn', label: 'Không có báo cáo kết quả trong', unit: 'ngày tới', v: 7, step: 1, on: false, test: t_noearn },
+        { id: 'setup', label: 'Có setup mua hôm nay', on: false, test: (s) => has(s.setups) },
+      ],
+      plan: (s) => (has(s.setups) ? { buy: s.h * 1.001, stop: s.l * 0.999, how: 'Theo setup hôm nay: mua khi vượt đỉnh phiên, stop dưới đáy phiên.', sell: 'Áp dụng quy tắc bán của huyền thoại có ký hiệu cùng mã này.' }
+        : { buy: s.piv * 1.001, stop: Math.max(s.piv * 0.94, s.lo10 * 0.999), how: 'Chưa có setup: chờ giá vượt đỉnh 20 phiên. Stop dưới đáy 10 phiên, tối đa 6%.', sell: 'Áp dụng quy tắc bán của huyền thoại có ký hiệu cùng mã này.' }) },
+  ];
+  const LKEY = 'nk_legends_v1';
+  const lgDefaults = () => ({ sel: Object.fromEntries(LEGENDS.map((L) => [L.id, true])), mode: 'any', near: false,
+    c: Object.fromEntries(LEGENDS.map((L) => [L.id, Object.fromEntries(L.conds.map((c) => [c.id, { on: c.on !== false, v: c.v }]))])) });
+  let LG = (() => { const d = lgDefaults(), s = store.get(LKEY, null); if (!s) return d;
+    for (const L of LEGENDS) { d.sel[L.id] = s.sel?.[L.id] ?? d.sel[L.id]; for (const c of L.conds) d.c[L.id][c.id] = Object.assign(d.c[L.id][c.id], s.c?.[L.id]?.[c.id] || {}); }
+    d.mode = s.mode || 'any'; d.near = !!s.near; return d; })();
+  const acct = () => Object.assign({}, S.latest.config, store.get('nk_cfg', {}));
+
+  function evalLegend(s, L) {
+    let ok = 0, n = 0; const miss = [];
+    for (const c of L.conds) { const st = LG.c[L.id][c.id]; if (!st.on) continue; n++; if (c.test(s, st.v)) ok++; else miss.push(c.label + (c.v !== undefined ? ` ${st.v}${c.unit && c.unit.startsWith('%') ? '%' : ''}` : '')); }
+    return { ok, n, miss, pass: n > 0 && ok === n };
+  }
+  let MATCH = null;
+  function computeMatch() { MATCH = new Map(); for (const s of S.stocks) MATCH.set(s.t, LEGENDS.filter((L) => evalLegend(s, L).pass).map((L) => L.id)); }
+  const matchesOf = (t) => { if (!MATCH) computeMatch(); return MATCH.get(t) || []; };
+  const LBY = Object.fromEntries(LEGENDS.map((L) => [L.id, L]));
+  const badge = (id) => { const L = LBY[id]; return el('span', { class: 'lg', style: `--lg:var(${L.color})`, title: `Đạt tiêu chí ${L.name}`, text: L.short }); };
+  const badges = (t) => { const f = document.createDocumentFragment(); matchesOf(t).forEach((id) => f.append(badge(id))); return f; };
+
+  function planOf(s, L) {
+    let p; try { p = L.plan(s); } catch (e) { p = null; }
+    if (!p) return null;
+    const ok = num(p.buy) && num(p.stop) && p.stop < p.buy;
+    const a = acct();
+    const per = ok ? p.buy - p.stop : null;
+    let sh = ok ? Math.floor(a.capital * a.risk_pct / 100 / per) : 0;
+    if (ok) sh = Math.min(sh, Math.floor(a.capital * a.max_pos_pct / 100 / p.buy));
+    return Object.assign(p, { ok, sp: ok ? per / p.buy * 100 : null, shares: sh, value: sh * (p.buy || 0), withinStop: ok && per / p.buy * 100 <= a.max_stop_pct });
+  }
+  function planTable(s) {
+    const rows = LEGENDS.map((L) => ({ L, e: evalLegend(s, L), p: planOf(s, L) })).sort((a, b) => (b.e.pass - a.e.pass) || (b.e.ok / (b.e.n || 1) - a.e.ok / (a.e.n || 1)));
+    const tb = el('tbody');
+    for (const { L, e, p } of rows) {
+      tb.append(el('tr', { class: e.pass ? '' : 'dim' },
+        el('td', { class: 'l' }, badge(L.id), ' ', el('b', { text: L.name })),
+        el('td', { class: 'l ' + (e.pass ? 'up' : ''), text: e.pass ? `Đạt đủ ${e.n} điều kiện` : `Đạt ${e.ok}/${e.n}`, title: e.miss.length ? 'Thiếu: ' + e.miss.join('; ') : '' }),
+        el('td', { text: p && p.ok ? n2(p.buy) : '—' }),
+        el('td', { text: p && p.ok ? `${n2(p.stop)} (${pct(p.sp)})` : '—', class: p && p.ok && !p.withinStop ? 'dn' : '' }),
+        el('td', { text: p && p.ok ? n0(p.shares) : '—' }),
+        el('td', { class: 'l plan-txt' }, el('div', { text: p ? p.how : '' }), el('div', { class: 'muted', text: p ? 'Bán: ' + p.sell : '' })),
+        el('td', {}, p && p.ok ? el('button', { class: 'btn sm ghost', type: 'button', text: '+ Nhật ký', onclick: () => prefillJournal({ t: s.t, setups: [L.name], entry: +p.buy.toFixed(2), stop: +p.stop.toFixed(2), shares: p.shares }) }) : null)));
+    }
+    return el('div', { class: 'tbl' }, el('table', { class: 'plan' },
+      el('thead', {}, el('tr', {}, ...['Huyền thoại', 'Tiêu chí', 'Mua trên', 'Stop', 'Số cổ', 'Cách vào lệnh và bán', ''].map((h, i) => el('th', { class: i === 0 || i === 1 || i === 5 ? 'l' : null, text: h })))), tb));
+  }
+
+  const Screener = (() => {
+    let last = [];
+    const save = () => { store.set(LKEY, LG); computeMatch(); run(); counts(); };
+    function counts() { for (const L of LEGENDS) { const n = S.stocks.filter((s) => matchesOf(s.t).includes(L.id)).length; const e = $(`#lgc-${L.id}`); if (e) e.textContent = `${n} mã`; } }
     function form() {
-      const box = $('#crit'); box.replaceChildren();
-      let fs = null;
-      for (const c of CRIT) {
-        if (c.g) { fs = el('fieldset', {}, el('legend', { text: c.g })); box.append(fs); continue; }
-        const st = cfg[c.id] || { on: false, v: c.v };
-        const cb = el('input', { type: 'checkbox', id: 'cr-' + c.id });
-        cb.checked = !!st.on;
-        cb.addEventListener('input', () => { cfg[c.id] = Object.assign({}, cfg[c.id], { on: cb.checked }); save(); });
-        const row = el('div', { class: 'crit-row' }, cb, el('label', { for: 'cr-' + c.id, text: c.label }));
-        if (c.v !== undefined) {
-          const nb = el('input', { type: 'number', id: 'crv-' + c.id, step: String(c.step || 1), min: '0', 'aria-label': c.label });
-          nb.value = st.v ?? c.v;
-          nb.addEventListener('input', () => { const v = Number(nb.value); if (isFinite(v)) { cfg[c.id] = Object.assign({}, cfg[c.id], { v }); save(); } });
-          row.append(nb, el('span', { class: 'muted small', text: c.unit || '' }));
+      const box = $('#strats'); box.replaceChildren();
+      for (const L of LEGENDS) {
+        const cb = el('input', { type: 'checkbox', id: 'lg-' + L.id, 'aria-label': 'Chọn ' + L.name }); cb.checked = !!LG.sel[L.id];
+        cb.addEventListener('input', () => { LG.sel[L.id] = cb.checked; card.classList.toggle('off', !cb.checked); save(); });
+        const list = el('div', { class: 'conds' });
+        for (const c of L.conds) {
+          const st = LG.c[L.id][c.id];
+          const cc = el('input', { type: 'checkbox', id: `lc-${L.id}-${c.id}` }); cc.checked = !!st.on;
+          cc.addEventListener('input', () => { st.on = cc.checked; save(); });
+          const row = el('div', { class: 'crit-row' }, cc, el('label', { for: `lc-${L.id}-${c.id}`, text: c.label }));
+          if (c.v !== undefined) {
+            const nb = el('input', { type: 'number', id: `lv-${L.id}-${c.id}`, step: String(c.step || 1), min: '0', 'aria-label': c.label }); nb.value = st.v;
+            nb.addEventListener('input', () => { const v = Number(nb.value); if (isFinite(v)) { st.v = v; save(); } });
+            row.append(nb, el('span', { class: 'muted small', text: c.unit || '' }));
+          }
+          if (c.market) { const okm = c.test(); row.append(el('span', { class: 'mk ' + (okm ? 'up' : 'dn'), text: okm ? 'Thị trường: đạt' : 'Thị trường: chưa đạt' })); }
+          list.append(row);
         }
-        fs.append(row);
+        const card = el('article', { class: 'strat' + (LG.sel[L.id] ? '' : ' off'), style: `--lg:var(${L.color})` },
+          el('div', { class: 'strat-h' }, cb, el('label', { for: 'lg-' + L.id }, badge(L.id), el('b', { text: L.name })), el('span', { class: 'strat-n', id: `lgc-${L.id}` })),
+          el('p', { class: 'strat-d', text: L.style }),
+          el('details', {}, el('summary', { text: `Điều kiện (${L.conds.length})` }), list));
+        box.append(card);
       }
     }
-    function save() { store.set(KEY, cfg); run(); }
     function run() {
-      const act = items.filter((c) => cfg[c.id] && cfg[c.id].on);
-      const near = $('#crit-near').checked;
+      const sel = LEGENDS.filter((L) => LG.sel[L.id]);
       const rows = [];
       for (const s of S.stocks) {
-        let ok = 0; const miss = [];
-        for (const c of act) { if (c.test(s, cfg[c.id].v)) ok++; else miss.push(c.label); }
-        const m = act.length - ok;
-        if (m === 0 || (near && m === 1)) rows.push(Object.assign({}, s, { _ok: ok, _miss: miss.join('; ') }));
+        const ev = sel.map((L) => ({ L, e: evalLegend(s, L) }));
+        const pass = ev.filter((x) => x.e.pass);
+        const near = ev.filter((x) => !x.e.pass && x.e.n - x.e.ok === 1);
+        const okRow = LG.mode === 'all' ? pass.length === sel.length && sel.length > 0 : pass.length > 0;
+        const nearRow = LG.near && !okRow && (LG.mode === 'all' ? pass.length + near.length === sel.length && near.length === 1 : near.length > 0);
+        if (okRow || nearRow) rows.push(Object.assign({}, s, { _n: pass.length, _near: !okRow, _nearTxt: near.map((x) => `${x.L.short} thiếu: ${x.e.miss[0]}`).join(' · ') }));
       }
       last = rows;
-      const full = rows.filter((r) => r._ok === act.length).length;
-      $('#scr-count').textContent = `${full} mã đạt đủ ${act.length} điều kiện` + (near ? ` · ${rows.length - full} mã thiếu 1` : '');
-      const fn = S.latest.fund_n;
-      $('#scr-note').textContent = `Số liệu doanh thu/EPS có cho ${n0(fn)} mã (khoảng 400 mã mạnh nhất và các mã có setup), cập nhật hằng tuần. Mã không có số liệu sẽ không đạt điều kiện tăng trưởng.` + (S.stocks.some((s) => isNum(s.mcap)) ? '' : ' Vốn hóa chỉ có khi dùng nguồn Massive.');
+      const full = rows.filter((r) => !r._near).length;
+      $('#scr-count').textContent = `${full} mã đạt` + (LG.near ? ` · ${rows.length - full} mã thiếu 1 điều kiện` : '');
+      $('#scr-note').textContent = `Số liệu doanh thu/EPS có cho ${n0(S.latest.fund_n)} mã (khoảng 400 mã mạnh nhất và các mã có setup), cập nhật hằng tuần; mã không có số liệu sẽ không đạt điều kiện tăng trưởng.` + (S.stocks.some((s) => isNum(s.mcap)) ? '' : ' Vốn hóa chỉ có khi dùng nguồn Massive.');
       table($('#tb-scr'), [
         { k: 't', label: 'Mã', tk: true },
-        { k: '_ok', label: 'Đạt', f: (r) => `${r._ok}/${act.length}`, c: (r) => (r._ok === act.length ? 'up' : 'wa'), title: 'Số điều kiện đạt' },
+        { k: '_n', label: 'Đạt tiêu chí', l: true, f: (r) => { const f = badges(r.t); if (r._near) f.append(el('span', { class: 'tag miss', text: r._nearTxt })); return f; }, sv: (r) => r._n * 10 - (r._near ? 5 : 0) },
         { k: 'rs_pos', label: 'Hạng RS', f: (r) => n0(r.rs_pos) },
         { k: 'ind_rank', label: 'Hạng ngành', f: (r) => (isNum(r.ind_rank) ? `${r.ind_rank}/${S.latest.n_ind}` : '—') },
-        { k: 'rs', label: 'RS', f: (r) => n0(r.rs) },
         { k: 'close', label: 'Giá', f: (r) => n2(r.close) },
+        { k: 'chg', label: 'Phiên', f: (r) => spct(r.chg), c: (r) => cls(r.chg) },
         { k: 'r21', label: '1 tháng', f: (r) => spct(r.r21), c: (r) => cls(r.r21) },
         { k: 'r63', label: '3 tháng', f: (r) => spct(r.r63), c: (r) => cls(r.r63) },
         { k: 'dd', label: 'Cách đỉnh', f: (r) => spct(r.dd) },
         { k: 'rev_yoy', label: 'DT quý', f: (r) => spct(r.rev_yoy), c: (r) => cls(r.rev_yoy) },
         { k: 'eps_yoy', label: 'EPS quý', f: (r) => spct(r.eps_yoy), c: (r) => cls(r.eps_yoy) },
-        { k: 'mcap', label: 'Vốn hóa (tỷ $)', f: (r) => n1(r.mcap) },
         { k: 'ind', label: 'Ngành', l: true, f: (r) => r.ind || r.theme },
-        { k: '_miss', label: 'Ghi chú', l: true, f: (r) => { const f = tags(r); (r.sig || []).forEach((t) => f.append(el('span', { class: 'tag', text: t }))); if (r._miss) f.append(el('span', { class: 'tag miss', text: 'Thiếu: ' + r._miss })); return f; }, sv: (r) => (r.setups || []).length },
-      ], rows, { sort: '_ok', limit: 300, rowClass: (r) => (r._ok === act.length ? '' : 'dim'), onRow: (r) => openChart(r.t), empty: 'Không có mã nào đạt. Thử tắt bớt điều kiện hoặc nới ngưỡng.' });
+        { k: 'setups', label: 'Setup, tín hiệu', l: true, f: (r) => { const f = document.createDocumentFragment(); [...(r.setups || []), ...(r.sig || [])].forEach((t) => f.append(el('span', { class: 'tag', text: t }))); return f; }, sv: (r) => (r.setups || []).length + (r.sig || []).length },
+      ], rows, { sort: '_n', limit: 300, rowClass: (r) => (r._near ? 'dim' : ''), onRow: (r) => openChart(r.t), empty: 'Không có mã nào đạt. Thử chọn thêm huyền thoại, tắt bớt điều kiện hoặc nới ngưỡng.' });
     }
     function init() {
-      form();
-      $('#crit-near').addEventListener('input', run);
-      $('#crit-reset').addEventListener('click', () => { cfg = defaults(); store.set(KEY, cfg); form(); run(); });
-      $('#wl-scr').addEventListener('click', () => exportWatchlist(last.map((r) => r.t), 'sieu-co'));
+      form(); counts();
+      const seg = (m) => { LG.mode = m; $('#mode-any').setAttribute('aria-pressed', String(m === 'any')); $('#mode-all').setAttribute('aria-pressed', String(m === 'all')); save(); };
+      $('#mode-any').addEventListener('click', () => seg('any')); $('#mode-all').addEventListener('click', () => seg('all'));
+      $('#mode-any').setAttribute('aria-pressed', String(LG.mode === 'any')); $('#mode-all').setAttribute('aria-pressed', String(LG.mode === 'all'));
+      $('#crit-near').checked = LG.near; $('#crit-near').addEventListener('input', () => { LG.near = $('#crit-near').checked; save(); });
+      $('#lg-all').addEventListener('click', () => { LEGENDS.forEach((L) => { LG.sel[L.id] = true; }); form(); save(); });
+      $('#lg-none').addEventListener('click', () => { LEGENDS.forEach((L) => { LG.sel[L.id] = false; }); form(); save(); });
+      $('#crit-reset').addEventListener('click', () => { LG = lgDefaults(); store.set(LKEY, LG); form(); seg('any'); $('#crit-near').checked = false; });
+      $('#wl-scr').addEventListener('click', () => exportWatchlist(last.filter((r) => !r._near).map((r) => r.t), 'huyen-thoai'));
+      $('#lg-key').replaceChildren(...LEGENDS.map((L) => el('span', {}, badge(L.id), ' ' + L.name)));
       run();
     }
     return { init };
@@ -721,6 +1014,8 @@
       }
       c.timeScale().fitContent();
     }
+    $('#m-plans').replaceChildren(el('h4', { text: 'Điểm mua và bán theo từng huyền thoại' }), planTable(Object.assign({}, s, setup && !s.t ? setup : {})),
+      el('p', { class: 'note', text: `Số cổ tính theo vốn ${usd(acct().capital)}, rủi ro ${acct().risk_pct}% mỗi lệnh; stop màu đỏ là rộng hơn mức tối đa ${acct().max_stop_pct}%. Hàng mờ: mã chưa đạt đủ tiêu chí của huyền thoại đó.` }));
     $('#m-actions').replaceChildren(
       setup ? el('button', { class: 'btn', type: 'button', text: 'Ghi vào nhật ký', onclick: () => { closeModal(); prefillJournal(setup); } }) : null,
       el('a', { class: 'btn ghost', href: `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(t)}`, target: '_blank', rel: 'noopener', text: 'Mở trên TradingView' }));
@@ -846,7 +1141,9 @@
     const get = async (k) => (await fetch(`data/${k}.json`, { cache: 'no-cache' })).json();
     try {
       [S.latest, S.history, S.stocks, S.setups, S.extended, S.themes, S.basket] = await Promise.all(['latest', 'history', 'stocks', 'setups', 'extended', 'themes', 'basket'].map(get));
-      [S.industries, S.patterns] = await Promise.all(['industries', 'patterns'].map((k) => get(k).catch(() => null)));
+      [S.industries, S.patterns, S.backtest, S.cycle] = await Promise.all(['industries', 'patterns', 'backtest', 'cycle'].map((k) => get(k).catch(() => null)));
+      S.cycle = S.cycle || { notes: [] };
+      S.backtest = S.backtest || { strategies: {}, vsa_types: [], notes: [] };
       S.industries = S.industries || []; S.patterns = S.patterns || { stats: [], dates: [], series: {} };
     } catch (e) {
       $('#asof').textContent = 'Chưa có dữ liệu. Hãy chạy pipeline (xem README).';
@@ -855,6 +1152,8 @@
     const L = S.latest;
     $('#asof').textContent = `Phiên ${fdate(L.asof)} · ${L.universe} mã · ${L.source || ''} · cập nhật ${new Date(L.generated).toLocaleString('vi-VN')}`;
     $('#demo-banner').hidden = !L.demo;
+    $('#ver').textContent = `Phiên bản ${APP_VERSION}` + (L.version && L.version !== APP_VERSION ? ` · dữ liệu ${L.version}` : '');
+    if (!L.demo && L.version !== APP_VERSION) { const b = $('#stale-banner'); b.hidden = false; b.textContent = `Giao diện (${APP_VERSION}) và bộ tính toán (${L.version || 'bản cũ'}) khác phiên bản. Hãy tải lại đủ các thư mục docs và pipeline lên GitHub rồi bấm Run workflow.`; }
     const age = (Date.now() - new Date(L.asof + 'T21:00:00Z').getTime()) / 864e5;
     if (age > 4 && !L.demo) { const b = $('#stale-banner'); b.hidden = false; b.textContent = `Dữ liệu đã cũ ${Math.floor(age)} ngày. Có thể lần chạy tự động gần đây bị lỗi — xem tab Actions trên GitHub.`; }
     rangeButtons();
