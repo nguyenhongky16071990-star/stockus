@@ -14,5 +14,6 @@
   "massive_calls_per_min": 0,
   "massive_base": "https://api.massive.com",
   "fund_top": 400,
-  "fund_per_run": 400
+  "fund_per_run": 400,
+  "paper_bootstrap_days": 30
 }

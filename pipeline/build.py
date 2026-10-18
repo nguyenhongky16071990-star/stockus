@@ -27,7 +27,7 @@ DATA = ROOT / "docs" / "data"
 CONFIG = json.loads((ROOT / "pipeline" / "config.json").read_text(encoding="utf-8"))
 INDEXES = ["QQQ", "SPY", "IWM", "SMH", "IGV"]
 FIELDS = ["Open", "High", "Low", "Close", "Volume"]
-APP_VERSION = "2026.10.18-c"  # phải trùng với APP_VERSION trong docs/app.js
+APP_VERSION = "2026.10.19-a"  # phải trùng với APP_VERSION trong docs/app.js
 
 
 # ---------------------------------------------------------------- tải dữ liệu
@@ -194,7 +194,12 @@ def anchored_vwap(h, l, c, v, start: int) -> np.ndarray:
 
 
 # ---------------------------------------------------------------- tính toán
-def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame) -> dict:
+class _Light(Exception):
+    pass
+
+
+def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = False) -> dict:
+    """light=True: bỏ qua kiểm chứng và chu kỳ (dùng khi chạy lại nhiều ngày cho danh mục mô phỏng)."""
     cfg = CONFIG
     if "QQQ" not in raw:
         raise SystemExit("Không tải được QQQ — dừng.")
@@ -524,7 +529,7 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame) -> dict:
     import cycle
     try:
         top_idx = (1 + (hist["b_ret1"].fillna(0) / 100)).cumprod() * 100
-        cyc = cycle.analyze(qc, top_idx, C, e21, top, adr, cfg["history_days"])
+        cyc = {"notes": []} if light else cycle.analyze(qc, top_idx, C, e21, top, adr, cfg["history_days"])
     except Exception as e:
         print("Chu kỳ lỗi:", e, file=sys.stderr)
         cyc = {"notes": ["Chưa tính được chu kỳ thị trường."]}
@@ -534,6 +539,9 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame) -> dict:
     ind_rank_p = pd.DataFrame({t: (g_rank[ind_s[t]] if ind_s[t] in g_rank else pd.Series(np.nan, index=dates)) for t in stocks})
     n_ind0 = int(g_rank.iloc[-1].notna().sum()) or 1
     try:
+        if light:
+            vs_ = backtest.vsa_signals(O, H, L, C, V, e21, e50, s150, v50, liquid)
+            raise _Light({t: [n for n, sg in vs_.items() if bool(sg[t].iloc[-1])] for t in stocks})
         bt, vsa_today = backtest.run(dict(O=O, H=H, L=L, C=C, V=V, e9=e9, e21=e21, e50=e50, s150=s150, v50=v50, adr=adr, dv=dv,
                                           liquid=liquid, rs=rs, rs_pos=rs_pos, tt=tt, ret=ret, hi20=hi20, hiprev=hiprev, dd_hi=dd_hi,
                                           udv=udv, stage=stage, ind_rank=ind_rank_p, n_ind=n_ind0,
@@ -541,6 +549,8 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame) -> dict:
                                           dd_qqq=dd.get("QQQ", pd.Series(0, index=dates))), cfg)
         bt["notes"] = backtest.notes(bt, {"ml": "Martin Luk", "qm": "Qullamaggie", "mm": "Mark Minervini", "wo": "William O'Neil",
                                           "sw": "Stan Weinstein", "pb": "Pradeep Bonde", "ok": "Oliver Kell", "vs": "VSA"})
+    except _Light as lt:
+        bt, vsa_today = {"strategies": {}, "vsa_types": [], "notes": []}, lt.args[0]
     except Exception as e:  # kiểm chứng lỗi không làm hỏng cả lần chạy
         print("Kiểm chứng lỗi:", e, file=sys.stderr)
         bt, vsa_today = {"strategies": {}, "vsa_types": [], "notes": ["Chưa chạy được phần kiểm chứng."]}, {}
@@ -906,7 +916,7 @@ def _jd(o):
 
 def write(out: dict) -> None:
     DATA.mkdir(parents=True, exist_ok=True)
-    for k in ("latest", "history", "stocks", "setups", "extended", "themes", "basket", "charts", "industries", "patterns", "backtest", "cycle"):
+    for k in ("latest", "history", "stocks", "setups", "extended", "themes", "basket", "charts", "industries", "patterns", "backtest", "cycle", "paper"):
         (DATA / f"{k}.json").write_text(json.dumps(out[k], ensure_ascii=False, separators=(",", ":"), default=_jd), encoding="utf-8")
     # lưu lại ảnh chụp setup + tổng quan mỗi ngày để thống kê về sau
     snap = DATA / "archive"
@@ -940,6 +950,35 @@ def attach_fundamentals(out: dict, demo: bool = False, key: str | None = None) -
         x["stage"], x["ipo"], x["dd"], x["rsnh"] = st.get("stage"), st.get("ipo"), st.get("dd"), st.get("rsnh")
     out["latest"]["fund_n"] = sum(1 for s in out["stocks"] if s.get("q_end"))
     print(f"Số liệu cơ bản: {out['latest']['fund_n']} mã")
+    return F
+
+
+def run_paper(raw, uni, out, F, demo=False):
+    """Danh mục mô phỏng theo từng huyền thoại. Lần đầu chạy lại N phiên gần nhất để có kết quả ngay."""
+    import paper
+
+    st = None if demo else paper.load_state(CONFIG)
+    if st is None:
+        dates = raw["QQQ"].index
+        B = int(CONFIG.get("paper_bootstrap_days", 30))
+        i0 = max(260, len(dates) - 1 - B)
+        st = paper.new_state(CONFIG, dates[i0].strftime("%Y-%m-%d"))
+        print(f"Danh mục mô phỏng: chạy lại {len(dates) - 1 - i0} phiên gần nhất")
+        for i in range(i0, len(dates) - 1):
+            cut = dates[i]
+            raw_i = {t: df[df.index <= cut] for t, df in raw.items()}
+            try:
+                o_i = compute(raw_i, uni, light=True)
+            except SystemExit:
+                continue
+            for s in o_i["stocks"]:
+                if s["t"] in F:
+                    s.update(F[s["t"]])
+            paper.run(st, raw, o_i, CONFIG, boot=True)
+    paper.run(st, raw, out, CONFIG)
+    if not demo:
+        paper.save_state(st)
+    return paper.summary(st, raw)
 
 
 def main():
@@ -964,9 +1003,16 @@ def main():
     out = compute(raw, uni)
     out["latest"]["source"] = source
     out["latest"]["version"] = APP_VERSION
-    attach_fundamentals(out, demo=a.demo, key=key if source.startswith("Massive") else None)
+    F = attach_fundamentals(out, demo=a.demo, key=key if source.startswith("Massive") else None)
     if a.demo:
         out["latest"]["demo"] = True
+    try:
+        out["paper"] = run_paper(raw, uni, out, F or {}, demo=a.demo)
+    except Exception as e:  # danh mục mô phỏng lỗi không làm hỏng cả trang
+        import traceback
+        traceback.print_exc()
+        print("Danh mục mô phỏng lỗi:", e, file=sys.stderr)
+        out["paper"] = {"accounts": {}, "error": str(e)}
     write(out)
     L = out["latest"]
     print(f"{L['asof']}: điểm {L['score']} ({L['stance']}), cảnh báo {L['alert']}, dẫn đầu {L['leaders']}, setup đạt chuẩn {L['n_setups']}")
