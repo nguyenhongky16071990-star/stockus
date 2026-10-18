@@ -27,6 +27,7 @@ DATA = ROOT / "docs" / "data"
 CONFIG = json.loads((ROOT / "pipeline" / "config.json").read_text(encoding="utf-8"))
 INDEXES = ["QQQ", "SPY", "IWM", "SMH", "IGV"]
 FIELDS = ["Open", "High", "Low", "Close", "Volume"]
+APP_VERSION = "2026.10.18-c"  # phải trùng với APP_VERSION trong docs/app.js
 
 
 # ---------------------------------------------------------------- tải dữ liệu
@@ -519,6 +520,31 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame) -> dict:
     ep63 = gap_ep.rolling(63, min_periods=1).max().astype(bool)
     e21up = (C > e21) & (e21 > e21.shift(5))
 
+    # ---- chu kỳ thị trường: tăng / điều chỉnh / giằng co / giảm
+    import cycle
+    try:
+        top_idx = (1 + (hist["b_ret1"].fillna(0) / 100)).cumprod() * 100
+        cyc = cycle.analyze(qc, top_idx, C, e21, top, adr, cfg["history_days"])
+    except Exception as e:
+        print("Chu kỳ lỗi:", e, file=sys.stderr)
+        cyc = {"notes": ["Chưa tính được chu kỳ thị trường."]}
+
+    # ---- kiểm chứng ngược các phương pháp và tín hiệu VSA hôm nay
+    import backtest
+    ind_rank_p = pd.DataFrame({t: (g_rank[ind_s[t]] if ind_s[t] in g_rank else pd.Series(np.nan, index=dates)) for t in stocks})
+    n_ind0 = int(g_rank.iloc[-1].notna().sum()) or 1
+    try:
+        bt, vsa_today = backtest.run(dict(O=O, H=H, L=L, C=C, V=V, e9=e9, e21=e21, e50=e50, s150=s150, v50=v50, adr=adr, dv=dv,
+                                          liquid=liquid, rs=rs, rs_pos=rs_pos, tt=tt, ret=ret, hi20=hi20, hiprev=hiprev, dd_hi=dd_hi,
+                                          udv=udv, stage=stage, ind_rank=ind_rank_p, n_ind=n_ind0,
+                                          qqq_regime=idx_reg.get("QQQ", pd.Series("Giằng co", index=dates)),
+                                          dd_qqq=dd.get("QQQ", pd.Series(0, index=dates))), cfg)
+        bt["notes"] = backtest.notes(bt, {"ml": "Martin Luk", "qm": "Qullamaggie", "mm": "Mark Minervini", "wo": "William O'Neil",
+                                          "sw": "Stan Weinstein", "pb": "Pradeep Bonde", "ok": "Oliver Kell", "vs": "VSA"})
+    except Exception as e:  # kiểm chứng lỗi không làm hỏng cả lần chạy
+        print("Kiểm chứng lỗi:", e, file=sys.stderr)
+        bt, vsa_today = {"strategies": {}, "vsa_types": [], "notes": ["Chưa chạy được phần kiểm chứng."]}, {}
+
     # ---- ảnh chụp hôm nay
     t0 = -1
     last = dates[t0]
@@ -542,9 +568,12 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame) -> dict:
             "ind": ind_s.get(t), "ind_rank": r1(g_rank[ind_s[t]].iloc[t0], 0) if ind_s.get(t) in g_rank else None,
             "e21up": bool(e21up[t].iloc[t0]), "udv": r1(udv[t].iloc[t0], 2), "ep63": bool(ep63[t].iloc[t0]),
             "mcap": r1(float(shares[t]) * C[t].iloc[t0] / 1e9, 1) if shares.get(t) else None,
-            "sig": sig_today.get(t, []),
+            "sig": sig_today.get(t, []), "vsa": vsa_today.get(t, []),
             "stage": int(stage[t].iloc[t0]) or None, "dnb": r1(dnb[t].iloc[t0], 2),
             "ipo": r1(ipo_age[t].iloc[t0], 0),
+            "h": r1(H[t].iloc[t0], 2), "l": r1(L[t].iloc[t0], 2), "e9v": r1(e9[t].iloc[t0], 2), "e21v": r1(e21[t].iloc[t0], 2),
+            "s150v": r1(s150[t].iloc[t0], 2), "piv": r1(H[t].iloc[-20:].max(), 2), "lo10": r1(L[t].iloc[-10:].min(), 2),
+            "vr": r1(V[t].iloc[t0] / v50[t].iloc[t0], 2) if v50[t].iloc[t0] else None,
             "pk_days": since_peak.get(t), "pk_dd": r1(ddp[t], 1) if t in since_peak else None, "bo_hold": bo_hold.get(t),
         })
     sdict = {s["t"]: s for s in stk}
@@ -713,7 +742,7 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame) -> dict:
     latest["notes_patterns"] = pattern_notes(pat_stats)
     patterns = {"stats": pat_stats, "dates": [d.strftime("%Y-%m-%d") for d in dates[-keep_n:]], "series": pat_series}
     return {"latest": latest, "history": history, "stocks": stk, "setups": setups, "extended": extended,
-            "themes": themes, "basket": basket, "charts": charts, "industries": industries, "patterns": patterns}
+            "themes": themes, "basket": basket, "charts": charts, "industries": industries, "patterns": patterns, "backtest": bt, "cycle": cyc}
 
 
 def _p(x, d=1):
@@ -877,7 +906,7 @@ def _jd(o):
 
 def write(out: dict) -> None:
     DATA.mkdir(parents=True, exist_ok=True)
-    for k in ("latest", "history", "stocks", "setups", "extended", "themes", "basket", "charts", "industries", "patterns"):
+    for k in ("latest", "history", "stocks", "setups", "extended", "themes", "basket", "charts", "industries", "patterns", "backtest", "cycle"):
         (DATA / f"{k}.json").write_text(json.dumps(out[k], ensure_ascii=False, separators=(",", ":"), default=_jd), encoding="utf-8")
     # lưu lại ảnh chụp setup + tổng quan mỗi ngày để thống kê về sau
     snap = DATA / "archive"
@@ -934,6 +963,7 @@ def main():
         raw, source = download(INDEXES + list(uni.ticker), CONFIG["years"]), "Yahoo Finance (danh sách universe.csv)"
     out = compute(raw, uni)
     out["latest"]["source"] = source
+    out["latest"]["version"] = APP_VERSION
     attach_fundamentals(out, demo=a.demo, key=key if source.startswith("Massive") else None)
     if a.demo:
         out["latest"]["demo"] = True
