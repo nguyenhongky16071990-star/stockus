@@ -50,6 +50,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/data/archive
           git add pipeline/tickers_info.json 2>/dev/null || true
+          git add pipeline/state/paper.json 2>/dev/null || true
           git commit -m "Dữ liệu ngày $(date -u +%F)" || echo "Không có thay đổi"
           git push || echo "Không đẩy được kho dữ liệu (không ảnh hưởng trang web)"
 
