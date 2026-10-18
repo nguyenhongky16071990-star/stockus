@@ -12,11 +12,13 @@ Mỗi sáng thứ Ba đến thứ Bảy lúc 7:15 giờ Tokyo, máy chủ GitHub
 | Tab | Nội dung |
 |---|---|
 | **Tổng quan** | Bảng kiểm 8 điều kiện của các huyền thoại (chấm xanh/vàng/đỏ), ứng viên đáng chú ý hôm nay, điểm sức khỏe 0–100, trạng thái (Tấn công / Bình thường / Thận trọng / Phòng thủ), đèn cảnh báo kèm lý do, xu hướng QQQ, giai đoạn Weinstein, ngày phân phối, ngày xác nhận tăng |
+| **Chu kỳ** | Thị trường (QQQ và nhóm top 100) đang ở pha Tăng, Điều chỉnh, Giằng co hay Giảm; mỗi pha thường kéo dài bao lâu, thay đổi bao nhiêu %, sau đó chuyển sang pha nào; chu kỳ breakout → tăng → điều chỉnh của mã mạnh; các sóng của QQQ |
 | **Nhóm mạnh nhất** | 100 mã mạnh nhất đang tăng hay giảm: lợi nhuận 1, 3, 5 phiên và 1 tháng, số mã lập đỉnh mới, số mã cách đỉnh dưới 10% và 20%, % còn trên EMA 21, % breakout giữ giá, kèm nhận xét tự động |
 | **Độ rộng** | Chỉ báo Stockbee (mã tăng/giảm ≥ 4%), % cổ phiếu trên SMA 40/200 và EMA 21, đỉnh/đáy mới 52 tuần, mã tăng/giảm ≥ 25% trong quý, McClellan |
 | **Ngành & dẫn đầu** | Xếp hạng ngành kiểu IBD (hạng hiện tại, thay đổi 1 tuần và 1 tháng), chủ đề, mã mới vào và vừa rời nhóm dẫn đầu |
 | **Mẫu hình** | Thống kê 8 kiểu mua (breakout nền, vượt đỉnh, bứt phá 4%, EP, về EMA 21/50 bật lên…): % có lãi sau 1, 3, 5 phiên và 1 tháng, % chạm stop. Nhận xét thị trường đang thưởng cho breakout hay mua điều chỉnh |
 | **Setup hôm nay** | Mã có setup mua (Nền chặt, EP, VCP, EMA crossback, EMA hội tụ, Inside day, Lấy lại EMA 9/AVWAP) kèm giá mua, stop, số cổ phiếu theo vốn của bạn |
+| **Kiểm chứng** | Chạy lại quá khứ: vào và bán lệnh đúng quy tắc của từng huyền thoại và VSA, thống kê % thắng, hệ số lợi nhuận, kỳ vọng R, theo từng trạng thái thị trường, đường cộng dồn R |
 | **Lọc siêu cổ** | Bộ lọc của riêng bạn: top RS, top ngành, doanh thu/EPS tăng, Trend Template, đường RS, vốn hóa… bật/tắt từng điều kiện, xem cả mã gần đạt |
 | **Tìm mã** | Toàn bộ danh sách với điểm RS, Trend Template, đường RS, khoảng cách tới EMA |
 | **Nhật ký** | Ghi lệnh của bạn; tự tính R, tỷ lệ thắng, kỳ vọng, đường vốn. Xuất và nhập CSV |

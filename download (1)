@@ -1,0 +1,7 @@
+# File dữ liệu do pipeline tạo mỗi lần chạy (không cần lưu vào kho)
+docs/data/*.json
+!docs/data/archive/
+__pycache__/
+*.pyc
+.venv/
+pipeline/cache/
