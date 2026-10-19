@@ -30,6 +30,7 @@
       <button role="tab" data-tab="leaders">Ngành</button>
       <button role="tab" data-tab="patterns">Mẫu hình</button>
       <button role="tab" data-tab="backtest">Kiểm chứng</button>
+      <button role="tab" data-tab="paper">Mô phỏng</button>
       <button role="tab" data-tab="setups">Setup hôm nay</button>
       <button role="tab" data-tab="screener">Lọc huyền thoại</button>
       <button role="tab" data-tab="search">Tìm mã</button>
@@ -290,6 +291,33 @@
     </article>
   </section>
 
+  <!-- DANH MỤC MÔ PHỎNG -->
+  <section id="tab-paper" class="tab" role="tabpanel" hidden>
+    <div class="intro">
+      <h2>Mỗi huyền thoại một tài khoản ảo</h2>
+      <p>Mỗi phong cách được giao 60.000 USD ảo. Hằng ngày, mã nào đạt bộ lọc mặc định của huyền thoại thì tài khoản đó tự đặt lệnh mua theo đúng cách vào lệnh của người đó, rồi chốt từng phần, dời stop và chốt toàn bộ theo đúng quy tắc của họ. Mọi điểm mua bán được lưu lại, nên kết quả cộng dồn mỗi ngày.</p>
+    </div>
+    <article class="card notes"><h3>Tình hình</h3><ul id="pp-notes"></ul></article>
+    <article class="card">
+      <h3>So sánh các tài khoản</h3>
+      <p class="note">Rủi ro 0,5% vốn mỗi lệnh (300 USD), vị thế tối đa 35% vốn, tối đa 5 lệnh mới mỗi ngày cho mỗi tài khoản, chỉ mua khi còn đủ tiền mặt. Không tính phí và trượt giá.</p>
+      <div class="tbl"><table id="tb-pp"></table></div>
+    </article>
+    <article class="card">
+      <h3>Lợi nhuận tài khoản theo ngày</h3>
+      <p class="note">% thay đổi giá trị tài khoản (tiền mặt + cổ phiếu đang giữ theo giá đóng cửa) so với vốn ban đầu. Đường đứt: QQQ cùng giai đoạn. Bấm tên để ẩn/hiện.</p>
+      <div class="btchips" id="pp-chips"></div>
+      <div class="chart tall-ch" id="ch-pp"></div>
+    </article>
+    <article class="card">
+      <div class="card-top"><h3>Chi tiết lệnh</h3><select id="pp-sel" aria-label="Chọn tài khoản"></select></div>
+      <h4 class="sub-h">Đang giữ</h4><div class="tbl"><table id="tb-pp-open"></table></div>
+      <h4 class="sub-h">Lệnh chờ mua</h4><div class="tbl"><table id="tb-pp-pend"></table></div>
+      <h4 class="sub-h">Đã đóng</h4><div class="tbl"><table id="tb-pp-closed"></table></div>
+      <p class="note">Dấu ↺: lệnh thuộc giai đoạn chạy lại quá khứ khi khởi tạo (dùng số liệu cơ bản hiện tại). Từ ngày khởi tạo trở đi là theo dõi thật, không biết trước tương lai.</p>
+    </article>
+  </section>
+
   <!-- LỌC SIÊU CỔ -->
   <section id="tab-screener" class="tab" role="tabpanel" hidden>
     <div class="intro">
@@ -379,6 +407,7 @@
         <dt>Breakout giữ giá</dt><dd>Breakout = mã top 100 đóng cửa vượt giá đóng cửa cao nhất 20 phiên trước. Giữ giá k phiên = trong k phiên sau, chưa phiên nào đóng cửa dưới mức đó.</dd>
         <dt>Nhịp điều chỉnh</dt><dd>Tính từ đỉnh (khi mã đang ở top 100) tới phiên đóng cửa vượt đỉnh đó, chỉ tính nhịp giảm từ 3%. Gãy = giảm sâu hơn 25% hoặc 60 phiên chưa lên lại. Trạng thái hiện tại: sát đỉnh (cách đỉnh 60 phiên dưới 3%), điều chỉnh 1–5, 6–15, trên 15 phiên.</dd>
         <dt>Nhóm mạnh nhất (100 mã)</dt><dd>100 mã có sức mạnh giá cao nhất trong số mã đủ thanh khoản (từ 20 triệu USD/ngày). Chọn 100 thay vì 50 vì khi quét toàn thị trường, 100 mã tương đương khoảng 3% mạnh nhất (RS từ 97), đúng vùng siêu cổ của O'Neil; mỗi mã chỉ chiếm 1% nên thống kê ổn định hơn, một mã gãy không làm méo cả nhóm, mà vẫn đủ chọn lọc để thấy dòng tiền rời nhóm dẫn đầu sớm. Muốn khác thì sửa <code>basket_size</code> trong config.json. Kết quả mỗi chu kỳ (1, 3, 5 phiên, 1 tháng) đo trên nhóm chốt từ đầu chu kỳ. Breakout = mã vừa lập đỉnh 20 phiên lần đầu; "giữ giá" = sau 5 phiên vẫn cao hơn giá breakout.</dd>
+        <dt>Danh mục mô phỏng</dt><dd>Mỗi huyền thoại một tài khoản ảo 60.000 USD, rủi ro 0,5% mỗi lệnh. Mã đạt bộ lọc MẶC ĐỊNH của huyền thoại (không theo thiết lập riêng trong trình duyệt của bạn) được đặt lệnh mua theo đúng cách vào lệnh của người đó, tối đa 5 lệnh mới mỗi ngày, ưu tiên mã mạnh nhất, chỉ khi còn đủ tiền mặt. Bán từng phần và bán hết theo quy tắc trong bảng điểm mua bán. Trạng thái lưu trong pipeline/state/paper.json trên GitHub và cộng dồn mỗi ngày. Lần chạy đầu tiên chạy lại 30 phiên gần nhất để có kết quả ngay (đánh dấu ↺).</dd>
         <dt>Ký hiệu huyền thoại</dt><dd><b>ML</b> Martin Luk · <b>QM</b> Qullamaggie · <b>MM</b> Mark Minervini · <b>WO</b> William O'Neil (CAN SLIM) · <b>SW</b> Stan Weinstein · <b>PB</b> Pradeep Bonde (Stockbee) · <b>OK</b> Oliver Kell · <b>VSA</b> phân tích giá và khối lượng (Wyckoff, Tom Williams) · <b>TÔI</b> bộ lọc riêng của bạn. Mã có ký hiệu nào là đạt đủ các điều kiện đang bật của huyền thoại đó (chỉnh trong tab Lọc huyền thoại). Điểm mua, stop và cách bán của từng người nằm trong cửa sổ biểu đồ khi bấm vào mã. Các mức giá là gợi ý theo quy tắc của từng huyền thoại, tính từ giá đóng cửa gần nhất.</dd>
         <dt>Bảng kiểm các huyền thoại</dt><dd>8 điều kiện thị trường: ngày phân phối và nhịp tạo đáy (O'Neil), xu hướng QQQ và số mã có đà tăng mạnh (Martin Luk), đỉnh mới so với đáy mới (Minervini), giai đoạn của QQQ (Weinstein), tỷ lệ bứt phá/sập 4% (Stockbee), nhóm mạnh và breakout (Qullamaggie). Từ 6 chấm xanh: thị trường thuận lợi; dưới 4: nên giảm tỷ trọng.</dd>
         <dt>Mã mới niêm yết (IPO)</dt><dd>Được xếp hạng từ 1 tháng sau phiên đầu tiên. Dưới 6 tháng, sức mạnh giá tính bằng mức tăng kể từ phiên đầu tiên. Có nhãn "IPO x tháng" trong năm đầu.</dd>

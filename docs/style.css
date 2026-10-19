@@ -221,3 +221,4 @@ table.plan td{vertical-align:top}
 .fl-step b{font-size:1.02rem;font-variant-numeric:tabular-nums}
 .fl-arr{align-self:center;color:var(--muted);font-size:1.2rem}
 @media (max-width:560px){.fl-arr{display:none}}
+.sub-h{margin:14px 0 4px;font-size:.92rem}

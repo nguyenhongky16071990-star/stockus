@@ -4,14 +4,15 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const LW = window.LightweightCharts;
-  const APP_VERSION = '2026.10.18-c'; // phải trùng với APP_VERSION trong pipeline/build.py
-  const S = { cycle: null, backtest: null, latest: null, history: [], stocks: [], setups: [], extended: [], themes: [], basket: [], industries: [], patterns: null, charts: null };
+  const APP_VERSION = '2026.10.19-a'; // phải trùng với APP_VERSION trong pipeline/build.py
+  const S = { paper: null, cycle: null, backtest: null, latest: null, history: [], stocks: [], setups: [], extended: [], themes: [], basket: [], industries: [], patterns: null, charts: null };
   const ranges = {};          // khoảng thời gian của từng biểu đồ
   const built = new Set();    // tab đã vẽ
   const live = {};            // biểu đồ đang hiển thị
   let hlScope = 'top';
   let cyKey = 'qqq';
   const PHC = { 'Tăng': '--good', 'Điều chỉnh': '--warn', 'Giằng co': '--c1', 'Giảm': '--bad' };
+  const ppOn = new Set(['ml', 'qm', 'mm', 'wo', 'sw', 'pb', 'ok', 'vs', 'qqq']);
   const btOn = new Set(['ml', 'qm', 'mm', 'wo', 'sw', 'pb', 'ok', 'vs']);        // biểu đồ vượt đỉnh/cách đỉnh: top 100 hay toàn thị trường
 
   // ------------------------------------------------------------ định dạng
@@ -215,6 +216,14 @@
       const band = c.addHistogramSeries({ priceScaleId: 'band', priceLineVisible: false, lastValueVisible: false });
       band.setData(pts.map(([d, , p]) => ({ time: d, value: 1, color: css(PHC[p] || '--muted') })));
       c.priceScale('band').applyOptions({ scaleMargins: { top: 0.93, bottom: 0 }, visible: false });
+    },
+    pp(c) {
+      const P = S.paper, A = P.accounts || {};
+      for (const L of LEGENDS) { const a = A[L.id]; if (!a || !ppOn.has(L.id) || !a.curve || !a.curve.length) continue;
+        c.addLineSeries({ color: css(L.color), lineWidth: 2, priceLineVisible: false, title: L.short }).setData(a.curve.map(([d, v]) => ({ time: d, value: v }))); }
+      if (ppOn.has('qqq') && P.qqq && P.qqq.length) c.addLineSeries({ color: css('--muted'), lineWidth: 2, lineStyle: 2, priceLineVisible: false, title: 'QQQ' }).setData(P.qqq.map(([d, v]) => ({ time: d, value: v })));
+      const z = c.addLineSeries({ color: 'transparent', priceLineVisible: false, lastValueVisible: false }); if (P.qqq && P.qqq.length) z.setData([{ time: P.qqq[0][0], value: 0 }]);
+      z.createPriceLine({ price: 0, color: css('--muted'), lineStyle: 2, lineWidth: 1, axisLabelVisible: false });
     },
     bt(c, rows) {
       const from = rows.length ? rows[0].d : '';
@@ -644,6 +653,81 @@
         { k: 'days', label: 'Số phiên', f: (r) => n0(r.days) },
         { k: 'chg', label: 'Thay đổi', f: (r) => spct(r.chg), c: (r) => cls(r.chg) },
       ], (Q.swings || []).slice().reverse(), {});
+    },
+    paper() {
+      const P = S.paper, A = P.accounts || {};
+      if (!Object.keys(A).length) { $('#pp-notes').replaceChildren(el('li', { text: P.error ? 'Chưa chạy được danh mục mô phỏng: ' + P.error : 'Chưa có dữ liệu danh mục mô phỏng. Sau lần chạy tới sẽ có.' })); return; }
+      const rows = LEGENDS.filter((L) => A[L.id]).map((L) => Object.assign({ id: L.id }, A[L.id], { nopen: A[L.id].open.length, npend: A[L.id].pending.length }));
+      const qret = P.qqq && P.qqq.length ? P.qqq[P.qqq.length - 1][1] : null;
+      const best = rows.slice().sort((a, b) => b.ret - a.ret)[0], worst = rows.slice().sort((a, b) => a.ret - b.ret)[0];
+      const rr = (x) => (isNum(x) ? (x > 0 ? '+' : '') + n2(x) + 'R' : '—');
+      $('#pp-notes').replaceChildren(
+        el('li', { text: `Bắt đầu từ ${fdate(P.start)}, cập nhật tới ${fdate(P.last)}. QQQ cùng giai đoạn: ${spct(qret)}.` }),
+        best ? el('li', { text: `Dẫn đầu: ${best.name} ${spct(best.ret)} (${usd(best.equity)}), ${best.n} lệnh đã đóng, thắng ${pct(best.win, 0)}, kỳ vọng ${rr(best.exp)}.` }) : null,
+        worst && worst !== best ? el('li', { text: `Kém nhất: ${worst.name} ${spct(worst.ret)}, sụt giảm tối đa ${spct(worst.mdd)}.` }) : null,
+        el('li', { text: `Vượt QQQ: ${rows.filter((r) => isNum(qret) && r.ret > qret).map((r) => r.name).join(', ') || 'chưa có phong cách nào'}.` }));
+      table($('#tb-pp'), [
+        { k: 'name', label: 'Tài khoản', l: true, f: (r) => { const f = document.createDocumentFragment(); f.append(badge(r.id), ' ' + r.name); return f; } },
+        { k: 'equity', label: 'Giá trị', f: (r) => usd(r.equity) },
+        { k: 'ret', label: 'Lợi nhuận', f: (r) => spct(r.ret), c: (r) => cls(r.ret) },
+        { k: 'vsq', label: 'So với QQQ', f: (r) => (isNum(qret) ? spct(r.ret - qret) : '—'), c: (r) => cls(r.ret - (qret || 0)), sv: (r) => r.ret - (qret || 0) },
+        { k: 'realized', label: 'Đã chốt', f: (r) => usd(r.realized), c: (r) => cls(r.realized) },
+        { k: 'n', label: 'Lệnh đóng', f: (r) => n0(r.n) },
+        { k: 'win', label: '% thắng', f: (r) => pct(r.win, 0) },
+        { k: 'avg_win', label: 'Lãi TB', f: (r) => spct(r.avg_win), c: () => 'up' },
+        { k: 'avg_loss', label: 'Lỗ TB', f: (r) => spct(r.avg_loss), c: () => 'dn' },
+        { k: 'exp', label: 'Kỳ vọng', f: (r) => rr(r.exp), c: (r) => cls(r.exp) },
+        { k: 'pf', label: 'Hệ số LN', f: (r) => n2(r.pf) },
+        { k: 'mdd', label: 'Sụt giảm tối đa', f: (r) => spct(r.mdd), c: () => 'dn' },
+        { k: 'nopen', label: 'Đang giữ', f: (r) => n0(r.nopen) },
+        { k: 'npend', label: 'Lệnh chờ', f: (r) => n0(r.npend) },
+      ], rows, { sort: 'ret' });
+      const chips = $('#pp-chips');
+      chips.replaceChildren(...LEGENDS.filter((L) => A[L.id]).map((L) => { const b = el('button', { type: 'button', class: 'btchip', 'aria-pressed': String(ppOn.has(L.id)) }, badge(L.id), ' ' + L.name);
+        b.addEventListener('click', () => { if (ppOn.has(L.id)) ppOn.delete(L.id); else ppOn.add(L.id); b.setAttribute('aria-pressed', String(ppOn.has(L.id))); drawHistChart('pp'); }); return b; }),
+        (() => { const b = el('button', { type: 'button', class: 'btchip', 'aria-pressed': String(ppOn.has('qqq')) }, 'QQQ'); b.addEventListener('click', () => { if (ppOn.has('qqq')) ppOn.delete('qqq'); else ppOn.add('qqq'); b.setAttribute('aria-pressed', String(ppOn.has('qqq'))); drawHistChart('pp'); }); return b; })());
+      drawHistChart('pp');
+      const sel = $('#pp-sel');
+      sel.replaceChildren(...LEGENDS.filter((L) => A[L.id]).map((L) => el('option', { value: L.id, text: L.name })));
+      const fillTxt = (fs) => (fs || []).map((x) => `${x.why}: ${n0(x.sh)} cổ @ ${n2(x.px)} (${fdate(x.d)})`).join(' · ');
+      const bootMark = (r) => (r.boot ? '↺ ' : '');
+      const drawAcc = () => {
+        const a = A[sel.value] || { open: [], pending: [], closed: [] };
+        table($('#tb-pp-open'), [
+          { k: 't', label: 'Mã', tk: true },
+          { k: 'in', label: 'Ngày mua', f: (r) => bootMark(r) + fdate(r.in) },
+          { k: 'entry', label: 'Giá mua', f: (r) => n2(r.entry) },
+          { k: 'stop', label: 'Stop hiện tại', f: (r) => n2(r.stop) + (r.stop > r.stop0 ? ' (đã dời)' : '') },
+          { k: 'shares', label: 'Số cổ còn', f: (r) => `${n0(r.shares)}/${n0(r.shares0)}` },
+          { k: 'last', label: 'Giá hiện tại', f: (r) => n2(r.last) },
+          { k: 'pct', label: 'Lãi/lỗ', f: (r) => spct(r.pct), c: (r) => cls(r.pct) },
+          { k: 'r', label: 'R', f: (r) => rr(r.r), c: (r) => cls(r.r) },
+          { k: 'held', label: 'Số phiên', f: (r) => n0(r.held) },
+          { k: 'fills', label: 'Đã chốt', l: true, f: (r) => fillTxt(r.fills) || '—', sv: (r) => (r.fills || []).length },
+        ], a.open, { sort: 'in', onRow: (r) => openChart(r.t), empty: 'Không có lệnh đang giữ.' });
+        table($('#tb-pp-pend'), [
+          { k: 't', label: 'Mã', tk: true },
+          { k: 'sig', label: 'Ngày tín hiệu', f: (r) => fdate(r.sig) },
+          { k: 'lvl', label: 'Mua khi vượt', f: (r) => n2(r.lvl) },
+          { k: 'stop', label: 'Stop', f: (r) => n2(r.stop) },
+          { k: 'sp', label: 'Stop %', f: (r) => pct((r.lvl - r.stop) / r.lvl * 100), sv: (r) => (r.lvl - r.stop) / r.lvl },
+          { k: 'left', label: 'Còn hiệu lực', f: (r) => `${n0(r.left)} phiên` },
+        ], a.pending, { sort: 'sig', onRow: (r) => openChart(r.t), empty: 'Không có lệnh chờ.' });
+        table($('#tb-pp-closed'), [
+          { k: 't', label: 'Mã', tk: true },
+          { k: 'in', label: 'Mua', f: (r) => `${bootMark(r)}${fdate(r.in)} @ ${n2(r.entry)}` },
+          { k: 'stop0', label: 'Stop ban đầu', f: (r) => n2(r.stop0) },
+          { k: 'out', label: 'Bán hết', f: (r) => fdate(r.out) },
+          { k: 'exit', label: 'Giá bán TB', f: (r) => n2(r.exit) },
+          { k: 'pnl', label: 'Lãi/lỗ', f: (r) => usd(r.pnl), c: (r) => cls(r.pnl) },
+          { k: 'pct', label: '%', f: (r) => spct(r.pct), c: (r) => cls(r.pct) },
+          { k: 'r', label: 'R', f: (r) => rr(r.r), c: (r) => cls(r.r) },
+          { k: 'days', label: 'Số phiên', f: (r) => n0(r.days) },
+          { k: 'fills', label: 'Các lần bán', l: true, f: (r) => fillTxt(r.fills), sv: (r) => (r.fills || []).length },
+        ], a.closed, { sort: 'out', onRow: (r) => openChart(r.t), empty: 'Chưa có lệnh đóng.' });
+      };
+      sel.addEventListener('input', drawAcc);
+      drawAcc();
     },
     backtest() {
       const B = S.backtest, ST = B.strategies || {};
@@ -1141,7 +1225,8 @@
     const get = async (k) => (await fetch(`data/${k}.json`, { cache: 'no-cache' })).json();
     try {
       [S.latest, S.history, S.stocks, S.setups, S.extended, S.themes, S.basket] = await Promise.all(['latest', 'history', 'stocks', 'setups', 'extended', 'themes', 'basket'].map(get));
-      [S.industries, S.patterns, S.backtest, S.cycle] = await Promise.all(['industries', 'patterns', 'backtest', 'cycle'].map((k) => get(k).catch(() => null)));
+      [S.industries, S.patterns, S.backtest, S.cycle, S.paper] = await Promise.all(['industries', 'patterns', 'backtest', 'cycle', 'paper'].map((k) => get(k).catch(() => null)));
+      S.paper = S.paper || { accounts: {} };
       S.cycle = S.cycle || { notes: [] };
       S.backtest = S.backtest || { strategies: {}, vsa_types: [], notes: [] };
       S.industries = S.industries || []; S.patterns = S.patterns || { stats: [], dates: [], series: {} };
