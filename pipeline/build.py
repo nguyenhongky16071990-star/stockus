@@ -27,7 +27,7 @@ DATA = ROOT / "docs" / "data"
 CONFIG = json.loads((ROOT / "pipeline" / "config.json").read_text(encoding="utf-8"))
 INDEXES = ["QQQ", "SPY", "IWM", "SMH", "IGV"]
 FIELDS = ["Open", "High", "Low", "Close", "Volume"]
-APP_VERSION = "2026.10.23-b"  # phải trùng với APP_VERSION trong docs/app.js
+APP_VERSION = "2026.10.23-c"  # phải trùng với APP_VERSION trong docs/app.js
 
 
 # ---------------------------------------------------------------- tải dữ liệu
@@ -258,6 +258,7 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
     n = valid.sum(axis=1).replace(0, np.nan)
     up4 = cnt((ret[1] >= 0.04) & (V > V.shift(1)))
     dn4 = cnt((ret[1] <= -0.04) & (V > V.shift(1)))
+    up4a, dn4a = cnt(ret[1] >= 0.04), cnt(ret[1] <= -0.04)   # mọi phiên ±4%, không cần khối lượng
     adv, dec = cnt(C > C.shift(1)), cnt(C < C.shift(1))
     net = (adv - dec).astype(float)
     leaders_n = cnt(leader)
@@ -306,6 +307,10 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
         "nh20": cnt(C >= hi20), "nl20": cnt(C <= lo20),
         "nh52": cnt(C >= hi252), "nl52": cnt(C <= lo252),
         "up4": up4, "dn4": dn4,
+        "up4a": up4a, "dn4a": dn4a, "net4": up4 - dn4, "net4a": up4a - dn4a,
+        "net4_10": (up4 - dn4).rolling(10, min_periods=3).sum(), "net4a_10": (up4a - dn4a).rolling(10, min_periods=3).sum(),
+        "up4_vp": up4.rolling(10, min_periods=3).sum() / up4a.rolling(10, min_periods=3).sum().replace(0, np.nan) * 100,
+        "dn4_vp": dn4.rolling(10, min_periods=3).sum() / dn4a.rolling(10, min_periods=3).sum().replace(0, np.nan) * 100,
         "ratio5": up4.rolling(5).sum() / dn4.rolling(5).sum().replace(0, np.nan),
         "ratio10": up4.rolling(10).sum() / dn4.rolling(10).sum().replace(0, np.nan),
         "q_up25": cnt(ret[63] >= 0.25), "q_dn25": cnt(ret[63] <= -0.25),
@@ -812,7 +817,7 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
         "leader_health": r1(h0.leader_health, 0), "pct_e21": r1(h0.pct_e21, 0), "pct_e21_5": r1(h5.pct_e21, 0),
         "pct_s40": r1(h0.pct_s40, 0), "pct_s200": r1(h0.pct_s200, 0), "pct_tt": r1(h0.pct_tt, 0),
         "nh20": int(h0.nh20), "nl20": int(h0.nl20), "nh52": int(h0.nh52), "nl52": int(h0.nl52),
-        "up4": int(h0.up4), "dn4": int(h0.dn4), "ratio5": r1(h0.ratio5, 2), "ratio10": r1(h0.ratio10, 2),
+        "up4": int(h0.up4), "dn4": int(h0.dn4), "up4a": int(h0.up4a), "dn4a": int(h0.dn4a), "up4_vp": r1(h0.up4_vp, 0), "dn4_vp": r1(h0.dn4_vp, 0), "ratio5": r1(h0.ratio5, 2), "ratio10": r1(h0.ratio10, 2),
         "q_up25": int(h0.q_up25), "q_dn25": int(h0.q_dn25), "mcclellan": r1(h0.mcclellan, 1),
         "basket": {k: r1(h0[k], 1) for k in ("b_ret1", "b_up", "b_gain", "b_loss", "b_bigdown", "b_ret5", "b_above21", "b_offhigh", "bo_n", "bo_ok", "bo_ret")},
         "n_setups": sum(1 for x in setups if x["ok"]),
