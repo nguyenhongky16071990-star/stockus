@@ -145,6 +145,11 @@
     <div class="tiles" id="br-tiles"></div>
     <div class="grid2">
       <article class="card"><h3>Stockbee: mã tăng/giảm ≥ 4% kèm khối lượng</h3><p class="note">Xanh: số mã tăng ≥ 4%. Đỏ: số mã giảm ≥ 4%. Đường: tỷ lệ 10 ngày (trên 1 là bên mua mạnh hơn).</p><div class="range" data-chart="sb"></div><div class="chart" id="ch-sb"></div></article>
+      <article class="card"><div class="card-top"><h3>Chênh lệch bứt phá − sập 4%</h3>
+        <div class="seg" role="group" aria-label="Cách đếm"><button type="button" id="sbn-vol" aria-pressed="true">Kèm khối lượng</button><button type="button" id="sbn-all" aria-pressed="false">Mọi phiên ±4%</button></div></div>
+        <p class="note">Cột (trục phải): số mã tăng ≥ 4% trừ số mã giảm ≥ 4% mỗi ngày, xanh là bên mua thắng, đỏ là bên bán thắng. Đường xanh dương (trục trái): tổng 10 ngày của chênh lệch, trên 0 là bên mua đang áp đảo. Đường cam đứt: % phiên tăng ≥ 4% có khối lượng xác nhận trong 10 ngày (cao là lực mua có tổ chức tham gia).</p>
+        <p class="note" id="sbn-note"></p>
+        <div class="range" data-chart="sbnet"></div><div class="chart" id="ch-sbnet"></div></article>
       <article class="card"><h3>% cổ phiếu trên các đường trung bình</h3><p class="note">SMA 40 dưới 20% thường là vùng quá bán gần đáy; trên 70% là hưng phấn.</p><div class="range" data-chart="pct"></div><div class="chart" id="ch-pct"></div></article>
       <article class="card"><h3>Đỉnh mới và đáy mới 52 tuần</h3><p class="note">Xanh: số mã lập đỉnh 52 tuần. Đỏ: số mã lập đáy 52 tuần.</p><div class="range" data-chart="nhnl"></div><div class="chart" id="ch-nhnl"></div></article>
       <article class="card"><h3>Mã tăng/giảm ≥ 25% trong một quý</h3><p class="note">Xu hướng trung hạn: mã giảm vượt mã tăng là thị trường yếu.</p><div class="range" data-chart="q25"></div><div class="chart" id="ch-q25"></div></article>

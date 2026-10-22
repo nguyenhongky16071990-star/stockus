@@ -4,7 +4,7 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const LW = window.LightweightCharts;
-  const APP_VERSION = '2026.10.23-b'; // phải trùng với APP_VERSION trong pipeline/build.py
+  const APP_VERSION = '2026.10.23-c'; // phải trùng với APP_VERSION trong pipeline/build.py
   const S = { flow: null, lab: null, cond: null, paper: null, cycle: null, backtest: null, latest: null, history: [], stocks: [], setups: [], extended: [], themes: [], basket: [], industries: [], patterns: null, charts: null };
   const ranges = {};          // khoảng thời gian của từng biểu đồ
   const built = new Set();    // tab đã vẽ
@@ -13,6 +13,7 @@
   let cyKey = 'qqq';
   const PHC = { 'Tăng': '--good', 'Điều chỉnh': '--warn', 'Giằng co': '--c1', 'Giảm': '--bad' };
   const GDC = { 'Vàng + đầu chu kỳ': '--good', 'Thời điểm vàng': '--good', 'Thuận lợi': '--c4', 'Trung tính': '--warn', 'Bất lợi': '--bad' };
+  let sbAll = false;
   const STC = { 'Xu hướng giảm': '--bad', 'Hồi phục ban đầu': '--c2', 'Dòng tiền lan rộng': '--c4', 'Uptrend xác nhận': '--good', 'Phân phối / suy yếu': '--warn', 'Chưa rõ ràng': '--muted' };
   const ppOn = new Set(['ml', 'qm', 'mm', 'wo', 'sw', 'pb', 'ok', 'vs', 'qqq']);
   const btOn = new Set(['ml', 'qm', 'mm', 'wo', 'sw', 'pb', 'ok', 'vs']);        // biểu đồ vượt đỉnh/cách đỉnh: top 100 hay toàn thị trường
@@ -120,6 +121,16 @@
       const r = c.addLineSeries({ color: css('--c1'), lineWidth: 2, priceScaleId: 'left', priceLineVisible: false, title: 'Tỷ lệ 10 ngày' });
       r.setData(ser(rows, 'ratio10'));
       r.createPriceLine({ price: 1, color: css('--c1'), lineStyle: 2, lineWidth: 1, axisLabelVisible: false });
+      c.applyOptions({ leftPriceScale: { visible: true } });
+    },
+    sbnet(c, rows) {
+      const k = sbAll ? 'net4a' : 'net4', k10 = sbAll ? 'net4a_10' : 'net4_10';
+      c.addHistogramSeries({ priceLineVisible: false, title: 'Chênh lệch ngày' }).setData(rows.filter((r) => isNum(r[k])).map((r) => ({ time: r.d, value: r[k], color: css(r[k] >= 0 ? '--good' : '--bad') + 'aa' })));
+      const l = c.addLineSeries({ color: css('--c1'), lineWidth: 2, priceScaleId: 'left', priceLineVisible: false, title: 'Tổng 10 ngày' });
+      l.setData(ser(rows, k10));
+      l.createPriceLine({ price: 0, color: css('--c1'), lineStyle: 2, lineWidth: 1, axisLabelVisible: false });
+      c.addLineSeries({ color: css('--c2'), lineWidth: 1, lineStyle: 2, priceScaleId: 'vp', priceLineVisible: false, title: '% tăng có KL' }).setData(ser(rows, 'up4_vp'));
+      c.priceScale('vp').applyOptions({ scaleMargins: { top: 0.05, bottom: 0.6 }, visible: false });
       c.applyOptions({ leftPriceScale: { visible: true } });
     },
     pct(c, rows) {
@@ -465,6 +476,11 @@
     },
     breadth() {
       const L = S.latest, T = $('#br-tiles'); T.replaceChildren();
+      const sv = $('#sbn-vol'), sa = $('#sbn-all');
+      const setSb = (all) => { sbAll = all; sv.setAttribute('aria-pressed', String(!all)); sa.setAttribute('aria-pressed', String(all)); drawHistChart('sbnet'); };
+      sv.addEventListener('click', () => setSb(false)); sa.addEventListener('click', () => setSb(true));
+      const h = S.history, last = h[h.length - 1] || {};
+      if (isNum(L.up4a)) $('#sbn-note').textContent = `Hôm nay: ${L.up4a} mã tăng ≥ 4% (${L.up4} có khối lượng xác nhận), ${L.dn4a} mã giảm ≥ 4% (${L.dn4} có khối lượng). Chênh lệch 10 ngày: ${n0(last.net4_10)} kèm khối lượng, ${n0(last.net4a_10)} mọi phiên. Trong 10 ngày, ${pct(L.up4_vp, 0)} phiên tăng mạnh có khối lượng xác nhận, ${pct(L.dn4_vp, 0)} phiên giảm mạnh có khối lượng.`;
       tile(T, 'Tăng / giảm ≥ 4% hôm nay', `${L.up4} / ${L.dn4}`, 'kèm khối lượng tăng');
       tile(T, 'Tỷ lệ Stockbee 5 ngày', n2(L.ratio5), '', L.ratio5 >= 1 ? 'up' : 'dn');
       tile(T, 'Tỷ lệ Stockbee 10 ngày', n2(L.ratio10), '', L.ratio10 >= 1 ? 'up' : 'dn');
@@ -472,7 +488,7 @@
       tile(T, 'Mã trên SMA 200', pct(L.pct_s200, 0), 'xu hướng dài hạn');
       tile(T, 'Tăng / giảm ≥ 25% trong quý', `${L.q_up25} / ${L.q_dn25}`, '');
       tile(T, 'McClellan', n1(L.mcclellan), '', cls(L.mcclellan));
-      ['sb', 'pct', 'nhnl', 'q25', 'lead', 'mcc'].forEach(drawHistChart);
+      ['sb', 'sbnet', 'pct', 'nhnl', 'q25', 'lead', 'mcc'].forEach(drawHistChart);
     },
     leaders() {
       table($('#tb-themes'), [
