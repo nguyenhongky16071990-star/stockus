@@ -246,10 +246,11 @@ def run(ctx: dict, cfg: dict) -> dict:
     start = min(start, nd - 30)
     recent_from = nd - 60
     tickers = list(C.columns)
-    out = {}
+    out, raw = {}, {}
     for k, (sig, spec) in S.items():
         tr = simulate(k, sig.fillna(False).astype(bool), spec, P, dates, qreg, start)
         out[k] = summarize(tr, dates, tickers, recent_from)
+        raw[k] = tr
     vtypes = []
     for name, sg in vsa.items():
         tr = simulate(name, (sg & (rs >= 50)).fillna(False).astype(bool), vspec, P, dates, qreg, start)
@@ -258,7 +259,8 @@ def run(ctx: dict, cfg: dict) -> dict:
     today_vsa = {t: [n for n, sg in vsa.items() if bool(sg[t].iloc[-1])] for t in C.columns}
     return {"from": dates[start].strftime("%Y-%m-%d"), "to": dates[-1].strftime("%Y-%m-%d"),
             "recent_from": dates[recent_from].strftime("%Y-%m-%d"), "regime_now": qreg[-1],
-            "strategies": out, "vsa_types": vtypes}, today_vsa
+            "strategies": out, "vsa_types": vtypes, "_raw": raw, "_start": start,
+            "_vsa": {n: (sg & (rs >= 50)) for n, sg in vsa.items()}}, today_vsa
 
 
 def notes(bt: dict, names: dict) -> list[str]:

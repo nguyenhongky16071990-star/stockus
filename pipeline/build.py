@@ -27,7 +27,7 @@ DATA = ROOT / "docs" / "data"
 CONFIG = json.loads((ROOT / "pipeline" / "config.json").read_text(encoding="utf-8"))
 INDEXES = ["QQQ", "SPY", "IWM", "SMH", "IGV"]
 FIELDS = ["Open", "High", "Low", "Close", "Volume"]
-APP_VERSION = "2026.10.19-a"  # phải trùng với APP_VERSION trong docs/app.js
+APP_VERSION = "2026.10.23-b"  # phải trùng với APP_VERSION trong docs/app.js
 
 
 # ---------------------------------------------------------------- tải dữ liệu
@@ -555,6 +555,49 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
         print("Kiểm chứng lỗi:", e, file=sys.stderr)
         bt, vsa_today = {"strategies": {}, "vsa_types": [], "notes": ["Chưa chạy được phần kiểm chứng."]}, {}
 
+    bt_raw, bt_vsa, bt_start = bt.pop("_raw", {}), bt.pop("_vsa", None), bt.pop("_start", 260)
+    upv = V.where(C > C.shift(1), 0).rolling(50, min_periods=30).sum()
+    dnv = V.where(C < C.shift(1), 0).rolling(50, min_periods=30).sum()
+    udv = upv / dnv.replace(0, np.nan)
+
+    # ---- Money Flow Radar và phòng thí nghiệm setup
+    flow_out, lab, lab_today, fctx = {"stage": None}, {"setups": []}, {}, None
+    if not light:
+        import flow
+        import setuplab
+        try:
+            fctx = dict(O=O, C=C, H=H, L=L, V=V, valid=valid, liquid=liquid, e21=e21, s50=s50, s200=s200, rs=rs, top=top, rs_nh=rs_nh,
+                        v50=v50, dd_hi=dd_hi, udv=udv, hist=hist, qqq=qqq, spy=raw["SPY"]["Close"].reindex(dates) if "SPY" in raw else None,
+                        g_rank=g_rank, ind_s=ind_s, start=bt_start, keep=cfg["history_days"], rsline=rsline, adr=adr, dnb=dnb)
+            flow_out, fser = flow.compute(fctx)
+            fctx.update(ev=fser["ev"], piv=fser["piv"])
+            hist["flow_stage"] = fser["stage"]
+            hist["flow_gold"] = fser["gold"]
+            hist["flow_breadth"], hist["flow_accum"], hist["flow_lead"], hist["flow_ft"] = fser["breadth"], fser["accum"], fser["lead"], fser["ft"]
+            n_ind_d = g_rank.notna().sum(axis=1).replace(0, np.nan).values
+            ctxm = {"stage": fser["stage"].values, "reg": idx_reg.get("QQQ", pd.Series("Giằng co", index=dates)).values,
+                    "btr": (fser["breadth"] - fser["breadth"].shift(10)).values, "ind_rank": ind_rank_p, "n_ind": n_ind_d,
+                    "gold": fser["gold"].values}
+            lab, lab_today = setuplab.analyze(dict(O=O, H=H, L=L, C=C, V=V, e21=e21, e50=e50, s50=s50, s200=s200, v50=v50, rs=rs,
+                                                   liquid=liquid, tt=tt), ctxm, bt_start, flow_out.get("stage"))
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print("Money Flow Radar / setup lỗi:", e, file=sys.stderr)
+
+    # ---- mẫu hình / phong cách nào hiệu quả trong điều kiện thị trường nào
+    cond = {"items": [], "dims": [], "notes": []}
+    if not light:
+        import condstats
+        try:
+            cond = condstats.analyze(hist, cycle.phase_series(qc), {n: sg for n, (_, sg) in PATTERNS.items()}, C, L, bt_raw,
+                                     {"ml": "Martin Luk", "qm": "Qullamaggie", "mm": "Mark Minervini", "wo": "William O'Neil",
+                                      "sw": "Stan Weinstein", "pb": "Pradeep Bonde", "ok": "Oliver Kell", "vs": "VSA"},
+                                     vsa=bt_vsa, start=bt_start)
+        except Exception as e:
+            print("Thống kê theo điều kiện thị trường lỗi:", e, file=sys.stderr)
+            cond = {"items": [], "dims": [], "notes": ["Chưa tính được thống kê theo điều kiện thị trường."]}
+
     # ---- ảnh chụp hôm nay
     t0 = -1
     last = dates[t0]
@@ -702,6 +745,52 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
     for s in stk:
         s.pop("_av", None)
 
+    # ---- bằng chứng dòng tiền từng mã + 3 câu hỏi trước khi mua cho tín hiệu hôm nay
+    radar, plans = [], []
+    if fctx is not None and lab.get("setups"):
+        try:
+            radar = flow.stock_radar(fctx, sdict, {t: [x["s"] for x in v] for t, v in lab_today.items()})
+            rmap = {x["t"]: x for x in radar}
+            stg = flow_out.get("stage")
+            t_ind = g_rank.iloc[t0].notna().sum() or 1
+            for t, sigs in lab_today.items():
+                s = sdict.get(t)
+                if not s:
+                    continue
+                rsb = setuplab._bucket("rs", s.get("rs"))
+                indb = setuplab._bucket("ind", (s["ind_rank"] / t_ind) if s.get("ind_rank") else None)
+                c0 = s["close"]
+                for g in sigs:
+                    pv, sp = g["pv"], g["sp"]
+                    if not pv or not sp or sp >= pv:
+                        continue
+                    entry = pv if g["kind"] != "close" else c0
+                    stop_pct = (entry - sp) / entry * 100
+                    sh = math.floor(cap * risk / (entry - sp)) if entry > sp else 0
+                    sh = min(sh, math.floor(cap * maxpos / entry)) if entry else 0
+                    hist_ = setuplab.lookup(lab, g["s"], stg, rsb, indb, (flow_out.get("golden") or {}).get("level"))
+                    rd = rmap.get(t, {})
+                    plans.append({"t": t, "name": s.get("name"), "ind": s.get("ind"), "rs": s.get("rs"), "close": c0, "setup": g["s"], "sig": g["sig"],
+                                  "left": g["left"], "kind": g["kind"], "pivot": pv, "stop": sp, "stop_pct": r1(stop_pct),
+                                  "dist": r1((pv / c0 - 1) * 100) if c0 else None, "shares": sh, "risk_usd": round(sh * (entry - sp)),
+                                  "t2r": r1(entry + 2 * (entry - sp), 2), "t3r": r1(entry + 3 * (entry - sp), 2),
+                                  "hi52": s.get("offhigh"), "rs_b": rsb, "ind_b": indb, "hist": hist_,
+                                  "ev": rd.get("score"), "ev_n": rd.get("n"), "missing": [e["label"] for e in rd.get("ev", []) if not e["ok"]],
+                                  "have": [e["label"] for e in rd.get("ev", []) if e["ok"]], "news": rd.get("news"),
+                                  "ok_stop": stop_pct <= maxstop})
+            plans.sort(key=lambda p: (-((p["hist"].get("stage") or {}).get("exp") or -9) if (p["hist"].get("stage") or {}).get("n", 0) >= 30 else 9, -(p["ev"] or 0)))
+            for s in stk:
+                if s["t"] in rmap:
+                    s["mf"] = rmap[s["t"]]["score"]
+                if s["t"] in lab_today:
+                    s["lab"] = [x["s"] for x in lab_today[s["t"]]]
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print("Radar cổ phiếu lỗi:", e, file=sys.stderr)
+    flow_out["radar"] = radar[:250]
+    lab["plans"] = plans
+
     # ---- tổng quan hôm nay
     h0, h5 = hist.iloc[t0], hist.iloc[t0 - 5]
     ftd_date, ftd_status = follow_through(qc, qqq["Volume"])
@@ -752,7 +841,7 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
     latest["notes_patterns"] = pattern_notes(pat_stats)
     patterns = {"stats": pat_stats, "dates": [d.strftime("%Y-%m-%d") for d in dates[-keep_n:]], "series": pat_series}
     return {"latest": latest, "history": history, "stocks": stk, "setups": setups, "extended": extended,
-            "themes": themes, "basket": basket, "charts": charts, "industries": industries, "patterns": patterns, "backtest": bt, "cycle": cyc}
+            "themes": themes, "basket": basket, "charts": charts, "industries": industries, "patterns": patterns, "backtest": bt, "cycle": cyc, "cond": cond, "flow": flow_out, "lab": lab}
 
 
 def _p(x, d=1):
@@ -916,7 +1005,7 @@ def _jd(o):
 
 def write(out: dict) -> None:
     DATA.mkdir(parents=True, exist_ok=True)
-    for k in ("latest", "history", "stocks", "setups", "extended", "themes", "basket", "charts", "industries", "patterns", "backtest", "cycle", "paper"):
+    for k in ("latest", "history", "stocks", "setups", "extended", "themes", "basket", "charts", "industries", "patterns", "backtest", "cycle", "cond", "flow", "lab", "paper"):
         (DATA / f"{k}.json").write_text(json.dumps(out[k], ensure_ascii=False, separators=(",", ":"), default=_jd), encoding="utf-8")
     # lưu lại ảnh chụp setup + tổng quan mỗi ngày để thống kê về sau
     snap = DATA / "archive"
