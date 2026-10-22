@@ -4,14 +4,16 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const LW = window.LightweightCharts;
-  const APP_VERSION = '2026.10.19-a'; // phải trùng với APP_VERSION trong pipeline/build.py
-  const S = { paper: null, cycle: null, backtest: null, latest: null, history: [], stocks: [], setups: [], extended: [], themes: [], basket: [], industries: [], patterns: null, charts: null };
+  const APP_VERSION = '2026.10.23-b'; // phải trùng với APP_VERSION trong pipeline/build.py
+  const S = { flow: null, lab: null, cond: null, paper: null, cycle: null, backtest: null, latest: null, history: [], stocks: [], setups: [], extended: [], themes: [], basket: [], industries: [], patterns: null, charts: null };
   const ranges = {};          // khoảng thời gian của từng biểu đồ
   const built = new Set();    // tab đã vẽ
   const live = {};            // biểu đồ đang hiển thị
   let hlScope = 'top';
   let cyKey = 'qqq';
   const PHC = { 'Tăng': '--good', 'Điều chỉnh': '--warn', 'Giằng co': '--c1', 'Giảm': '--bad' };
+  const GDC = { 'Vàng + đầu chu kỳ': '--good', 'Thời điểm vàng': '--good', 'Thuận lợi': '--c4', 'Trung tính': '--warn', 'Bất lợi': '--bad' };
+  const STC = { 'Xu hướng giảm': '--bad', 'Hồi phục ban đầu': '--c2', 'Dòng tiền lan rộng': '--c4', 'Uptrend xác nhận': '--good', 'Phân phối / suy yếu': '--warn', 'Chưa rõ ràng': '--muted' };
   const ppOn = new Set(['ml', 'qm', 'mm', 'wo', 'sw', 'pb', 'ok', 'vs', 'qqq']);
   const btOn = new Set(['ml', 'qm', 'mm', 'wo', 'sw', 'pb', 'ok', 'vs']);        // biểu đồ vượt đỉnh/cách đỉnh: top 100 hay toàn thị trường
 
@@ -237,6 +239,20 @@
       const z = c.addLineSeries({ color: 'transparent', priceLineVisible: false, lastValueVisible: false }); z.setData(rows.length ? [{ time: rows[0].d, value: 0 }] : []);
       z.createPriceLine({ price: 0, color: css('--muted'), lineStyle: 2, lineWidth: 1, axisLabelVisible: false });
     },
+    gold(c, rows) {
+      c.addLineSeries({ color: css('--ink'), lineWidth: 2, priceLineVisible: false, title: 'QQQ' }).setData(ser(rows, 'qqq'));
+      const band = c.addHistogramSeries({ priceScaleId: 'band', priceLineVisible: false, lastValueVisible: false });
+      band.setData(rows.filter((r) => r.flow_gold).map((r) => ({ time: r.d, value: 1, color: css(GDC[r.flow_gold] || '--muted') })));
+      c.priceScale('band').applyOptions({ scaleMargins: { top: 0.9, bottom: 0 }, visible: false });
+    },
+    q25f(c, rows) { CHARTS.q25(c, rows); },
+    flow(c, rows) {
+      [['flow_breadth', '--c1', 'Độ rộng'], ['flow_accum', '--c2', 'Tích lũy'], ['flow_lead', '--c3', 'Dẫn dắt'], ['flow_ft', '--c5', 'Follow-through']].forEach(([k, col, t]) =>
+        c.addLineSeries({ color: css(col), lineWidth: 2, priceLineVisible: false, title: t }).setData(ser(rows, k)));
+      const band = c.addHistogramSeries({ priceScaleId: 'band', priceLineVisible: false, lastValueVisible: false });
+      band.setData(rows.filter((r) => r.flow_stage).map((r) => ({ time: r.d, value: 1, color: css(STC[r.flow_stage] || '--muted') })));
+      c.priceScale('band').applyOptions({ scaleMargins: { top: 0.9, bottom: 0 }, visible: false });
+    },
     mcc(c, rows) {
       const s = c.addHistogramSeries({ priceLineVisible: false });
       s.setData(rows.filter((r) => isNum(r.mcclellan)).map((r) => ({ time: r.d, value: r.mcclellan, color: css(r.mcclellan >= 0 ? '--good' : '--bad') })));
@@ -258,6 +274,7 @@
     c.timeScale().fitContent();
     live.surv = c;
   }
+  function drawFlow() { drawHistChart('flow'); }
   function drawHistChart(key) {
     const box = $('#ch-' + key);
     if (!box || box.closest('.tab').hidden) return;
@@ -654,6 +671,281 @@
         { k: 'chg', label: 'Thay đổi', f: (r) => spct(r.chg), c: (r) => cls(r.chg) },
       ], (Q.swings || []).slice().reverse(), {});
     },
+    flow() {
+      const F = S.flow;
+      if (!F || !F.stage) { $('#fl-stage').replaceChildren(el('p', { class: 'empty', text: 'Chưa có dữ liệu dòng tiền. Sau lần chạy tới sẽ có.' })); return; }
+      const sc = F.scores || {}, s10 = F.scores10 || {};
+      $('#fl-stage').replaceChildren(
+        el('div', { class: 'fl-st', style: `--ph:var(${STC[F.stage] || '--muted'})` },
+          el('span', { class: 'muted small', text: 'Giai đoạn dòng tiền hiện tại' }), el('b', { class: 'fl-stn', text: F.stage }),
+          el('span', { class: 'small muted', text: `${F.stage_days} phiên liên tiếp` }), el('p', { text: F.stage_desc })),
+        el('div', { class: 'fl-sc' }, ...[['breadth', 'Độ rộng', 'Sức mạnh có lan rộng không?'], ['accum', 'Tích lũy', 'Phiên tăng có khối lượng xác nhận không?'], ['lead', 'Dẫn dắt', 'Cổ phiếu mạnh mới có xuất hiện không?'], ['ft', 'Follow-through', 'Điểm mua gần đây có giữ được không?']].map(([k, lb, q]) => {
+          const v = sc[k], d = isNum(v) && isNum(s10[k]) ? v - s10[k] : null;
+          return el('div', { class: 'fl-sci' }, el('span', { class: 'lb', text: lb }), el('b', { class: v >= 60 ? 'up' : v < 40 ? 'dn' : 'wa', text: n0(v) }),
+            el('span', { class: 'small ' + cls(d), text: isNum(d) ? `${d > 0 ? '+' : ''}${n0(d)} so với 10 phiên trước` : '' }), el('span', { class: 'small muted', text: q }));
+        })));
+      $('#fl-warn').replaceChildren(...(F.warnings || []).map((t) => el('div', { class: 'banner warn', text: t })));
+      const groups = {};
+      (F.evidence || []).forEach((e) => (groups[e.pillar] = groups[e.pillar] || []).push(e));
+      const miss = (F.evidence || []).filter((e) => !e.ok);
+      $('#fl-miss').textContent = miss.length ? `Còn thiếu ${miss.length}/${F.evidence.length} bằng chứng: ${miss.map((e) => e.label).join('; ')}.` : 'Đủ cả 16 bằng chứng.';
+      $('#fl-ev').replaceChildren(...Object.entries(groups).map(([g, xs]) => el('div', { class: 'fl-evg' }, el('h4', { text: `${g} · ${xs.filter((x) => x.ok).length}/${xs.length}` }),
+        el('ul', { class: 'fl-evl' }, ...xs.map((e) => el('li', { class: e.ok ? 'ok' : 'no' }, el('span', { class: 'fl-mk', text: e.ok ? '✓' : '✗' }),
+          el('span', { class: 'fl-lb', text: e.label }), el('b', { text: (isNum(e.value) ? (e.unit === '%' ? n1(e.value) : n0(e.value)) : '—') + (e.unit || '') }), el('span', { class: 'muted small', text: 'cần ' + e.need })))))));
+      drawFlow();
+      const G = F.golden || {};
+      if (G.level) {
+        const gb = $('#gd-badge'); gb.textContent = G.level + (G.level === 'Thời điểm vàng' && G.early ? ' · đầu chu kỳ' : '') + ` · ${G.count}/6`;
+        gb.style.setProperty('--ph', `var(${GDC[G.level] || '--muted'})`);
+        $('#gd-checks').replaceChildren(...(G.checks || []).map((c) => el('li', { class: c.ok ? 'ok' : 'no' }, el('span', { class: 'fl-mk', text: c.ok ? '✓' : '✗' }), el('span', { class: 'fl-lb', text: c.label }))),
+          el('li', { class: G.early ? 'ok' : 'no' }, el('span', { class: 'fl-mk', text: G.early ? '✓' : '·' }), el('span', { class: 'fl-lb', text: `Đầu chu kỳ: ${isNum(G.since) ? n0(G.since) + ' phiên kể từ lần điều chỉnh gần nhất' : 'chưa xác định'} (vàng nhất khi ≤ 40 phiên)` })));
+        table($('#tb-gd-val'), [
+          { k: 'level', label: 'Mức', l: true, f: (r) => el('span', { class: 'ph-badge sm', style: `--ph:var(${GDC[r.level] || '--good'})`, text: r.level }) },
+          { k: 'days', label: 'Số phiên', f: (r) => n0(r.days) },
+          { k: 'q21', label: 'QQQ 1 tháng sau', f: (r) => spct(r.q21), c: (r) => cls(r.q21) },
+          { k: 'q21_up', label: '% lần tăng', f: (r) => pct(r.q21_up, 0) },
+          { k: 'bo_hold', label: 'Breakout giữ pivot', f: (r) => (isNum(r.bo_hold) ? `${pct(r.bo_hold, 0)} · ${n0(r.bo_n)}` : '—'), sv: (r) => r.bo_hold },
+        ], G.validation || [], {});
+        table($('#tb-gd-win'), [
+          { k: 'from', label: 'Từ', f: (r) => fdate(r.from) + (r.early ? ' ★' : '') },
+          { k: 'to', label: 'Đến', f: (r) => (r.open ? 'đang diễn ra' : fdate(r.to)) },
+          { k: 'days', label: 'Số phiên', f: (r) => n0(r.days) },
+          { k: 'q_in', label: 'QQQ trong cửa sổ', f: (r) => spct(r.q_in), c: (r) => cls(r.q_in) },
+          { k: 'q_after', label: 'QQQ tới 1 tháng sau', f: (r) => spct(r.q_after), c: (r) => cls(r.q_after) },
+        ], G.windows || [], { sort: 'from', empty: 'Chưa có cửa sổ vàng nào trong dữ liệu.' });
+        const q = G.q25 || {};
+        $('#gd-q25').textContent = isNum(q.up) ? `Hôm nay: ${n0(q.up)} mã tăng ≥25% / ${n0(q.dn)} mã giảm ≥25% trong một quý (chênh lệch ${spct(q.net)} số mã, 10 phiên trước ${spct(q.net10)}). ${q.up > q.dn ? 'Bên tăng đang áp đảo.' : 'Bên giảm đang nhiều hơn: thị trường phân hóa.'}` : '';
+        drawHistChart('gold'); drawHistChart('q25f');
+      }
+      table($('#tb-fl-val'), [
+        { k: 'stage', label: 'Giai đoạn', l: true, f: (r) => el('span', { class: 'ph-badge sm', style: `--ph:var(${STC[r.stage] || '--muted'})`, text: r.stage }) },
+        { k: 'days', label: 'Số phiên', f: (r) => n0(r.days) },
+        { k: 'q21', label: 'QQQ 1 tháng sau', f: (r) => spct(r.q21), c: (r) => cls(r.q21) },
+        { k: 'q21_up', label: '% lần QQQ tăng', f: (r) => pct(r.q21_up, 0) },
+        { k: 'bo_hold', label: 'Breakout giữ pivot 5 phiên', f: (r) => (isNum(r.bo_hold) ? `${pct(r.bo_hold, 0)} · ${n0(r.bo_n)}` : '—'), sv: (r) => r.bo_hold },
+      ], (F.validation || []).filter((r) => r.days), {});
+      table($('#tb-fl-sec'), [
+        { k: 'ind', label: 'Ngành', l: true, f: (r) => { const f = document.createDocumentFragment(); f.append(r.ind); if (r.label) f.append(' ', el('span', { class: 'tag ' + (r.label === 'Suy yếu' ? 'bad' : r.label === 'Mới nổi' ? 'warn' : 'ld'), text: r.label })); return f; } },
+        { k: 'rank', label: 'Hạng', f: (r) => n0(r.rank), sv: (r) => -r.rank },
+        { k: 'd21', label: 'Hạng 1 tháng trước', f: (r) => (isNum(r.rank21) ? `${n0(r.rank21)} (${r.rank21 - r.rank > 0 ? '+' : ''}${n0(r.rank21 - r.rank)})` : '—'), c: (r) => cls((r.rank21 || r.rank) - r.rank), sv: (r) => (r.rank21 || r.rank) - r.rank },
+        { k: 'rel21', label: 'Hơn SPY 1 tháng', f: (r) => spct(r.rel21), c: (r) => cls(r.rel21) },
+        { k: 'rs80', label: 'Mã RS ≥ 80', f: (r) => `${n0(r.rs80)} (${r.broad > 0 ? '+' : ''}${n0(r.broad)})`, c: (r) => cls(r.broad), title: 'Số mã RS ≥ 80 và thay đổi so với 10 phiên trước: tiền đang lan sang nhiều mã hơn?' },
+        { k: 'nearhi', label: 'Gần đỉnh 52T', f: (r) => `${n0(r.nearhi)}/${n0(r.n)}` },
+        { k: 'bo10', label: 'Breakout 10 phiên', f: (r) => n0(r.bo10) },
+        { k: 'bo_hold', label: 'Giữ pivot', f: (r) => (isNum(r.bo_hold) ? `${pct(r.bo_hold, 0)} · ${r.bo_seen}` : '—'), sv: (r) => r.bo_hold },
+        { k: 'score', label: 'Điểm luân chuyển', f: (r) => n1(r.score) },
+      ], F.sectors || [], { sort: 'score' });
+      const R = F.radar || [];
+      const selMin = $('#fl-min'), q = $('#fl-q');
+      const drawRadar = () => {
+        const mn = Number(selMin.value || 0), qs = q.value.trim().toUpperCase();
+        const rows = R.filter((r) => r.score >= mn && (!qs || r.t.includes(qs) || (r.ind || '').toUpperCase().includes(qs)));
+        $('#fl-count').textContent = `${rows.length} mã`;
+        table($('#tb-fl-radar'), [
+          { k: 't', label: 'Mã', tk: true },
+          { k: 'ind', label: 'Ngành', l: true },
+          { k: 'rs', label: 'RS', f: (r) => n0(r.rs) },
+          { k: 'chg', label: 'Hôm nay', f: (r) => spct(r.chg), c: (r) => cls(r.chg) },
+          { k: 'score', label: 'Bằng chứng', f: (r) => el('span', { class: 'fl-dots', title: r.ev.map((e) => `${e.ok ? '✓' : '✗'} ${e.label}: ${e.detail}`).join('\n') }, ...r.ev.map((e) => el('i', { class: e.ok ? 'on' : '' })), ` ${r.score}/${r.n}`) },
+          { k: 'streak', label: 'RS ≥ 80 từ', f: (r) => (r.streak ? `${n0(r.streak)} phiên` : '—') },
+          { k: 'missing', label: 'Còn thiếu', l: true, f: (r) => r.ev.filter((e) => !e.ok).map((e) => e.label).join(' · ') || '—', sv: (r) => r.n - r.score },
+          { k: 'lab', label: 'Setup / cảnh báo', l: true, f: (r) => { const f = document.createDocumentFragment(); (r.lab || []).forEach((x) => f.append(el('span', { class: 'tag', text: x }))); if (r.news) f.append(el('span', { class: 'tag warn', text: 'Gap sự kiện', title: r.news })); return f; }, sv: (r) => (r.lab || []).length },
+        ], rows, { sort: 'score', onRow: (r) => openChart(r.t), limit: 150, empty: 'Không có mã nào đạt.' });
+      };
+      selMin.addEventListener('input', drawRadar); q.addEventListener('input', drawRadar);
+      drawRadar();
+    },
+    lab() {
+      const B = S.lab;
+      if (!B || !(B.setups || []).length) { $('#lb-notes').replaceChildren(el('li', { text: 'Chưa có dữ liệu. Sau lần chạy tới sẽ có.' })); return; }
+      const MIN = B.min_n || 30, stNow = (S.flow || {}).stage;
+      const rr = (x) => (isNum(x) ? (x > 0 ? '+' : '') + n2(x) + 'R' : '—');
+      const good = B.setups.filter((s) => (s.by.stage[stNow] || {}).n >= MIN).sort((a, b) => b.by.stage[stNow].exp - a.by.stage[stNow].exp);
+      const oosBad = B.setups.filter((s) => (s.ins.n || 0) >= MIN && (s.oos.n || 0) >= MIN && s.ins.exp > 0.1 && s.oos.exp <= 0);
+      $('#lb-notes').replaceChildren(...[
+        el('li', { text: `Kiểm chứng ${n0(B.n_closed)} lệnh từ ${fdate(B.from)} tới ${fdate(B.to)}. Trong mẫu: trước ${fdate(B.cut)}; ngoài mẫu: từ ${fdate(B.cut)}. Mỗi lệnh đã trừ trượt giá ${n1(B.slip)}% mỗi lần khớp.` }),
+        stNow ? el('li', { text: good.length ? `Trong giai đoạn "${stNow}", setup có kỳ vọng tốt nhất: ${good.slice(0, 3).map((s) => `${s.name} ${rr(s.by.stage[stNow].exp)}, thắng ${pct(s.by.stage[stNow].win, 0)} (${s.by.stage[stNow].n} lệnh)`).join('; ')}.` : `Chưa có setup nào đủ ${MIN} lệnh trong giai đoạn "${stNow}" để kết luận.` }) : null,
+        good.length ? el('li', { text: `Kém nhất trong giai đoạn này: ${good.slice(-2).reverse().map((s) => `${s.name} ${rr(s.by.stage[stNow].exp)}`).join('; ')}.` }) : null,
+        oosBad.length ? el('li', { class: 'dn', text: `Cảnh báo: ${oosBad.map((s) => s.name).join(', ')} có lãi trong mẫu nhưng mất lợi thế ở dữ liệu ngoài mẫu.` }) : null,
+        el('li', { text: 'Bảng chỉ dùng thông tin có tại thời điểm vào lệnh. Riêng cột khối lượng phiên mua chỉ biết khi phiên đó kết thúc.' })].filter(Boolean));
+      const st = { dim: 'stage', m: 'exp' };
+      const selDim = $('#lb-dim'), selM = $('#lb-m'), selSet = $('#lb-set');
+      selDim.replaceChildren(...B.dims.map((d) => el('option', { value: d.key, text: d.label })));
+      const nowB = (key) => (key === 'stage' ? stNow : null);
+      const val = (c) => (c && c.n ? (st.m === 'exp' ? c.exp : st.m === 'win' ? c.win : st.m === 'p2r' ? c.p2r : c.fail3) : null);
+      const colr = (c) => {
+        const v = val(c); if (!isNum(v)) return null;
+        const [lo, hi, inv] = st.m === 'exp' ? [-0.4, 0.4, false] : st.m === 'win' ? [30, 55, false] : st.m === 'p2r' ? [10, 35, false] : [30, 70, true];
+        let t = Math.max(-1, Math.min(1, (v - (lo + hi) / 2) / ((hi - lo) / 2))); if (inv) t = -t;
+        return `background:color-mix(in srgb,var(${t >= 0 ? '--good' : '--bad'}) ${Math.round(Math.abs(t) * 42)}%,transparent)`;
+      };
+      const ctext = (c) => {
+        if (!c || !c.n) return el('span', { class: 'muted', text: '—' });
+        const main = st.m === 'exp' ? rr(c.exp) : st.m === 'win' ? pct(c.win, 0) : st.m === 'p2r' ? pct(c.p2r, 0) : pct(c.fail3, 0);
+        const sub = st.m === 'win' && isNum(c.lo) ? ` [${c.lo}–${c.hi}]` : '';
+        return el('span', {}, el('b', { text: main }), el('small', { class: 'cd-n', text: sub + ' ' + n0(c.n) }));
+      };
+      const cell = (c, extra) => el('td', { class: [c && c.n && c.n < MIN ? 'cd-low' : '', extra || ''].join(' ').trim() || null, style: colr(c),
+        title: c && c.n ? `${c.n} lệnh / ${c.days} phiên khác nhau · thắng ${c.win}% (95%: ${c.lo}–${c.hi}%) · E ${rr(c.exp)} · đạt +2R ${c.p2r}% · thất bại 3 phiên ${c.fail3}%` : null }, ctext(c));
+      const drawM = () => {
+        const D = B.dims.find((d) => d.key === st.dim) || B.dims[0], nb = nowB(D.key);
+        const head = el('tr', {}, el('th', { class: 'l', text: 'Setup' }), el('th', { text: 'Tất cả' }), el('th', { text: 'Trong mẫu' }), el('th', { class: 'cd-like', text: 'Ngoài mẫu' }), el('th', { text: '60 phiên' }),
+          ...D.buckets.map((b) => el('th', { class: b === nb ? 'cd-today' : null, text: (b === nb ? '★ ' : '') + b })));
+        const sg = st.m === 'fail3' ? -1 : 1; const rows = B.setups.slice().sort((a, b) => ((val(b.all) ?? -99 * sg) - (val(a.all) ?? -99 * sg)) * sg);
+        $('#tb-lb').replaceChildren(el('thead', {}, head), el('tbody', {}, ...rows.map((s) => el('tr', { class: 'click', onclick: () => { selSet.value = s.name; drawDetail(); $('#lb-detail').scrollIntoView({ behavior: 'smooth', block: 'start' }); } },
+          el('td', { class: 'l', text: s.name }), cell(s.all), cell(s.ins), cell(s.oos, 'cd-like'), cell(s.recent), ...D.buckets.map((b) => cell((s.by[D.key] || {})[b], b === nb ? 'cd-today' : ''))))));
+      };
+      selSet.replaceChildren(...B.setups.map((s) => el('option', { value: s.name, text: s.name })));
+      const drawDetail = () => {
+        const s = B.setups.find((x) => x.name === selSet.value) || B.setups[0];
+        $('#lb-rule').textContent = s.rule;
+        const rows = [['Số giao dịch hợp lệ', 'n', (v) => n0(v)], ['Số phiên khác nhau có tín hiệu', 'days', (v) => n0(v)], ['Tỷ lệ thắng sau chi phí', 'win', (v, c) => (isNum(v) ? `${pct(v, 0)} (95%: ${c.lo}–${c.hi}%)` : '—')],
+          ['Lợi nhuận kỳ vọng mỗi lệnh', 'exp', rr], ['Lãi trung bình khi thắng', 'avg_w', rr], ['Lỗ trung bình khi thua', 'avg_l', rr], ['Hệ số lợi nhuận', 'pf', (v) => n2(v)],
+          ['Đạt +1R trước khi chạm stop', 'p1r', (v) => pct(v, 0)], ['Đạt +2R trước khi chạm stop', 'p2r', (v) => pct(v, 0)], ['Đạt +3R trước khi chạm stop', 'p3r', (v) => pct(v, 0)],
+          ['Thất bại trong 3 phiên đầu', 'fail3', (v) => pct(v, 0)], ['Lãi tối đa trong lệnh (MFE, trung vị)', 'mfe', rr], ['Lỗ tối đa trong lệnh (MAE, trung vị)', 'mae', rr],
+          ['Sụt giảm lớn nhất (cộng dồn R)', 'mdd', (v) => (isNum(v) ? n1(v) + 'R' : '—')], ['Số phiên giữ TB', 'hold', (v) => n1(v)]];
+        $('#tb-lb-det').replaceChildren(el('thead', {}, el('tr', {}, el('th', { class: 'l', text: 'Chỉ số' }), el('th', { text: 'Tất cả' }), el('th', { text: 'Trong mẫu' }), el('th', { text: 'Ngoài mẫu' }))),
+          el('tbody', {}, ...rows.map(([lb, k, f]) => el('tr', {}, el('td', { class: 'l', text: lb }), ...[s.all, s.ins, s.oos].map((c) => el('td', { text: c && c.n ? f(c[k], c) : '—' }))))));
+        $('#lb-det-title').textContent = `${s.name}: thống kê đầy đủ`;
+        const box = $('#lb-dims');
+        box.replaceChildren(...B.dims.map((d) => el('div', { class: 'cd-row' }, el('div', { class: 'cd-rl', text: d.label }),
+          el('div', { class: 'cd-cells' }, ...d.buckets.map((b) => { const c = (s.by[d.key] || {})[b], nb = nowB(d.key);
+            return el('div', { class: ['cd-cell', b === nb ? 'cd-today' : '', c && c.n && c.n < MIN ? 'cd-low' : ''].join(' ').trim(), style: colr(c) }, el('span', { class: 'small muted', text: (b === nb ? '★ ' : '') + b }), ctext(c)); })))));
+        if (live.lbcurve) { live.lbcurve.remove(); delete live.lbcurve; }
+        const cb = $('#ch-lb'); if (!cb.closest('.tab').hidden && (s.curve || []).length) {
+          const c = baseChart(cb); live.lbcurve = c;
+          const ln = c.addLineSeries({ color: css('--accent'), lineWidth: 2, priceLineVisible: false, title: 'Cộng dồn R' });
+          ln.setData(s.curve.map(([d, v]) => ({ time: d, value: v })));
+          ln.createPriceLine({ price: 0, color: css('--muted'), lineStyle: 2, lineWidth: 1, axisLabelVisible: false });
+          c.timeScale().fitContent();
+        }
+      };
+      selDim.addEventListener('input', () => { st.dim = selDim.value; drawM(); });
+      selM.addEventListener('input', () => { st.m = selM.value; drawM(); drawDetail(); });
+      selSet.addEventListener('input', drawDetail);
+      drawM(); drawDetail();
+      // ---- breakout thất bại
+      const Fl = B.fail || {};
+      $('#lb-fail-sum').textContent = Fl.n ? `${n0(Fl.n)} breakout (VCP, nền phẳng, cốc tay cầm, cờ cán cao, breakout 20 phiên): ${pct(Fl.fail, 0)} thất bại (chạm stop hoặc đóng cửa dưới pivot trong 3 phiên đầu và không có lãi). Kỳ vọng lần mua đầu ${rr((Fl.first || {}).exp)}; mua lại sau khi lấy lại pivot ${rr((Fl.reentry || {}).exp)} (${n0((Fl.reentry || {}).n)} lệnh, thắng ${pct((Fl.reentry || {}).win, 0)}).` : '';
+      table($('#tb-lb-cause'), [
+        { k: 'label', label: 'Nguyên nhân (biết lúc mua)', l: true, f: (r) => el('span', { title: r.desc, text: r.label }) },
+        { k: 'fail_w', label: 'Tỷ lệ thất bại khi có', f: (r) => `${pct(r.fail_w, 0)} · ${n0(r.n_w)}`, sv: (r) => r.fail_w },
+        { k: 'fail_wo', label: 'Khi không có', f: (r) => `${pct(r.fail_wo, 0)} · ${n0(r.n_wo)}`, sv: (r) => r.fail_wo },
+        { k: 'diff', label: 'Chênh lệch', f: (r) => (isNum(r.fail_w) && isNum(r.fail_wo) ? `${r.fail_w - r.fail_wo > 0 ? '+' : ''}${n0(r.fail_w - r.fail_wo)} điểm` : '—'), c: (r) => cls(-(r.fail_w - r.fail_wo)), sv: (r) => (r.fail_w ?? 0) - (r.fail_wo ?? 0) },
+        { k: 'exp_w', label: 'Kỳ vọng khi có', f: (r) => rr(r.exp_w), c: (r) => cls(r.exp_w) },
+        { k: 'exp_wo', label: 'Khi không có', f: (r) => rr(r.exp_wo), c: (r) => cls(r.exp_wo) },
+        { k: 'share', label: '% lệnh thất bại có nguyên nhân này', f: (r) => pct(r.share, 0) },
+      ], Fl.causes || [], { sort: 'diff' });
+      table($('#tb-lb-multi'), [
+        { k: 'label', label: 'Số nguyên nhân cùng lúc', l: true },
+        { k: 'n', label: 'Số lệnh', f: (r) => n0(r.n) },
+        { k: 'win', label: '% thắng', f: (r) => pct(r.win, 0) },
+        { k: 'exp', label: 'Kỳ vọng', f: (r) => rr(r.exp), c: (r) => cls(r.exp) },
+        { k: 'fail3', label: 'Thất bại 3 phiên', f: (r) => pct(r.fail3, 0) },
+      ], Fl.multi || [], {});
+      table($('#tb-lb-recent'), [
+        { k: 't', label: 'Mã', tk: true },
+        { k: 's', label: 'Setup', l: true },
+        { k: 'in', label: 'Mua', f: (r) => fdate(r.in) },
+        { k: 'fail', label: 'Thủng pivot', f: (r) => fdate(r.fail) },
+        { k: 'pv', label: 'Pivot', f: (r) => n2(r.pv) },
+        { k: 'vs_pv', label: 'Giá so pivot', f: (r) => spct(r.vs_pv), c: (r) => cls(r.vs_pv) },
+        { k: 'status', label: 'Trạng thái', l: true, c: (r) => (r.reclaim ? 'up' : '') },
+        { k: 'causes', label: 'Nguyên nhân có lúc mua', l: true, f: (r) => r.causes.join(' · ') || '—', sv: (r) => r.causes.length },
+      ], Fl.recent || [], { sort: 'fail', onRow: (r) => openChart(r.t), empty: 'Không có breakout thất bại trong 30 phiên.' });
+      // ---- tín hiệu hôm nay: 3 câu hỏi
+      const P = B.plans || [];
+      const onlyOk = $('#lb-ok');
+      const drawPlans = () => {
+        const rows = P.filter((p) => !onlyOk.checked || p.ok_stop);
+        table($('#tb-lb-plan'), [
+          { k: 't', label: 'Mã', tk: true },
+          { k: 'setup', label: 'Setup', l: true, f: (r) => r.setup + (r.sig !== S.latest.asof ? ` (tín hiệu ${fdate(r.sig)})` : '') },
+          { k: 'q1', label: '1. Lợi thế lịch sử (giai đoạn hiện tại)', f: (r) => { const c = r.hist.stage || {}; return c.n ? el('span', { class: c.n < MIN ? 'cd-low' : cls(c.exp) }, `${rr(c.exp)} · thắng ${pct(c.win, 0)} · ${n0(c.n)}`) : 'Chưa có mẫu'; }, sv: (r) => ((r.hist.stage || {}).n >= MIN ? r.hist.stage.exp : -9) },
+          { k: 'ev', label: '2. Bằng chứng dòng tiền', f: (r) => el('span', { title: 'Có: ' + r.have.join('; ') + '\nThiếu: ' + r.missing.join('; ') }, `${r.ev ?? '—'}/${r.ev_n ?? 9}`, r.news ? el('span', { class: 'tag warn', text: 'Gap sự kiện', title: r.news }) : '') },
+          { k: 'pivot', label: '3. Điểm mua', f: (r) => (r.kind === 'close' ? `Đã bứt phá @ ${n2(r.close)}` : `Vượt ${n2(r.pivot)} (cách ${pct(r.dist)})`) },
+          { k: 'stop', label: 'Sai khi thủng', f: (r) => `${n2(r.stop)} (−${n1(r.stop_pct)}%)`, c: (r) => (r.ok_stop ? '' : 'dn'), sv: (r) => r.stop_pct },
+          { k: 'shares', label: 'Số cổ', f: (r) => n0(r.shares) },
+          { k: 't2r', label: 'Mục tiêu +2R', f: (r) => n2(r.t2r) },
+        ], rows, { onRow: (r) => openChart(r.t), empty: 'Không có tín hiệu.' });
+      };
+      onlyOk.addEventListener('input', drawPlans);
+      drawPlans();
+    },
+    cond() {
+      const C = S.cond, items = C.items || [], dims = C.dims || [], MIN = C.min_n || 20;
+      $('#cd-notes').replaceChildren(...(C.notes || ['Chưa có dữ liệu. Sau lần chạy tới sẽ có.']).map((t) => el('li', { text: t })));
+      $('#cd-range').textContent = C.from ? `Giai đoạn thống kê: ${fdate(C.from)} – ${fdate(C.to)}. Ô mờ: dưới ${MIN} tín hiệu, chưa đủ tin cậy.` : '';
+      $('#cd-now').replaceChildren(...dims.filter((d) => d.now).map((d) => el('div', { class: 'cd-nowi' }, el('span', { class: 'muted small', text: d.label }), el('b', { text: d.now }))));
+      if (!items.length) return;
+      const st = { group: 'Mẫu hình', dim: (dims[0] || {}).key, h: '5', m: 'win' };
+      const selDim = $('#cd-dim'), selH = $('#cd-h'), selM = $('#cd-m'), selItem = $('#cd-item');
+      selDim.replaceChildren(...dims.map((d) => el('option', { value: d.key, text: d.label })));
+      const groups = ['Mẫu hình', 'VSA', 'Phong cách'].filter((g) => items.some((i) => i.group === g));
+      const segG = $('#cd-group');
+      const color = (c, m, metric) => {
+        if (!c || !c.n) return '';
+        let v, lo, hi;
+        if (metric === 'r') { v = m === 'win' ? c.win : c.exp; [lo, hi] = m === 'win' ? [20, 50] : [-0.5, 0.5]; }
+        else { v = m === 'win' ? c.win : c.avg; [lo, hi] = m === 'win' ? [40, 65] : [-2, 3]; }
+        if (!isNum(v)) return '';
+        const mid = (lo + hi) / 2, t = Math.max(-1, Math.min(1, (v - mid) / ((hi - lo) / 2)));
+        const col = t >= 0 ? 'var(--good)' : 'var(--bad)';
+        return `background:color-mix(in srgb,${col} ${Math.round(Math.abs(t) * 42)}%,transparent)`;
+      };
+      const cellTxt = (c, metric) => {
+        if (!c || !c.n) return el('span', { class: 'muted', text: '—' });
+        const main = metric === 'r' ? `${c.exp > 0 ? '+' : ''}${n2(c.exp)}R · ${pct(c.win, 0)}` : `${pct(c.win, 0)} · ${spct(c.avg)}`;
+        return el('span', {}, el('b', { text: main }), el('small', { class: 'cd-n', text: ` ${n0(c.n)}` }));
+      };
+      const getRes = (it) => (it.metric === 'r' ? it.h.trade : it.h[st.h]) || {};
+      const sortKey = (it, c) => (c && c.n >= MIN ? (it.metric === 'r' ? (st.m === 'win' ? c.win : c.exp) : (st.m === 'win' ? c.win : c.avg)) : -1e9);
+      const draw = () => {
+        const isR = st.group === 'Phong cách';
+        selH.disabled = isR;
+        selM.replaceChildren(...(isR ? [['win', 'Sắp xếp: % thắng'], ['avg', 'Sắp xếp: kỳ vọng R']] : [['win', 'Sắp xếp: % có lãi'], ['avg', 'Sắp xếp: lãi trung bình']]).map(([v, t]) => el('option', { value: v, text: t })));
+        selM.value = st.m;
+        const D = dims.find((d) => d.key === st.dim) || dims[0];
+        const rows = items.filter((i) => i.group === st.group);
+        const tbl = $('#tb-cd');
+        const head = el('tr', {}, el('th', { class: 'l', text: isR ? 'Phong cách' : 'Mẫu hình' }), el('th', { text: 'Mọi phiên' }), el('th', { class: 'cd-like', text: 'Giống hôm nay', title: (C.like.desc || []).join('; ') }),
+          ...D.buckets.map((b) => el('th', { class: b === D.now ? 'cd-today' : null, text: (b === D.now ? '★ ' : '') + b, title: `${n0(D.days[b])} phiên` })));
+        const nowB = D.now;
+        rows.sort((a, b) => sortKey(b, (getRes(b)[st.dim] || {})[nowB] || getRes(b).like) - sortKey(a, (getRes(a)[st.dim] || {})[nowB] || getRes(a).like));
+        const body = el('tbody', {}, ...rows.map((it) => {
+          const R = getRes(it), m = it.metric;
+          const td = (c, extra) => el('td', { class: [c && c.n && c.n < MIN ? 'cd-low' : '', extra || ''].join(' ').trim() || null, style: color(c, st.m, m) || null, title: c && c.n ? `${n0(c.n)} ${m === 'r' ? 'lệnh' : 'tín hiệu'}` + (isNum(c.stop) ? `, ${c.stop}% chạm đáy ngày tín hiệu trong 5 phiên` : '') : null }, cellTxt(c, m));
+          const name = el('td', { class: 'l' });
+          if (m === 'r' && LBY[it.id]) name.append(badge(it.id), ' ');
+          name.append(it.name);
+          return el('tr', { class: 'click', onclick: () => { selItem.value = it.id; drawItem(); $('#cd-item-card').scrollIntoView({ behavior: 'smooth', block: 'start' }); } },
+            name, td(R.all), td(R.like, 'cd-like'), ...D.buckets.map((b) => td((R[st.dim] || {})[b], b === nowB ? 'cd-today' : '')));
+        }));
+        tbl.replaceChildren(el('thead', {}, head), body);
+        $('#cd-legend').textContent = isR
+          ? 'Mỗi ô: kỳ vọng (R trung bình mỗi lệnh) · % lệnh thắng, số nhỏ là số lệnh. Lệnh theo quy tắc ở tab Kiểm chứng, gắn vào điều kiện thị trường của ngày vào lệnh.'
+          : `Mỗi ô: % tín hiệu có lãi sau ${st.h} phiên · lãi trung bình, số nhỏ là số tín hiệu. Tính từ giá đóng cửa ngày tín hiệu, gom theo điều kiện thị trường của ngày đó.`;
+        selItem.replaceChildren(...items.filter((i) => i.group === st.group).map((i) => el('option', { value: i.id, text: i.name })));
+        drawItem();
+      };
+      const drawItem = () => {
+        const it = items.find((i) => i.id === selItem.value) || items.find((i) => i.group === st.group);
+        if (!it) return;
+        const R = getRes(it), m = it.metric, box = $('#cd-item-box');
+        box.replaceChildren(...dims.map((d) => el('div', { class: 'cd-row' }, el('div', { class: 'cd-rl', text: d.label }),
+          el('div', { class: 'cd-cells' }, ...d.buckets.map((b) => { const c = (R[d.key] || {})[b];
+            return el('div', { class: ['cd-cell', b === d.now ? 'cd-today' : '', c && c.n && c.n < MIN ? 'cd-low' : ''].join(' ').trim(), style: color(c, st.m, m) || null },
+              el('span', { class: 'small muted', text: (b === d.now ? '★ ' : '') + b }), cellTxt(c, m)); })))));
+        $('#cd-item-title').textContent = `${it.name}: hiệu quả theo từng tiêu chí` + (m === 'r' ? '' : ` (sau ${st.h} phiên)`);
+      };
+      segG.replaceChildren(...groups.map((g) => { const b = el('button', { type: 'button', 'aria-pressed': String(g === st.group), text: g === 'Phong cách' ? 'Phong cách huyền thoại' : g === 'VSA' ? 'Tín hiệu VSA' : 'Mẫu hình' });
+        b.addEventListener('click', () => { st.group = g; st.m = 'win'; segG.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); draw(); }); return b; }));
+      selDim.addEventListener('input', () => { st.dim = selDim.value; draw(); });
+      selH.addEventListener('input', () => { st.h = selH.value; draw(); });
+      selM.addEventListener('input', () => { st.m = selM.value; draw(); });
+      selItem.addEventListener('input', drawItem);
+      draw();
+    },
     paper() {
       const P = S.paper, A = P.accounts || {};
       if (!Object.keys(A).length) { $('#pp-notes').replaceChildren(el('li', { text: P.error ? 'Chưa chạy được danh mục mô phỏng: ' + P.error : 'Chưa có dữ liệu danh mục mô phỏng. Sau lần chạy tới sẽ có.' })); return; }
@@ -689,10 +981,12 @@
       drawHistChart('pp');
       const sel = $('#pp-sel');
       sel.replaceChildren(...LEGENDS.filter((L) => A[L.id]).map((L) => el('option', { value: L.id, text: L.name })));
-      const fillTxt = (fs) => (fs || []).map((x) => `${x.why}: ${n0(x.sh)} cổ @ ${n2(x.px)} (${fdate(x.d)})`).join(' · ');
+      const fillTxt = (fs) => (fs || []).map((x) => (x.sh ? `${x.why}: ${n0(x.sh)} cổ @ ${n2(x.px)} (${fdate(x.d)})` : `${x.why} (${fdate(x.d)})`)).join(' · ');
+      $('#pp-common').replaceChildren(...(P.common || []).map((t) => el('li', { text: t })));
       const bootMark = (r) => (r.boot ? '↺ ' : '');
       const drawAcc = () => {
         const a = A[sel.value] || { open: [], pending: [], closed: [] };
+        $('#pp-rules').replaceChildren(...(a.rules || ['Bản dữ liệu cũ chưa có mô tả quy tắc.']).map((t) => el('li', { text: t })));
         table($('#tb-pp-open'), [
           { k: 't', label: 'Mã', tk: true },
           { k: 'in', label: 'Ngày mua', f: (r) => bootMark(r) + fdate(r.in) },
@@ -1079,7 +1373,7 @@
     add('Ngành', s.ind || s.theme || '—'); if (isNum(s.ind_rank)) add('Hạng ngành', `${s.ind_rank}/${S.latest.n_ind}`); add('RS', n0(s.rs)); if (isNum(s.rs_pos)) add('Hạng RS', n0(s.rs_pos));
     if (s.stage) add('Giai đoạn', String(s.stage)); if (isNum(s.rev_yoy)) add('DT quý', spct(s.rev_yoy)); if (isNum(s.eps_yoy)) add('EPS quý', spct(s.eps_yoy)); if (s.earn) add('Báo cáo', fdate(s.earn)); add('Giá', n2(s.close)); add('1 tháng', spct(s.r21)); add('3 tháng', spct(s.r63)); add('Biên độ ngày', pct(s.adr)); add('So EMA 21', spct(s.d21));
     const box = $('#ch-modal');
-    if (!S.charts) { box.textContent = 'Đang tải biểu đồ…'; try { S.charts = await (await fetch('data/charts.json', { cache: 'no-cache' })).json(); } catch (e) { S.charts = {}; } }
+    if (!S.charts) { box.textContent = 'Đang tải biểu đồ…'; try { S.charts = await (await fetch(`data/charts.json?v=${encodeURIComponent(S.latest.generated || '')}`)).json(); } catch (e) { S.charts = {}; } }
     const d = S.charts[t];
     if (modalChart) { modalChart.remove(); modalChart = null; }
     if (!d) { box.replaceChildren(el('p', { class: 'empty', text: 'Chỉ lưu biểu đồ cho top 100 và mã có setup để trang nhẹ. Mã này hiện không thuộc nhóm đó.' })); }
@@ -1098,12 +1392,37 @@
       }
       c.timeScale().fitContent();
     }
-    $('#m-plans').replaceChildren(el('h4', { text: 'Điểm mua và bán theo từng huyền thoại' }), planTable(Object.assign({}, s, setup && !s.t ? setup : {})),
+    const qa = threeQ(t);
+    $('#m-plans').replaceChildren(...qa, el('h4', { text: 'Điểm mua và bán theo từng huyền thoại' }), planTable(Object.assign({}, s, setup && !s.t ? setup : {})),
       el('p', { class: 'note', text: `Số cổ tính theo vốn ${usd(acct().capital)}, rủi ro ${acct().risk_pct}% mỗi lệnh; stop màu đỏ là rộng hơn mức tối đa ${acct().max_stop_pct}%. Hàng mờ: mã chưa đạt đủ tiêu chí của huyền thoại đó.` }));
-    $('#m-actions').replaceChildren(
+    $('#m-actions').replaceChildren(...[
       setup ? el('button', { class: 'btn', type: 'button', text: 'Ghi vào nhật ký', onclick: () => { closeModal(); prefillJournal(setup); } }) : null,
-      el('a', { class: 'btn ghost', href: `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(t)}`, target: '_blank', rel: 'noopener', text: 'Mở trên TradingView' }));
+      el('a', { class: 'btn ghost', href: `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(t)}`, target: '_blank', rel: 'noopener', text: 'Mở trên TradingView' })].filter(Boolean));
     $('#m-close').focus();
+  }
+  function threeQ(t) {
+    const P = ((S.lab || {}).plans || []).filter((p) => p.t === t);
+    const R = ((S.flow || {}).radar || []).find((x) => x.t === t);
+    if (!P.length && !R) return [];
+    const MIN = (S.lab || {}).min_n || 30, stNow = (S.flow || {}).stage;
+    const rr = (x) => (isNum(x) ? (x > 0 ? '+' : '') + n2(x) + 'R' : '—');
+    const line = (lb, c) => (c && c.n ? `${lb}: kỳ vọng ${rr(c.exp)}, thắng ${c.win}% (95%: ${c.lo}–${c.hi}%), đạt +2R ${c.p2r}%, thất bại 3 phiên ${c.fail3}% · ${c.n} lệnh${c.n < MIN ? ' (chưa đủ mẫu)' : ''}` : `${lb}: chưa có lệnh nào`);
+    const box = el('div', { class: 'q3' }, el('h4', { text: 'Ba câu hỏi trước khi mua' }));
+    const q = (n, title, ...kids) => box.append(el('div', { class: 'q3-i' }, el('div', { class: 'q3-n', text: n }), el('div', {}, el('b', { text: title }), ...kids)));
+    if (P.length) {
+      q('1', 'Mẫu hình này có xác suất thành công cao trong điều kiện hiện tại không?', ...P.map((p) => el('ul', { class: 'small-list' }, el('li', {}, el('b', { text: p.setup })),
+        el('li', { text: line(`Giai đoạn "${stNow}"`, p.hist.stage) }), el('li', { text: line(p.rs_b || 'RS', p.hist.rs) }), el('li', { text: line(`Ngành ${p.ind_b || ''}`, p.hist.ind) }),
+        el('li', { text: line(`Thị trường "${((S.flow || {}).golden || {}).level || '—'}"`, p.hist.gold) }),
+        el('li', { text: line('Cùng giai đoạn + RS ≥ 80 + ngành nửa trên', p.hist.now_best) }), el('li', { text: line('Ngoài mẫu (dữ liệu chưa dùng để xem xét)', p.hist.oos) }))));
+    } else q('1', 'Mẫu hình này có xác suất thành công cao trong điều kiện hiện tại không?', el('p', { class: 'small muted', text: 'Hôm nay mã này không có setup nào trong bảng kiểm chứng.' }));
+    if (R) q('2', `Dòng tiền có thật sự quay lại mã này? ${R.score}/${R.n} bằng chứng`, el('ul', { class: 'fl-evl' }, ...R.ev.map((e) => el('li', { class: e.ok ? 'ok' : 'no' }, el('span', { class: 'fl-mk', text: e.ok ? '✓' : '✗' }), el('span', { class: 'fl-lb', text: e.label }), el('span', { class: 'muted small', text: e.detail })))),
+      R.news ? el('p', { class: 'banner warn small', text: R.news }) : null, el('p', { class: 'small muted', text: 'Khối lượng không cho biết chính xác tổ chức nào mua; đây là bằng chứng xác suất về cung cầu. Không có dữ liệu short interest nên chỉ cảnh báo được các cú gap từ nền yếu.' }));
+    if (P.length) q('3', 'Điểm vào nào có lợi thế, khi nào phải thừa nhận mình sai?', ...P.map((p) => el('ul', { class: 'small-list' },
+      el('li', { text: p.kind === 'close' ? `${p.setup}: đã bứt phá hôm nay tại ${n2(p.close)}. Không mua đuổi nếu phiên tới mở cửa cao hơn pivot ${n2(p.pivot)} quá 3%.` : `${p.setup}: đặt lệnh chờ mua khi giá vượt ${n2(p.pivot)} (cách giá hiện tại ${pct(p.dist)}), còn hiệu lực ${p.left} phiên. Không mua nếu mở cửa gap cao hơn pivot trên 3%.` }),
+      el('li', { class: p.ok_stop ? '' : 'dn', text: `Sai khi: giá chạm ${n2(p.stop)} (stop −${n1(p.stop_pct)}%${p.ok_stop ? '' : `, rộng hơn mức tối đa ${acct().max_stop_pct}% của bạn`}), hoặc đóng cửa lại dưới pivot trong 3 phiên đầu (trước đây xảy ra ở ${(p.hist.all || {}).fail3 ?? '—'}% lệnh của setup này).` }),
+      el('li', { text: `Cỡ lệnh: ${n0(p.shares)} cổ, rủi ro khoảng ${usd(p.risk_usd)}. Mục tiêu tham khảo +2R ${n2(p.t2r)}, +3R ${n2(p.t3r)}; quy tắc kiểm chứng: chốt 1/2 tại +2R, dời stop về hòa vốn, phần còn lại thoát khi đóng cửa dưới EMA 21.` }))));
+    box.append(el('p', { class: 'small muted', text: 'Không câu trả lời nào tự quyết định lệnh mua. Hãy xem bằng chứng nào đang thiếu.' }));
+    return [box];
   }
   function closeModal() { $('#modal').hidden = true; if (modalChart) { modalChart.remove(); modalChart = null; } }
   $('#m-close').addEventListener('click', closeModal);
@@ -1222,10 +1541,15 @@
 
   // ------------------------------------------------------------ khởi động
   async function load() {
-    const get = async (k) => (await fetch(`data/${k}.json`, { cache: 'no-cache' })).json();
+    // tải latest trước, rồi mọi file khác kèm mã lần chạy để không bao giờ trộn dữ liệu của hai lần chạy khác nhau
+    let ver = '';
+    const get = async (k) => (await fetch(`data/${k}.json?v=${encodeURIComponent(ver)}`, ver ? {} : { cache: 'no-store' })).json();
     try {
-      [S.latest, S.history, S.stocks, S.setups, S.extended, S.themes, S.basket] = await Promise.all(['latest', 'history', 'stocks', 'setups', 'extended', 'themes', 'basket'].map(get));
-      [S.industries, S.patterns, S.backtest, S.cycle, S.paper] = await Promise.all(['industries', 'patterns', 'backtest', 'cycle', 'paper'].map((k) => get(k).catch(() => null)));
+      S.latest = await (await fetch(`data/latest.json?t=${Date.now()}`, { cache: 'no-store' })).json();
+      ver = S.latest.generated || String(Date.now());
+      [S.history, S.stocks, S.setups, S.extended, S.themes, S.basket] = await Promise.all(['history', 'stocks', 'setups', 'extended', 'themes', 'basket'].map(get));
+      [S.industries, S.patterns, S.backtest, S.cycle, S.paper, S.cond, S.flow, S.lab] = await Promise.all(['industries', 'patterns', 'backtest', 'cycle', 'paper', 'cond', 'flow', 'lab'].map((k) => get(k).catch(() => null)));
+      S.cond = S.cond || { items: [], dims: [], notes: [] };
       S.paper = S.paper || { accounts: {} };
       S.cycle = S.cycle || { notes: [] };
       S.backtest = S.backtest || { strategies: {}, vsa_types: [], notes: [] };
@@ -1241,6 +1565,9 @@
     if (!L.demo && L.version !== APP_VERSION) { const b = $('#stale-banner'); b.hidden = false; b.textContent = `Giao diện (${APP_VERSION}) và bộ tính toán (${L.version || 'bản cũ'}) khác phiên bản. Hãy tải lại đủ các thư mục docs và pipeline lên GitHub rồi bấm Run workflow.`; }
     const age = (Date.now() - new Date(L.asof + 'T21:00:00Z').getTime()) / 864e5;
     if (age > 4 && !L.demo) { const b = $('#stale-banner'); b.hidden = false; b.textContent = `Dữ liệu đã cũ ${Math.floor(age)} ngày. Có thể lần chạy tự động gần đây bị lỗi — xem tab Actions trên GitHub.`; }
+    if (S.flow && S.flow.stage) { const fb = $('#flow-banner'), F = S.flow, sc = F.scores || {}; fb.hidden = false; fb.style.setProperty('--ph', `var(${STC[F.stage] || '--muted'})`);
+      const GG = F.golden || {}; fb.replaceChildren(el('b', { text: `Giai đoạn dòng tiền: ${F.stage}` }), GG.level ? el('b', { class: 'gd-inl', style: `--ph:var(${GDC[GG.level] || '--muted'})`, text: ` · ${GG.level} (${GG.count}/6)` }) : '', ` · Độ rộng ${n0(sc.breadth)} · Tích lũy ${n0(sc.accum)} · Dẫn dắt ${n0(sc.lead)} · Follow-through ${n0(sc.ft)}` + ((F.warnings || []).length ? ` · ⚠ ${F.warnings.length} cảnh báo` : '') + ' → xem tab Dòng tiền');
+      fb.addEventListener('click', () => showTab('flow')); }
     rangeButtons();
     showTab(location.hash.slice(1) || store.get('nk_tab', 'overview'));
   }
