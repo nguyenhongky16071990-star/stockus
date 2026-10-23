@@ -282,3 +282,7 @@ li.dn{color:var(--bad)}
 .gd-checks{margin:6px 0 10px}
 .gd-k1{color:var(--good)}.gd-k2{color:var(--c4)}.gd-k3{color:var(--warn)}.gd-k4{color:var(--bad)}
 .fl-banner b.gd-inl{color:var(--ph)}
+.gr-dots{display:inline-flex;gap:3px}
+.gr-dots i{width:10px;height:10px;border-radius:3px;background:var(--line);display:inline-block}
+.gr-sw{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px}
+#gr-chips{margin-bottom:8px}

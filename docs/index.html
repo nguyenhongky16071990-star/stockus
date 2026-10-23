@@ -160,9 +160,33 @@
 
   <!-- NGÀNH & DẪN ĐẦU -->
   <section id="tab-leaders" class="tab" role="tabpanel" hidden>
+    <div class="intro">
+      <h2>Ngành nào đang thật sự dẫn dắt?</h2>
+      <p>Ngành dẫn thật phải mạnh ở nhiều mặt cùng lúc, giữ vị trí nhiều tuần và có nhiều mã cùng tăng, không chỉ nhờ 1–2 mã. Điểm ngành dẫn gộp 7 bằng chứng, mỗi bằng chứng được xếp hạng giữa các ngành trong cùng ngày (100 = tốt nhất). App tự kiểm chứng xem ngành điểm cao trước đây có thật sự tăng hơn SPY 1 và 3 tháng sau không.</p>
+    </div>
+    <article class="card notes"><h3>Nhận xét</h3><ul id="gr-notes"></ul></article>
+    <article class="card">
+      <h3>Điểm ngành dẫn</h3>
+      <p class="note">7 chấm theo thứ tự: sức mạnh giá, đường RS so với SPY, độ rộng trong ngành, độ bền, tích lũy khối lượng, nền giá, tăng trưởng EPS/doanh thu. Xanh đậm: nhóm đầu; xám: nhóm cuối. Rê chuột để xem chi tiết, bấm vào ngành để vẽ đường RS.</p>
+      <div class="tools"><select id="gr-lab" aria-label="Lọc nhãn"><option value="">Mọi ngành</option><option>Dẫn dắt</option><option>Mới nổi</option><option>Suy yếu</option><option>Tụt hậu</option></select><input type="search" id="gr-q" placeholder="Tìm ngành…" aria-label="Tìm ngành"><span class="muted small" id="gr-count"></span></div>
+      <div class="tbl tall"><table id="tb-gr"></table></div>
+    </article>
+    <article class="card">
+      <h3>Đường RS của ngành so với SPY</h3>
+      <p class="note">Mỗi đường = chỉ số ngành (bình quân các mã) chia cho SPY, đặt bằng 100 ở đầu biểu đồ. Đường đi lên là ngành mạnh hơn thị trường; đường RS lập đỉnh trước khi giá lập đỉnh là dấu hiệu dẫn dắt sớm. Bấm tên ngành để ẩn/hiện.</p>
+      <div class="btchips" id="gr-chips"></div>
+      <div class="seg" role="group" aria-label="Biểu đồ"><button type="button" id="gr-v-rsl" aria-pressed="true">Đường RS</button><button type="button" id="gr-v-sc" aria-pressed="false">Điểm theo thời gian</button></div>
+      <div class="chart tall-ch" id="ch-gr"></div>
+    </article>
+    <article class="card">
+      <h3>Kiểm chứng: điểm cao có dự báo ngành tăng hơn SPY không?</h3>
+      <p class="note" id="gr-val-note"></p>
+      <div class="grid2"><div class="tbl"><table id="tb-gr-val"></table></div><div class="tbl"><table id="tb-gr-val2"></table></div></div>
+    </article>
     <article class="card">
       <h3>Xếp hạng ngành</h3>
-      <p class="note">Xếp theo trung vị sức mạnh giá của các mã trong ngành (ngành có từ 3 mã). Hạng 1 là mạnh nhất. Cột thay đổi so với 1 tuần và 1 tháng trước cho biết ngành nào đang được dòng tiền chú ý.</p>
+      <p class="note">Xếp theo trung vị sức mạnh giá của các mã trong ngành (ngành có từ 3 mã). Hạng 1 là mạnh nhất. Các cột lợi nhuận là trung vị các mã (không bị 1 mã tăng quá mạnh kéo lệch); "% mã tăng" là tỷ lệ mã có lãi trong 1 tháng — cao là sức mạnh lan rộng.</p>
+      <p class="note" id="ind-anchor"></p>
       <div class="tools"><input type="search" id="q-ind" placeholder="Tìm ngành…" aria-label="Tìm ngành"><span class="muted small" id="ind-count"></span></div>
       <div class="tbl tall"><table id="tb-ind"></table></div>
     </article>
