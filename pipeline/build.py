@@ -27,7 +27,7 @@ DATA = ROOT / "docs" / "data"
 CONFIG = json.loads((ROOT / "pipeline" / "config.json").read_text(encoding="utf-8"))
 INDEXES = ["QQQ", "SPY", "IWM", "SMH", "IGV"]
 FIELDS = ["Open", "High", "Low", "Close", "Volume"]
-APP_VERSION = "2026.10.23-c"  # phải trùng với APP_VERSION trong docs/app.js
+APP_VERSION = "2026.10.24-b"  # phải trùng với APP_VERSION trong docs/app.js
 
 
 # ---------------------------------------------------------------- tải dữ liệu
@@ -590,6 +590,18 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
             traceback.print_exc()
             print("Money Flow Radar / setup lỗi:", e, file=sys.stderr)
 
+    # ---- điểm ngành dẫn
+    groups_out = {"rows": []}
+    if not light:
+        import groups as _grp
+        try:
+            groups_out, _ = _grp.compute(dict(C=C, H=H, L=L, V=V, valid=valid, liquid=liquid, rs=rs, s50=s50, dd_hi=dd_hi, adr=adr, perf=perf,
+                                              ind_s=ind_s, spy=raw["SPY"]["Close"].reindex(dates).ffill() if "SPY" in raw else qc, start=bt_start))
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print("Điểm ngành dẫn lỗi:", e, file=sys.stderr)
+
     # ---- mẫu hình / phong cách nào hiệu quả trong điều kiện thị trường nào
     cond = {"items": [], "dims": [], "notes": []}
     if not light:
@@ -603,6 +615,18 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
             print("Thống kê theo điều kiện thị trường lỗi:", e, file=sys.stderr)
             cond = {"items": [], "dims": [], "notes": ["Chưa tính được thống kê theo điều kiện thị trường."]}
 
+    # ---- đỉnh và đáy gần nhất của QQQ (sóng ≥ 7%): đo mỗi mã, mỗi ngành đã đi được bao nhiêu từ đó
+    import cycle as _cy
+    sw_q = _cy.zigzag(qc, 0.07)
+    pk_list = [x["to"] for x in sw_q if x["dir"] == "up" and not x.get("open")] + [x["from"] for x in sw_q if x["dir"] == "down"]
+    tr_list = [x["to"] for x in sw_q if x["dir"] == "down" and not x.get("open")] + [x["from"] for x in sw_q if x["dir"] == "up"]
+    anchors = {}
+    for key, lst in (("pk", pk_list), ("tr", tr_list)):
+        if lst:
+            d_ = pd.Timestamp(max(lst))
+            anchors[key] = {"d": d_.strftime("%Y-%m-%d"), "qqq": r1((qc.iloc[-1] / qc.loc[d_] - 1) * 100, 1), "px": C.loc[d_]}
+    r_from = {k: (C.iloc[-1] / v["px"] - 1) * 100 for k, v in anchors.items()}
+
     # ---- ảnh chụp hôm nay
     t0 = -1
     last = dates[t0]
@@ -615,6 +639,7 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
             "chg": r1(ret[1][t].iloc[t0] * 100), "r5": r1(ret[5][t].iloc[t0] * 100),
             "r21": r1(ret[21][t].iloc[t0] * 100), "r63": r1(ret[63][t].iloc[t0] * 100),
             "r126": r1(ret[126][t].iloc[t0] * 100), "rs": r1(rs[t].iloc[t0], 0),
+            "r_pk": r1(r_from["pk"][t]) if "pk" in r_from else None, "r_tr": r1(r_from["tr"][t]) if "tr" in r_from else None,
             "adr": r1(adr[t].iloc[t0]), "dv": r1(dv[t].iloc[t0] / 1e6, 0),
             "d9": r1((C[t].iloc[t0] / e9[t].iloc[t0] - 1) * 100), "d21": r1((C[t].iloc[t0] / e21[t].iloc[t0] - 1) * 100),
             "d50": r1((C[t].iloc[t0] / e50[t].iloc[t0] - 1) * 100),
@@ -718,7 +743,9 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
         gm = pd.DataFrame(mem)
         industries.append({
             "ind": g, "rank": int(rk), "rank5": r1(g_rank[g].iloc[t0 - 5], 0), "rank21": r1(g_rank[g].iloc[t0 - 21], 0),
-            "n": len(mem), "rs": r1(gm.rs.mean(), 0), "r5": r1(gm.r5.mean()), "r21": r1(gm.r21.mean()), "r63": r1(gm.r63.mean()),
+            "n": len(mem), "rs": r1(gm.rs.median(), 0), "r5": r1(gm.r5.median()), "r21": r1(gm.r21.median()), "r63": r1(gm.r63.median()),
+            "r126": r1(gm.r126.median()), "r_pk": r1(gm.r_pk.median()) if "r_pk" in gm else None, "r_tr": r1(gm.r_tr.median()) if "r_tr" in gm else None,
+            "up21": r1((gm.r21 > 0).mean() * 100, 0),
             "leaders": int(gm.leader.sum()), "top": int(gm.top.sum()), "best": [x["t"] for x in mem[:4]],
         })
     n_ind = len(industries)
@@ -825,6 +852,7 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
         "basket2": {k: r1(hist[k].iloc[t0], 1) for k in ("b_ret1", "b_ret3", "b_ret5", "b_ret21", "b_nh52", "b_nh20", "b_w10", "b_w20", "b_ddmed")} | {k + "_5": r1(hist[k].iloc[t0 - 5], 1) for k in ("b_ret5", "b_nh52", "b_w20", "b_ddmed")}
                     | {k + "_21": r1(hist[k].iloc[t0 - 21], 1) for k in ("b_nh52", "b_w20")},
         "config": cfg,
+        "anchors": {k: {"d": v["d"], "qqq": v["qqq"]} for k, v in anchors.items()},
     }
 
     keep = hist.iloc[-cfg["history_days"]:].copy()
@@ -846,7 +874,7 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
     latest["notes_patterns"] = pattern_notes(pat_stats)
     patterns = {"stats": pat_stats, "dates": [d.strftime("%Y-%m-%d") for d in dates[-keep_n:]], "series": pat_series}
     return {"latest": latest, "history": history, "stocks": stk, "setups": setups, "extended": extended,
-            "themes": themes, "basket": basket, "charts": charts, "industries": industries, "patterns": patterns, "backtest": bt, "cycle": cyc, "cond": cond, "flow": flow_out, "lab": lab}
+            "themes": themes, "basket": basket, "charts": charts, "industries": industries, "patterns": patterns, "backtest": bt, "cycle": cyc, "cond": cond, "flow": flow_out, "lab": lab, "groups": groups_out}
 
 
 def _p(x, d=1):
@@ -1010,7 +1038,7 @@ def _jd(o):
 
 def write(out: dict) -> None:
     DATA.mkdir(parents=True, exist_ok=True)
-    for k in ("latest", "history", "stocks", "setups", "extended", "themes", "basket", "charts", "industries", "patterns", "backtest", "cycle", "cond", "flow", "lab", "paper"):
+    for k in ("latest", "history", "stocks", "setups", "extended", "themes", "basket", "charts", "industries", "patterns", "backtest", "cycle", "cond", "flow", "lab", "groups", "paper"):
         (DATA / f"{k}.json").write_text(json.dumps(out[k], ensure_ascii=False, separators=(",", ":"), default=_jd), encoding="utf-8")
     # lưu lại ảnh chụp setup + tổng quan mỗi ngày để thống kê về sau
     snap = DATA / "archive"
@@ -1044,6 +1072,11 @@ def attach_fundamentals(out: dict, demo: bool = False, key: str | None = None) -
         x["stage"], x["ipo"], x["dd"], x["rsnh"] = st.get("stage"), st.get("ipo"), st.get("dd"), st.get("rsnh")
     out["latest"]["fund_n"] = sum(1 for s in out["stocks"] if s.get("q_end"))
     print(f"Số liệu cơ bản: {out['latest']['fund_n']} mã")
+    try:
+        import groups as _grp
+        _grp.add_fund(out)
+    except Exception as e:
+        print("Cơ bản theo ngành lỗi:", e, file=sys.stderr)
     return F
 
 
@@ -1082,6 +1115,7 @@ def main():
     a = ap.parse_args()
     uni = load_universe()
     key = os.environ.get("MASSIVE_API_KEY") or os.environ.get("POLYGON_API_KEY")
+    massive_err = None
     if a.demo:
         raw, source = demo_data(INDEXES + list(uni.ticker)), "Giả lập"
     elif key and not a.yahoo:
@@ -1091,11 +1125,14 @@ def main():
             source = "Massive (toàn thị trường)"
         except Exception as e:  # Massive lỗi thì vẫn có trang với Yahoo
             print("Massive lỗi, chuyển sang Yahoo:", e, file=sys.stderr)
+            massive_err = str(e)[:300]
             raw, source = download(INDEXES + list(uni.ticker), CONFIG["years"]), "Yahoo Finance (Massive lỗi)"
     else:
         raw, source = download(INDEXES + list(uni.ticker), CONFIG["years"]), "Yahoo Finance (danh sách universe.csv)"
     out = compute(raw, uni)
     out["latest"]["source"] = source
+    if massive_err:
+        out["latest"]["massive_error"] = massive_err.replace(key or "", "***") if key else massive_err
     out["latest"]["version"] = APP_VERSION
     F = attach_fundamentals(out, demo=a.demo, key=key if source.startswith("Massive") else None)
     if a.demo:

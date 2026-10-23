@@ -11,7 +11,7 @@
   "history_days": 500,
   "scan_min_price": 3,
   "scan_min_dollar_vol": 2000000,
-  "massive_calls_per_min": 0,
+  "massive_calls_per_min": 5,
   "massive_base": "https://api.massive.com",
   "fund_top": 400,
   "fund_per_run": 400,

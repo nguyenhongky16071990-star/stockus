@@ -52,23 +52,29 @@ class Client:
             url = self.base + url
         params = dict(params or {})
         params["apiKey"] = self.key
-        for attempt in range(6):
+        attempt, waits = 0, 0
+        while attempt < 6:
             self._wait()
             self.calls += 1
             try:
                 r = self.s.get(url, params=params, timeout=40)
             except requests.RequestException:
-                time.sleep(2 * (attempt + 1))
+                attempt += 1
+                time.sleep(2 * attempt)
                 continue
-            if r.status_code == 429:
-                time.sleep(15)
+            if r.status_code == 429:   # vượt giới hạn lệnh gọi của gói: chờ rồi thử lại, không tính là lỗi
+                waits += 1
+                if waits > 30:
+                    raise RuntimeError("Massive liên tục báo vượt giới hạn lệnh gọi (429). Đặt massive_calls_per_min = 5 trong config.json nếu dùng gói miễn phí.")
+                time.sleep(20)
                 continue
             if r.status_code == 401:
                 raise RuntimeError("MASSIVE_API_KEY không hợp lệ (lỗi 401). Kiểm tra lại secret trên GitHub.")
             if r.status_code == 403:
                 raise Forbidden(r.text[:200])
             if r.status_code >= 500:
-                time.sleep(3 * (attempt + 1))
+                attempt += 1
+                time.sleep(3 * attempt)
                 continue
             r.raise_for_status()
             js = r.json()
@@ -103,7 +109,7 @@ def _grouped_day(cl: Client, d: str, recent: bool) -> pd.DataFrame | None:
         js = cl.get(f"/v2/aggs/grouped/locale/us/market/stocks/{d}", {"adjusted": "false"})
     except Forbidden:
         na.touch()  # ngoài phạm vi lịch sử của gói đang dùng
-        return None
+        return "forbidden"
     res = js.get("results") or []
     df = pd.DataFrame(res).reindex(columns=COLS) if res else pd.DataFrame(columns=COLS)
     df = df.dropna(subset=["T", "c"])
@@ -122,12 +128,31 @@ def fetch_prices(cl: Client, days: list[str], workers: int) -> pd.DataFrame:
     def job(d):
         return d, _grouped_day(cl, d, d in recent)
 
-    with ThreadPoolExecutor(max_workers=workers) as ex:
-        for i, (d, df) in enumerate(ex.map(job, days)):
+    if workers == 1:
+        # gói giới hạn lệnh gọi: tải từ mới về cũ, gặp ngày ngoài phạm vi lịch sử của gói thì dừng (không phí lệnh gọi)
+        streak = 0
+        for i, d in enumerate(reversed(days)):
+            _, df = job(d)
+            if isinstance(df, str):
+                streak += 1
+                if streak >= 3:
+                    print(f"  Gói Massive chỉ có lịch sử tới khoảng {d}; bỏ qua các ngày cũ hơn")
+                    for dd in days[:len(days) - i - 1]:
+                        (CACHE / "grouped" / f"{dd}.na").touch()
+                    break
+                continue
+            streak = 0
             if df is not None and len(df):
                 frames[d] = df
-            if (i + 1) % 100 == 0:
-                print(f"  … {i + 1}/{len(days)}")
+            if (i + 1) % 50 == 0:
+                print(f"  … {i + 1}/{len(days)} ({cl.calls} lệnh gọi)", flush=True)
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            for i, (d, df) in enumerate(ex.map(job, days)):
+                if isinstance(df, pd.DataFrame) and len(df):
+                    frames[d] = df
+                if (i + 1) % 100 == 0:
+                    print(f"  … {i + 1}/{len(days)}")
     if not frames:
         raise RuntimeError("Massive không trả về dữ liệu giá nào.")
     long = pd.concat([df.assign(d=d) for d, df in frames.items()], ignore_index=True)
