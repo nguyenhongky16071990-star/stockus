@@ -4,7 +4,8 @@ Mỗi phương pháp gồm: tín hiệu (chỉ dùng giá và khối lượng, v
 lợi nhuận lịch sử), cách vào lệnh, stop ban đầu và quy tắc bán đúng như người đó
 mô tả. Kết quả tính theo R (bội số rủi ro): 1R = giá mua − stop.
 
-Giả định: không phí, không trượt giá; mỗi mã chỉ một lệnh mở cho mỗi phương pháp;
+Quy tắc vào/ra lệnh và điều kiện thị trường giống hệt tab Mô phỏng (paper.py), trượt giá 0,1% mỗi lần khớp;
+mỗi mã chỉ một lệnh mở cho mỗi phương pháp, không giới hạn vốn;
 chỉ dùng các mã còn niêm yết hôm nay (có thiên lệch sống sót).
 """
 from __future__ import annotations
@@ -149,6 +150,167 @@ def simulate(name, sig, spec, P, dates, regime, start, max_stop=12.0):
     return trades
 
 
+# ---------------------------------------------------------------- mô phỏng theo đúng quy tắc của tab Mô phỏng (paper.py)
+SLIP = 0.001
+MA_NAME = {"e9": "EMA 9", "e10": "EMA 10", "e21": "EMA 21", "s10": "SMA 10", "s20": "SMA 20", "s50": "SMA 50", "s150": "đường 30 tuần"}
+
+
+def simulate_rules(name, sig, spec, A, dates, regime, start):
+    """Giống paper._step_position nhưng không giới hạn vốn: mỗi tín hiệu là một lệnh, tính theo R sau trượt giá."""
+    O, H, L, C, V = A["O"], A["H"], A["L"], A["C"], A["V"]
+    nd, nt = C.shape
+    sv = sig.values
+    lvlA = spec["lvl"].values if spec.get("lvl") is not None else None
+    stpA = spec["stop"].values
+    trades, busy = [], np.full(nt, -1)
+    rows, cols = np.nonzero(sv[start:nd - 1])
+    order = np.lexsort((rows, cols))
+    for k in order:
+        d, j = rows[k] + start, cols[k]
+        if d <= busy[j]:
+            continue
+        sp0 = stpA[d, j]
+        if spec["entry"] == "stop":
+            lv, e0 = lvlA[d, j], None
+            if not (np.isfinite(lv) and np.isfinite(sp0)) or sp0 >= lv:
+                continue
+            for q in range(d + 1, min(nd, d + 1 + spec.get("pending", 1))):
+                if not np.isfinite(H[q, j]):
+                    break
+                if H[q, j] >= lv:
+                    e0 = q
+                    break
+                if L[q, j] <= sp0:
+                    break
+            if e0 is None:
+                busy[j] = d + spec.get("pending", 1)
+                continue
+            fill = max(O[e0, j], lv) if np.isfinite(O[e0, j]) else lv
+            if spec.get("chase") and fill > lv * spec["chase"]:
+                busy[j] = e0
+                continue
+            fill *= 1 + SLIP
+        else:
+            e0, fill = d, C[d, j] * (1 + SLIP)
+        stop = fill * (1 - spec["stop_pct"] / 100) if spec.get("stop_pct") else sp0
+        if not (np.isfinite(fill) and np.isfinite(stop)) or stop >= fill:
+            continue
+        risk = fill - stop
+        if risk / fill * 100 > spec.get("max_stop", 12):
+            continue
+        trail_ma = spec.get("trail")
+        if callable(trail_ma):
+            trail_ma = trail_ma(d, j)
+        st = {"stop": stop, "rem": 1.0, "r": 0.0, "done": set(), "be": False, "hold8": False, "nd": False}
+        reason, x = None, None
+
+        def sell(frac, px):
+            f = min(frac, st["rem"])
+            st["r"] += f * (px - fill) / risk
+            st["rem"] -= f
+
+        # phiên mua
+        if spec["entry"] == "stop" and L[e0, j] <= stop:
+            sell(1, stop * (1 - SLIP))
+            reason, x = "Chạm stop ngay phiên mua", e0
+        elif spec.get("vol") and np.isfinite(A["v50"][e0, j]) and V[e0, j] < spec["vol"] * A["v50"][e0, j] and C[e0, j] < fill:
+            sell(1, C[e0, j] * (1 - SLIP))
+            reason, x = "Bứt phá thiếu khối lượng", e0
+        elif spec.get("lod") and L[e0, j] * 0.999 > st["stop"] and L[e0, j] < fill:
+            st["stop"] = L[e0, j] * 0.999
+        i = e0
+        while x is None:
+            i += 1
+            if i >= nd:
+                break
+            o, h, l, c = O[i, j], H[i, j], L[i, j], C[i, j]
+            if not np.isfinite(c):
+                continue
+            o = o if np.isfinite(o) else c
+            held = i - e0 + 1
+            if l <= st["stop"]:
+                sell(1, min(o, st["stop"]) * (1 - SLIP))
+                reason, x = ("Hòa vốn" if st["be"] and st["stop"] >= fill else ("Stop đã dời" if st["stop"] > stop else "Chạm stop")), i
+                break
+            if spec.get("be_r") and h >= fill + spec["be_r"] * risk and st["stop"] < fill:
+                st["stop"], st["be"] = fill, True
+            for pi, pt in enumerate(spec.get("partials", [])):
+                if pi in st["done"] or st["rem"] <= 1e-9:
+                    continue
+                kind, px = pt[0], None
+                if kind == "R" and h >= fill + pt[1] * risk:
+                    px, frac, be = max(o, fill + pt[1] * risk), pt[2], pt[3]
+                elif kind == "pct" and h >= fill * (1 + pt[1] / 100):
+                    px, frac, be = max(o, fill * (1 + pt[1] / 100)), pt[2], pt[3]
+                elif kind == "day_profit" and held >= pt[1] and c > fill:
+                    px, frac, be = c * (1 - SLIP), pt[2], pt[3]
+                elif kind == "ext" and np.isfinite(A[pt[1]][i, j]) and c >= A[pt[1]][i, j] * (1 + pt[2] / 100):
+                    px, frac, be = c * (1 - SLIP), pt[3], pt[4]
+                if px is not None:
+                    sell(frac, px)
+                    st["done"].add(pi)
+                    if be and st["stop"] < fill:
+                        st["stop"], st["be"] = fill, True
+            if st["rem"] <= 1e-9:
+                reason, x = "Chốt lời", i
+                break
+            if spec.get("oneil"):
+                if not st["hold8"] and h >= fill * 1.2:
+                    if held <= 15:
+                        st["hold8"] = True
+                        st["stop"], st["be"] = max(st["stop"], fill), True
+                    else:
+                        sell(1, max(o, fill * 1.2))
+                        reason, x = "Chốt hết tại +20%", i
+                        break
+                s50v, v50v = A["s50"][i, j], A["v50"][i, j]
+                if np.isfinite(s50v) and c < s50v and ((np.isfinite(v50v) and V[i, j] >= 1.5 * v50v and (not st["hold8"] or held > 40)) or (st["hold8"] and held > 40)):
+                    sell(1, c * (1 - SLIP))
+                    reason, x = "Thủng SMA 50", i
+                    break
+            if spec.get("weekly") and A["wk_end"][i]:
+                if np.isfinite(A["s150"][i, j]) and c < A["s150"][i, j]:
+                    sell(1, c * (1 - SLIP))
+                    reason, x = "Tuần đóng cửa dưới đường 30 tuần", i
+                    break
+                lo = A["lo20"][i, j]
+                if np.isfinite(lo) and st["stop"] < lo * 0.99 < c:
+                    st["stop"] = lo * 0.99
+            if spec.get("vsa") and np.isfinite(A["v20"][i, j]) and np.isfinite(A["rng20"][i, j]):
+                rng = h - l
+                pb = (c - l) / rng if rng > 0 else 0.5
+                vv, v20 = V[i, j], A["v20"][i, j]
+                if np.isfinite(A["hi20"][i, j]) and h > A["hi20"][i, j] and pb <= 0.33 and vv >= 1.5 * v20:
+                    sell(1, c * (1 - SLIP)); reason, x = "VSA: Upthrust", i; break
+                if vv >= 2 * v20 and rng >= 1.8 * A["rng20"][i, j] and pb < 0.5 and c > fill:
+                    sell(1, c * (1 - SLIP)); reason, x = "VSA: Buying climax", i; break
+                if (not st["nd"] and c > C[i - 1, j] and rng < 0.7 * A["rng20"][i, j] and vv < V[i - 1, j] and vv < V[i - 2, j]
+                        and np.isfinite(A["hi20"][i, j]) and h >= A["hi20"][i, j] * 0.97 and c > fill):
+                    st["nd"] = True
+                    sell(0.5, c * (1 - SLIP))
+            if spec.get("nofollow") and held >= spec["nofollow"] and c <= fill and not st["done"]:
+                sell(1, c * (1 - SLIP)); reason, x = "Không bứt tiếp", i; break
+            if held > spec.get("trail_after", 0):
+                stage_ = "post" if st["done"] else "pre"
+                hit = None
+                for ma, when in ([[trail_ma, "post"]] if isinstance(trail_ma, str) else []) + spec.get("trail_list", []):
+                    if when in (stage_, "all") and np.isfinite(A[ma][i, j]) and c < A[ma][i, j]:
+                        hit = ma
+                        break
+                if hit:
+                    sell(1, c * (1 - SLIP)); reason, x = f"Đóng cửa dưới {MA_NAME[hit]}", i; break
+            if held >= spec["max_hold"]:
+                sell(1, c * (1 - SLIP)); reason, x = "Hết thời gian giữ", i; break
+        open_ = x is None
+        if open_:
+            st["r"] += st["rem"] * (C[nd - 1, j] - fill) / risk
+            x, reason = nd - 1, "Đang mở"
+        busy[j] = x
+        trades.append({"j": j, "d": e0, "x": x, "entry": fill, "stop": stop, "r": st["r"], "pct": st["r"] * risk / fill * 100,
+                       "days": x - e0, "why": reason, "open": open_, "reg": regime[e0] if regime is not None else None})
+    return trades
+
+
 def summarize(trades, dates, tickers, recent_from):
     closed = [t for t in trades if not t["open"]]
     def stats(ts):
@@ -213,34 +375,49 @@ def run(ctx: dict, cfg: dict) -> dict:
     lo10 = L.rolling(10, min_periods=5).min()
     top = rs_pos <= cfg.get("basket_size", 100)
 
+    # điều kiện thị trường riêng của từng người (giống tab Mô phỏng)
+    qc = ctx["qqq_close"].reindex(dates)
+    q_e21, q_s10, q_s20, q_s50 = qc.ewm(span=21, adjust=False).mean(), qc.rolling(10).mean(), qc.rolling(20).mean(), qc.rolling(50, min_periods=40).mean()
+    q_s150 = qc.rolling(150, min_periods=100).mean()
+    bc = lambda m: pd.DataFrame(np.broadcast_to(m.fillna(False).values[:, None], C.shape), index=dates, columns=C.columns)
+    M = {"ml": bc((qc > q_e21) & pd.Series(qreg != "Xấu", index=dates)), "qm": bc((qc > q_s20) & (q_s10 > q_s20)), "mm": bc(qc > q_s50),
+         "wo": mk, "sw": bc((qc > q_s150) & (q_s150 > q_s150.shift(20))), "pb": bc(qc > q_s20), "ok": bc(qc > q_e21), "vs": bc(qc > q_s50)}
+    lo10 = L.rolling(10, min_periods=5).min()
+    pv = piv20 * 1.001
     S = {}
-    S["ml"] = (liquid & top & (adr >= 4) & e21up & (d9.abs() <= 5) & (reclaim9 | inside | conv) & mk_ml,
-               dict(entry="stop", lvl=H * 1.001, stop=L * 0.999, partials=[("R", 3, 0.15)], trail="e9", max_hold=60,
-                    max_stop=cfg.get("max_stop_pct", 6)))
-    S["qm"] = (liquid & ((ret[21] >= 0.3) | (ret[63] >= 0.3)) & (adr >= 4) & (dv >= 20e6) & (C > e21) & (tight | gap_ep),
-               dict(entry="stop", lvl=H * 1.001, stop=np.maximum(L * 0.999, H * 1.001 * (1 - adr / 100)),
-                    partials=[("day", 4, 0.5)], trail="e9", trail_after=4, max_hold=60))
+    S["ml"] = (liquid & top & (adr >= 4) & e21up & (d9.abs() <= 5) & (reclaim9 | inside | conv) & M["ml"],
+               dict(entry="stop", lvl=H * 1.001, stop=L * 0.999, pending=1, chase=1.03, max_stop=cfg.get("max_stop_pct", 6), lod=True,
+                    partials=[["R", 2, 0.25, True], ["R", 4, 0.25, False]], trail_list=[["e21", "pre"], ["e9", "post"]], max_hold=60))
+    adrv = adr.values
+    S["qm"] = (liquid & ((ret[21] >= 0.3) | (ret[63] >= 0.3)) & (adr >= 4) & (dv >= 20e6) & (C > e21) & (tight | gap_ep) & M["qm"],
+               dict(entry="stop", lvl=H * 1.001, stop=np.maximum(L * 0.999, H * 1.001 * (1 - adr / 100)), pending=1, chase=1.05, max_stop=12, lod=True,
+                    partials=[["day_profit", 3, 0.5, True]], trail=lambda d, j: "s10" if adrv[d, j] >= 6 else "s20", trail_after=0, max_hold=150))
     vcp = (rng5 < 0.7 * adr) & (C >= 0.9 * piv20) & (V.rolling(5).mean() < v50)
-    S["mm"] = (liquid & tt & (rs >= 80) & (dd_hi >= -25) & vcp,
-               dict(entry="stop", lvl=piv20 * 1.001, pending=5, stop=np.maximum(piv20 * 1.001 * 0.92, lo10 * 0.999),
-                    partials=[("pct", 20, 0.5)], be_after_partial=True, trail="e21", trail_after=5, max_hold=60, max_stop=8.5))
+    S["mm"] = (liquid & tt & (rs >= 80) & (dd_hi >= -25) & vcp & M["mm"],
+               dict(entry="stop", lvl=pv, pending=5, chase=1.05, stop=np.maximum(pv * 0.92, lo10 * 0.999), max_stop=8.5, vol=1.4, be_r=2,
+                    partials=[["R", 3, 1 / 3, True], ["R", 5, 1 / 3, True]], trail_list=[["s50", "pre"], ["s20", "post"]], trail_after=3, max_hold=150))
     grp20 = indr <= max(1, round(n_ind * 0.2))
-    S["wo"] = (liquid & (rs >= 80) & (dd_hi >= -15) & (udv >= 1.1) & grp20 & brk & mk,
-               dict(entry="close", stop=C * 0.93, partials=[("pct", 20, 1.0)], max_hold=40, max_stop=7.5))
-    S["sw"] = (liquid & (stage == 2) & (rs >= 70) & (indr <= n_ind / 2) & (udv >= 1) & (C > hiprev) & (V >= 2 * v50),
-               dict(entry="close", stop=np.maximum(s150 * 0.99, C * 0.85), trail="s150", max_hold=120, max_stop=15.5))
-    S["pb"] = (liquid & (ret[1] >= 0.04) & (V > V.shift(1)) & (V >= 1.5 * v50) & ((ret[21] - ret[1]) <= 0.25) & (dv >= 5e6),
-               dict(entry="close", stop=L * 0.999, partials=[("pct", 15, 1.0)], max_hold=4))
+    S["wo"] = (liquid & (rs >= 80) & (dd_hi >= -15) & (udv >= 1.1) & grp20 & M["wo"],
+               dict(entry="stop", lvl=pv, pending=5, chase=1.05, stop=pv * 0.925, stop_pct=7.5, max_stop=8.5, vol=1.4, oneil=True, max_hold=150))
+    s150b = (s150 * 0.99).where(s150 < pv, lo10 * 0.999)
+    S["sw"] = (liquid & (stage == 2) & (rs >= 70) & (indr <= n_ind / 2) & (udv >= 1) & M["sw"],
+               dict(entry="stop", lvl=pv, pending=5, chase=1.05, stop=np.maximum(s150b, pv * 0.85), max_stop=15.5, vol=1.5, weekly=True, max_hold=260))
+    S["pb"] = (liquid & (ret[1] >= 0.04) & (V > V.shift(1)) & (V >= 1.5 * v50) & ((ret[21] - ret[1]) <= 0.25) & (dv >= 5e6) & M["pb"],
+               dict(entry="close", stop=L * 0.999, max_stop=10, partials=[["pct", 8, 0.5, True]], nofollow=3, max_hold=5))
     cross = (low3 <= e21 * 1.01) & (C > e9) & (C > H.shift(1))
-    S["ok"] = (liquid & (rs_pos <= 200) & e21up & cross & (d9 <= 8),
-               dict(entry="stop", lvl=H * 1.001, pending=2, stop=np.minimum(L, e21) * 0.995, partials=[("ext9", 15, 0.5)], trail="e21",
-                    trail_after=2, max_hold=60))
+    S["ok"] = (liquid & (rs_pos <= 200) & e21up & cross & (d9 <= 8) & M["ok"],
+               dict(entry="stop", lvl=H * 1.001, pending=2, chase=1.04, stop=np.minimum(L, e21) * 0.995, max_stop=10,
+                    partials=[["ext", "e10", 15, 0.5, True]], trail_list=[["e21", "pre"], ["e10", "post"]], trail_after=1, max_hold=90))
     vsa = vsa_signals(O, H, L, C, V, e21, e50, ctx["s150"], v50, liquid)
     any_vsa = vsa["Không có cung"] | vsa["Kiểm định cung"] | vsa["Rũ bỏ (spring)"] | vsa["Khối lượng chặn"]
-    vspec = dict(entry="stop", lvl=H * 1.001, pending=3, stop=L * 0.995, partials=[("R", 2, 0.5)], be_after_partial=True, trail="e21",
-                 trail_after=3, max_hold=40)
-    S["vs"] = (any_vsa & (rs >= 50), vspec)
-
+    vspec = dict(entry="stop", lvl=H * 1.001, pending=3, stop=L * 0.995, max_stop=10, be_r=2, vsa=True, max_hold=60)
+    S["vs"] = (any_vsa & (rs >= 50) & M["vs"], vspec)
+    wk = pd.Series(dates.to_period("W"), index=dates)
+    A = {"O": O.values, "H": H.values, "L": L.values, "C": C.values, "V": V.values, "e9": e9.values, "e21": e21.values,
+         "e10": C.ewm(span=10, adjust=False).mean().values, "s10": C.rolling(10).mean().values, "s20": C.rolling(20).mean().values,
+         "s50": C.rolling(50, min_periods=40).mean().values, "s150": s150.values, "v50": V.rolling(50, min_periods=20).mean().shift(1).values,
+         "v20": V.rolling(20, min_periods=10).mean().shift(1).values, "rng20": (H - L).rolling(20).mean().shift(1).values,
+         "hi20": H.rolling(20).max().shift(1).values, "lo20": L.rolling(20).min().values, "wk_end": (wk != wk.shift(-1)).values}
     P = {k: v.values for k, v in (("O", O), ("H", H), ("L", L), ("C", C), ("e9", e9), ("e21", e21), ("s150", s150))}
     start = max(260, nd - int(cfg.get("bt_days", 500)))
     start = min(start, nd - 30)
@@ -248,12 +425,12 @@ def run(ctx: dict, cfg: dict) -> dict:
     tickers = list(C.columns)
     out, raw = {}, {}
     for k, (sig, spec) in S.items():
-        tr = simulate(k, sig.fillna(False).astype(bool), spec, P, dates, qreg, start)
+        tr = simulate_rules(k, sig.fillna(False).astype(bool), spec, A, dates, qreg, start)
         out[k] = summarize(tr, dates, tickers, recent_from)
         raw[k] = tr
     vtypes = []
     for name, sg in vsa.items():
-        tr = simulate(name, (sg & (rs >= 50)).fillna(False).astype(bool), vspec, P, dates, qreg, start)
+        tr = simulate_rules(name, (sg & (rs >= 50)).fillna(False).astype(bool), vspec, A, dates, qreg, start)
         s_ = summarize(tr, dates, tickers, recent_from)
         vtypes.append({"type": name, **{k: s_.get(k) for k in ("n", "win", "exp", "pf", "hold")}, "recent": s_["recent"]})
     today_vsa = {t: [n for n, sg in vsa.items() if bool(sg[t].iloc[-1])] for t in C.columns}

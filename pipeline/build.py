@@ -27,7 +27,7 @@ DATA = ROOT / "docs" / "data"
 CONFIG = json.loads((ROOT / "pipeline" / "config.json").read_text(encoding="utf-8"))
 INDEXES = ["QQQ", "SPY", "IWM", "SMH", "IGV"]
 FIELDS = ["Open", "High", "Low", "Close", "Volume"]
-APP_VERSION = "2026.10.24-b"  # phải trùng với APP_VERSION trong docs/app.js
+APP_VERSION = "2026.10.24-c"  # phải trùng với APP_VERSION trong docs/app.js
 
 
 # ---------------------------------------------------------------- tải dữ liệu
@@ -551,7 +551,7 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
                                           liquid=liquid, rs=rs, rs_pos=rs_pos, tt=tt, ret=ret, hi20=hi20, hiprev=hiprev, dd_hi=dd_hi,
                                           udv=udv, stage=stage, ind_rank=ind_rank_p, n_ind=n_ind0,
                                           qqq_regime=idx_reg.get("QQQ", pd.Series("Giằng co", index=dates)),
-                                          dd_qqq=dd.get("QQQ", pd.Series(0, index=dates))), cfg)
+                                          dd_qqq=dd.get("QQQ", pd.Series(0, index=dates)), qqq_close=qc), cfg)
         bt["notes"] = backtest.notes(bt, {"ml": "Martin Luk", "qm": "Qullamaggie", "mm": "Mark Minervini", "wo": "William O'Neil",
                                           "sw": "Stan Weinstein", "pb": "Pradeep Bonde", "ok": "Oliver Kell", "vs": "VSA"})
     except _Light as lt:
@@ -753,29 +753,6 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
     # ---- nhóm mạnh nhất hôm nay
     basket = sorted([s for s in stk if s["top"]], key=lambda s: -(s["rs"] or 0))
 
-    # ---- biểu đồ từng mã (chỉ mã đáng chú ý để trang nhẹ)
-    # quét toàn thị trường có thể ra hàng trăm mã, nên giới hạn khoảng 300 biểu đồ
-    lead_top = sorted([s for s in stk if s["leader"]], key=lambda s: -(s["rs"] or 0))[:120]
-    chart_set = {s["t"] for s in basket} | {x["t"] for x in setups if x["ok"]} | {s["t"] for s in lead_top}
-    for x in setups:
-        if len(chart_set) >= 300:
-            break
-        chart_set.add(x["t"])
-    charts = {}
-    for t in chart_set:
-        k = 160
-        d = dates[-k:]
-        av_low, av_gap, *_ = sdict[t].get("_av", (np.full(len(dates), np.nan),) * 2)
-        charts[t] = {
-            "d": [x.strftime("%Y-%m-%d") for x in d],
-            "o": [r1(x, 2) for x in O[t].iloc[-k:]], "h": [r1(x, 2) for x in H[t].iloc[-k:]],
-            "l": [r1(x, 2) for x in L[t].iloc[-k:]], "c": [r1(x, 2) for x in C[t].iloc[-k:]],
-            "v": [r1(x, 0) for x in V[t].iloc[-k:]],
-            "e9": [r1(x, 2) for x in e9[t].iloc[-k:]], "e21": [r1(x, 2) for x in e21[t].iloc[-k:]], "e50": [r1(x, 2) for x in e50[t].iloc[-k:]],
-            "avl": [r1(x, 2) for x in av_low[-k:]], "avg": [r1(x, 2) for x in av_gap[-k:]],
-        }
-    for s in stk:
-        s.pop("_av", None)
 
     # ---- bằng chứng dòng tiền từng mã + 3 câu hỏi trước khi mua cho tín hiệu hôm nay
     radar, plans = [], []
@@ -822,6 +799,38 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
             print("Radar cổ phiếu lỗi:", e, file=sys.stderr)
     flow_out["radar"] = radar[:250]
     lab["plans"] = plans
+
+    # ---- biểu đồ từng mã (chỉ mã đáng chú ý để trang nhẹ)
+    # quét toàn thị trường có thể ra hàng trăm mã, nên giới hạn khoảng 300 biểu đồ
+    lead_top = sorted([s for s in stk if s["leader"]], key=lambda s: -(s["rs"] or 0))[:120]
+    chart_set = {s["t"] for s in basket} | {x["t"] for x in setups if x["ok"]} | {s["t"] for s in lead_top}
+    for x in setups:
+        if len(chart_set) >= 300:
+            break
+        chart_set.add(x["t"])
+    # mã xuất hiện ở các bảng mới (tín hiệu 3 câu hỏi, radar, ngành dẫn, breakout thất bại) cũng cần biểu đồ khi bấm vào
+    extra = [p["t"] for p in plans] + [x["t"] for x in radar[:150]] + [x["t"] for x in (lab.get("fail") or {}).get("recent", [])]
+    extra += [t for r in (groups_out.get("rows") or [])[:40] for t in r.get("best", [])]
+    for t in extra:
+        if len(chart_set) >= 480:
+            break
+        if t in sdict:
+            chart_set.add(t)
+    charts = {}
+    for t in chart_set:
+        k = 160
+        d = dates[-k:]
+        av_low, av_gap, *_ = sdict[t].get("_av", (np.full(len(dates), np.nan),) * 2)
+        charts[t] = {
+            "d": [x.strftime("%Y-%m-%d") for x in d],
+            "o": [r1(x, 2) for x in O[t].iloc[-k:]], "h": [r1(x, 2) for x in H[t].iloc[-k:]],
+            "l": [r1(x, 2) for x in L[t].iloc[-k:]], "c": [r1(x, 2) for x in C[t].iloc[-k:]],
+            "v": [r1(x, 0) for x in V[t].iloc[-k:]],
+            "e9": [r1(x, 2) for x in e9[t].iloc[-k:]], "e21": [r1(x, 2) for x in e21[t].iloc[-k:]], "e50": [r1(x, 2) for x in e50[t].iloc[-k:]],
+            "avl": [r1(x, 2) for x in av_low[-k:]], "avg": [r1(x, 2) for x in av_gap[-k:]],
+        }
+    for s in stk:
+        s.pop("_av", None)
 
     # ---- tổng quan hôm nay
     h0, h5 = hist.iloc[t0], hist.iloc[t0 - 5]
@@ -1144,6 +1153,24 @@ def main():
         traceback.print_exc()
         print("Danh mục mô phỏng lỗi:", e, file=sys.stderr)
         out["paper"] = {"accounts": {}, "error": str(e)}
+    # biểu đồ cho mã đang giữ / chờ mua trong danh mục mô phỏng (bấm vào từ tab Mô phỏng)
+    try:
+        held = {p["t"] for a_ in (out["paper"].get("accounts") or {}).values() for p in a_.get("open", []) + a_.get("pending", [])}
+        for t in held - set(out["charts"]):
+            df = raw.get(t)
+            if df is None or len(df) < 30:
+                continue
+            k = 160
+            c_ = df["Close"]
+            e = {n: c_.ewm(span=n, adjust=False, min_periods=n).mean() for n in (9, 21, 50)}
+            tail = df.iloc[-k:]
+            out["charts"][t] = {"d": [x.strftime("%Y-%m-%d") for x in tail.index],
+                                **{kk: [r1(x, 2) for x in tail[col]] for kk, col in (("o", "Open"), ("h", "High"), ("l", "Low"), ("c", "Close"))},
+                                "v": [r1(x, 0) for x in tail["Volume"]],
+                                **{f"e{n}": [r1(x, 2) for x in e[n].iloc[-k:]] for n in (9, 21, 50)},
+                                "avl": [None] * len(tail), "avg": [None] * len(tail)}
+    except Exception as e:
+        print("Biểu đồ danh mục mô phỏng lỗi:", e, file=sys.stderr)
     write(out)
     L = out["latest"]
     print(f"{L['asof']}: điểm {L['score']} ({L['stance']}), cảnh báo {L['alert']}, dẫn đầu {L['leaders']}, setup đạt chuẩn {L['n_setups']}")
