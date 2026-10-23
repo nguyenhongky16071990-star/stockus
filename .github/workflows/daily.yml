@@ -33,16 +33,25 @@ jobs:
 
       # giữ lại giá các ngày đã tải để mỗi sáng chỉ tải thêm phiên mới
       - name: Khôi phục bộ đệm dữ liệu
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: pipeline/cache
           key: massive-${{ github.run_id }}
           restore-keys: massive-
 
       - name: Tải dữ liệu và tính toán
+        timeout-minutes: 320
         env:
           MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
         run: python pipeline/build.py
+
+      # lưu bộ đệm cả khi bước trước lỗi hoặc hết giờ, để lần chạy sau không phải tải lại từ đầu
+      - name: Lưu bộ đệm dữ liệu
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: pipeline/cache
+          key: massive-${{ github.run_id }}
 
       - name: Lưu kho dữ liệu hằng ngày
         run: |
