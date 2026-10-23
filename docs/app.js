@@ -4,7 +4,7 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const LW = window.LightweightCharts;
-  const APP_VERSION = '2026.10.24'; // phải trùng với APP_VERSION trong pipeline/build.py
+  const APP_VERSION = '2026.10.24-b'; // phải trùng với APP_VERSION trong pipeline/build.py
   const S = { groups: null, flow: null, lab: null, cond: null, paper: null, cycle: null, backtest: null, latest: null, history: [], stocks: [], setups: [], extended: [], themes: [], basket: [], industries: [], patterns: null, charts: null };
   const ranges = {};          // khoảng thời gian của từng biểu đồ
   const built = new Set();    // tab đã vẽ
@@ -1643,6 +1643,7 @@
     const L = S.latest;
     $('#asof').textContent = `Phiên ${fdate(L.asof)} · ${L.universe} mã · ${L.source || ''} · cập nhật ${new Date(L.generated).toLocaleString('vi-VN')}`;
     $('#demo-banner').hidden = !L.demo;
+    if (L.massive_error) { const b = $('#stale-banner'); b.hidden = false; b.textContent = `Massive lỗi nên đang dùng Yahoo: ${L.massive_error}`; }
     $('#ver').textContent = `Phiên bản ${APP_VERSION}` + (L.version && L.version !== APP_VERSION ? ` · dữ liệu ${L.version}` : '');
     if (!L.demo && L.version !== APP_VERSION) { const b = $('#stale-banner'); b.hidden = false; b.textContent = `Giao diện (${APP_VERSION}) và bộ tính toán (${L.version || 'bản cũ'}) khác phiên bản. Hãy tải lại đủ các thư mục docs và pipeline lên GitHub rồi bấm Run workflow.`; }
     const age = (Date.now() - new Date(L.asof + 'T21:00:00Z').getTime()) / 864e5;
