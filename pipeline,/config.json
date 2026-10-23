@@ -1,0 +1,20 @@
+{
+  "capital": 60000,
+  "risk_pct": 0.5,
+  "max_stop_pct": 6,
+  "max_pos_pct": 35,
+  "basket_size": 100,
+  "min_dollar_vol": 20000000,
+  "min_price": 5,
+  "leader_min_adr": 4,
+  "years": 3,
+  "history_days": 500,
+  "scan_min_price": 3,
+  "scan_min_dollar_vol": 2000000,
+  "massive_calls_per_min": 0,
+  "massive_base": "https://api.massive.com",
+  "fund_top": 400,
+  "fund_per_run": 400,
+  "paper_bootstrap_days": 126,
+  "paper_slip_pct": 0.1
+}
