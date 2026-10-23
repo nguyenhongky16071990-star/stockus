@@ -27,7 +27,7 @@ DATA = ROOT / "docs" / "data"
 CONFIG = json.loads((ROOT / "pipeline" / "config.json").read_text(encoding="utf-8"))
 INDEXES = ["QQQ", "SPY", "IWM", "SMH", "IGV"]
 FIELDS = ["Open", "High", "Low", "Close", "Volume"]
-APP_VERSION = "2026.10.24-c"  # phải trùng với APP_VERSION trong docs/app.js
+APP_VERSION = "2026.10.24-d"  # phải trùng với APP_VERSION trong docs/app.js
 
 
 # ---------------------------------------------------------------- tải dữ liệu
@@ -647,6 +647,8 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
             "offhigh": r1((C[t].iloc[t0] / hi252[t].iloc[t0] - 1) * 100) if pd.notna(hi252[t].iloc[t0]) else None,
             "tt": bool(tt[t].iloc[t0]), "leader": bool(top[t].iloc[t0]), "leader5": bool(top[t].iloc[t0 - 5]),  # một danh sách duy nhất: top 100
             "rsnh": bool(rs_nh[t].iloc[t0]), "top": bool(top[t].iloc[t0]), "setups": [],
+            "rsnh5": bool(rs_nh[t].iloc[-5:].any()),
+            "rslead": bool(rs_nh[t].iloc[-5:].any() and pd.notna(hi_all[t].iloc[t0]) and C[t].iloc[t0] < 0.97 * hi_all[t].iloc[t0]),
             "r3": r1(ret[3][t].iloc[t0] * 100), "rs_pos": r1(rs_pos[t].iloc[t0], 0), "dd": r1(dd_hi[t].iloc[t0]),
             "ind": ind_s.get(t), "ind_rank": r1(g_rank[ind_s[t]].iloc[t0], 0) if ind_s.get(t) in g_rank else None,
             "e21up": bool(e21up[t].iloc[t0]), "udv": r1(udv[t].iloc[t0], 2), "ep63": bool(ep63[t].iloc[t0]),
