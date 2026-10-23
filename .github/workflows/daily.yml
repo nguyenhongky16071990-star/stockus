@@ -18,7 +18,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 180  # lần đầu với gói Massive miễn phí (5 lệnh/phút) mất khoảng 1,5–2 giờ
+    timeout-minutes: 340  # lần đầu với gói Massive miễn phí (5 lệnh/phút) mất khoảng 2–3 giờ
     steps:
       - uses: actions/checkout@v4
 
