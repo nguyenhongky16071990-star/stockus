@@ -4,7 +4,7 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const LW = window.LightweightCharts;
-  const APP_VERSION = '2026.10.24-b'; // phải trùng với APP_VERSION trong pipeline/build.py
+  const APP_VERSION = '2026.10.24-c'; // phải trùng với APP_VERSION trong pipeline/build.py
   const S = { groups: null, flow: null, lab: null, cond: null, paper: null, cycle: null, backtest: null, latest: null, history: [], stocks: [], setups: [], extended: [], themes: [], basket: [], industries: [], patterns: null, charts: null };
   const ranges = {};          // khoảng thời gian của từng biểu đồ
   const built = new Set();    // tab đã vẽ
@@ -50,12 +50,16 @@
   function showTab(name) {
     if (!$('#tab-' + name)) name = 'overview';
     $$('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
+    const tb = $(`.tabs button[data-tab="${name}"]`), g = tb ? tb.dataset.g : 'mkt';
+    $$('.groups button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.g === g)));
+    $$('.tabs button').forEach((b) => { b.hidden = b.dataset.g !== g; });
     $$('.tab').forEach((t) => { t.hidden = t.id !== 'tab-' + name; });
     if (location.hash.slice(1) !== name) history.replaceState(null, '', '#' + name);
     if (S.latest && !built.has(name)) { built.add(name); BUILD[name] && BUILD[name](); }
     store.set('nk_tab', name);
   }
   $$('.tabs button').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+  $$('.groups button').forEach((b) => b.addEventListener('click', () => { const f = $(`.tabs button[data-g="${b.dataset.g}"]`); if (f) showTab(f.dataset.tab); }));
 
   // ------------------------------------------------------------ biểu đồ
   function baseChart(container) {
@@ -364,6 +368,7 @@
   const BUILD = {
     overview() {
       const L = S.latest;
+      verdict();
       $('#score').textContent = L.score;
       $('#stance').textContent = L.stance;
       $('#score-delta').textContent = delta(L.score, L.score5, ' điểm');
@@ -377,6 +382,8 @@
         'Phòng thủ': 'Đứng ngoài, giữ tiền mặt. Chờ nhóm dẫn đầu và độ rộng phục hồi rồi mới mua lại.',
       };
       $('#advice').textContent = adv[L.stance] || '';
+      const GG = (S.flow || {}).golden;
+      if (GG && GG.level) $('#advice').textContent = `Điểm này đo độ khỏe chung của chỉ số và độ rộng. Quyết định tỷ trọng theo "Kết luận hôm nay" ở trên (mức ${GG.level}, ${GG.count}/6 bằng chứng), vì kết luận xét thêm breakout có giữ được không, ngành dẫn và ngày phân phối.`;
       const ac = $('#alert-card'); ac.className = 'alert-card lv-' + L.alert;
       $('#alert-level').textContent = L.alert;
       $('#alert-reasons').replaceChildren(...(L.alert_reasons.length ? L.alert_reasons : ['Không có tín hiệu bất thường.']).map((t) => el('li', { text: t })));
@@ -1481,6 +1488,37 @@
       setup ? el('button', { class: 'btn', type: 'button', text: 'Ghi vào nhật ký', onclick: () => { closeModal(); prefillJournal(setup); } }) : null,
       el('a', { class: 'btn ghost', href: `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(t)}`, target: '_blank', rel: 'noopener', text: 'Mở trên TradingView' })].filter(Boolean));
     $('#m-close').focus();
+  }
+  function verdict() {
+    const F = S.flow || {}, G = F.golden || {}, GR = ((S.groups || {}).rows) || [], B = S.lab || {};
+    if (!G.level) return;
+    $('#verdict').hidden = false;
+    const lv = G.level, early = lv === 'Thời điểm vàng' && G.early;
+    const vb = $('#vd-badge'); vb.textContent = lv + (early ? ' · đầu chu kỳ' : ''); vb.style.setProperty('--ph', `var(${GDC[lv] || '--muted'})`);
+    const EXP = { 'Thời điểm vàng': ['Tấn công', '75–100% vốn, có thể giữ 6–10 vị thế. Ưu tiên mã dẫn dắt vượt nền đầu tiên.'], 'Thuận lợi': ['Mua có chọn lọc', '50–75% vốn, mua thử trước rồi tăng dần khi lệnh đầu có lãi.'],
+      'Trung tính': ['Thận trọng', '25–50% vốn, chỉ setup tốt nhất, quy mô nhỏ, chốt lời nhanh hơn.'], 'Bất lợi': ['Phòng thủ', '0–25% vốn. Bảo toàn vốn, chủ yếu theo dõi danh sách mã mạnh để chuẩn bị cho nhịp tăng sau.'] };
+    const [act, how] = EXP[lv] || ['—', ''];
+    $('#vd-main').replaceChildren(el('b', { text: act + ': ' }), how);
+    const miss = (G.checks || []).filter((c) => !c.ok).map((c) => c.label);
+    $('#vd-mkt').replaceChildren(...[
+      el('li', { text: `Giai đoạn dòng tiền: ${F.stage || '—'} (${F.stage_days || '—'} phiên).` }),
+      el('li', { text: `${G.count}/6 bằng chứng thời điểm vàng đạt.` + (miss.length ? ` Còn thiếu: ${miss.slice(0, 3).join('; ')}${miss.length > 3 ? '…' : ''}.` : '') }),
+      (F.warnings || []).length ? el('li', { class: 'dn', text: F.warnings[0] }) : null,
+      el('li', { text: `Cảnh báo: ${S.latest.alert} · ${S.latest.dd_qqq} ngày phân phối QQQ.` }),
+    ].filter(Boolean));
+    const lead = GR.filter((r) => r.label === 'Dẫn dắt').slice(0, 3), emer = GR.filter((r) => r.label === 'Mới nổi').slice(0, 3), weak = GR.filter((r) => r.label === 'Suy yếu').slice(0, 3);
+    $('#vd-grp').replaceChildren(...[
+      el('li', { text: lead.length ? `Dẫn dắt: ${lead.map((r) => r.ind).join(', ')}.` : 'Chưa có ngành nào đủ tiêu chuẩn dẫn dắt.' }),
+      emer.length ? el('li', { text: `Mới nổi: ${emer.map((r) => r.ind).join(', ')}.` }) : null,
+      weak.length ? el('li', { class: 'dn', text: `Suy yếu, tránh mua mới: ${weak.map((r) => r.ind).join(', ')}.` }) : null,
+    ].filter(Boolean));
+    const MIN = B.min_n || 30;
+    const good = (B.plans || []).filter((p) => p.ok_stop && (p.ev || 0) >= 4 && ((p.hist.stage || {}).n || 0) >= MIN && p.hist.stage.exp > 0)
+      .sort((a, b) => b.hist.stage.exp - a.hist.stage.exp || (b.ev || 0) - (a.ev || 0));
+    const seen = new Set(); const picks = good.filter((p) => (seen.has(p.t) ? false : seen.add(p.t))).slice(0, 5);
+    $('#vd-pick').replaceChildren(...(picks.length ? picks.map((p) => el('li', {}, el('button', { class: 'chip sm', type: 'button', text: p.t, onclick: () => openChart(p.t) }),
+      ` ${p.setup}: mua khi vượt ${n2(p.pivot)}, sai khi thủng ${n2(p.stop)} (−${n1(p.stop_pct)}%). Lịch sử: ${p.hist.stage.exp > 0 ? '+' : ''}${n2(p.hist.stage.exp)}R, ${p.ev}/${p.ev_n} bằng chứng.`))
+      : [el('li', { text: lv === 'Bất lợi' ? 'Không có điểm mua đủ tiêu chuẩn — phù hợp với thị trường bất lợi.' : 'Chưa có tín hiệu nào vừa có kỳ vọng dương trong giai đoạn này, vừa đủ bằng chứng dòng tiền, vừa có stop trong mức cho phép.' })]));
   }
   function threeQ(t) {
     const P = ((S.lab || {}).plans || []).filter((p) => p.t === t);

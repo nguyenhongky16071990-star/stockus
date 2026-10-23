@@ -22,23 +22,29 @@
         <p class="sub" id="asof">Đang tải dữ liệu…</p>
       </div>
     </div>
+    <nav class="groups" aria-label="Nhóm trang">
+      <button type="button" data-g="mkt" aria-pressed="true">Thị trường</button>
+      <button type="button" data-g="stk" aria-pressed="false">Ngành &amp; cổ phiếu</button>
+      <button type="button" data-g="test" aria-pressed="false">Kiểm chứng</button>
+      <button type="button" data-g="me" aria-pressed="false">Nhật ký &amp; hướng dẫn</button>
+    </nav>
     <nav class="tabs" role="tablist" aria-label="Các trang">
-      <button role="tab" data-tab="overview" aria-selected="true">Tổng quan</button>
-      <button role="tab" data-tab="flow">Dòng tiền</button>
-      <button role="tab" data-tab="cycle">Chu kỳ</button>
-      <button role="tab" data-tab="basket">Top 100</button>
-      <button role="tab" data-tab="breadth">Độ rộng</button>
-      <button role="tab" data-tab="leaders">Ngành</button>
-      <button role="tab" data-tab="patterns">Mẫu hình</button>
-      <button role="tab" data-tab="lab">Hiệu quả setup</button>
-      <button role="tab" data-tab="cond">Theo thị trường</button>
-      <button role="tab" data-tab="backtest">Kiểm chứng</button>
-      <button role="tab" data-tab="paper">Mô phỏng</button>
-      <button role="tab" data-tab="setups">Setup hôm nay</button>
-      <button role="tab" data-tab="screener">Lọc huyền thoại</button>
-      <button role="tab" data-tab="search">Tìm mã</button>
-      <button role="tab" data-tab="journal">Nhật ký</button>
-      <button role="tab" data-tab="guide">Hướng dẫn</button>
+      <button role="tab" data-g="mkt" data-tab="overview" aria-selected="true">Tổng quan</button>
+      <button role="tab" data-g="mkt" data-tab="flow">Dòng tiền</button>
+      <button role="tab" data-g="mkt" data-tab="breadth">Độ rộng</button>
+      <button role="tab" data-g="mkt" data-tab="cycle">Chu kỳ</button>
+      <button role="tab" data-g="stk" data-tab="leaders">Ngành</button>
+      <button role="tab" data-g="stk" data-tab="basket">Top 100</button>
+      <button role="tab" data-g="stk" data-tab="setups">Setup hôm nay</button>
+      <button role="tab" data-g="stk" data-tab="screener">Lọc huyền thoại</button>
+      <button role="tab" data-g="stk" data-tab="search">Tìm mã</button>
+      <button role="tab" data-g="test" data-tab="lab">Hiệu quả setup</button>
+      <button role="tab" data-g="test" data-tab="patterns">Mẫu hình</button>
+      <button role="tab" data-g="test" data-tab="cond">Theo thị trường</button>
+      <button role="tab" data-g="test" data-tab="backtest">Kiểm chứng huyền thoại</button>
+      <button role="tab" data-g="test" data-tab="paper">Mô phỏng</button>
+      <button role="tab" data-g="me" data-tab="journal">Nhật ký</button>
+      <button role="tab" data-g="me" data-tab="guide">Hướng dẫn</button>
     </nav>
   </div>
 </header>
@@ -50,6 +56,16 @@
   <!-- TỔNG QUAN -->
   <section id="tab-overview" class="tab" role="tabpanel">
     <button type="button" class="banner fl-banner" id="flow-banner" hidden></button>
+    <article class="card verdict" id="verdict" hidden>
+      <div class="card-top"><h3>Kết luận hôm nay</h3><span class="gd-badge" id="vd-badge"></span></div>
+      <p class="vd-main" id="vd-main"></p>
+      <div class="vd-grid">
+        <div><h4 class="sub-h">Thị trường</h4><ul class="small-list" id="vd-mkt"></ul></div>
+        <div><h4 class="sub-h">Tiền đang vào đâu</h4><ul class="small-list" id="vd-grp"></ul></div>
+        <div><h4 class="sub-h">Đáng theo dõi nhất</h4><ul class="small-list" id="vd-pick"></ul></div>
+      </div>
+      <p class="note">Tổng hợp tự động từ các tab Dòng tiền, Ngành và Hiệu quả setup. Mức vốn gợi ý là khung tham khảo theo cách các huyền thoại tăng giảm tỷ trọng theo thị trường, không phải khuyến nghị đầu tư.</p>
+    </article>
     <div class="hero">
       <div class="gauge-card" id="gauge-card">
         <div class="gauge-lbl">Điểm sức khỏe thị trường</div>
@@ -452,9 +468,9 @@
     <article class="card">
       <h3>Cách kiểm chứng và giới hạn</h3>
       <ul class="small-list">
-        <li>Chỉ dùng giá và khối lượng. Điều kiện về doanh thu/EPS không có dữ liệu lịch sử nên không đưa vào kiểm chứng.</li>
+        <li>Chỉ dùng giá và khối lượng. Điều kiện về doanh thu/EPS không có dữ liệu lịch sử nên không đưa vào kiểm chứng (khác tab Mô phỏng, nơi dùng cả số liệu cơ bản hiện tại).</li>
         <li>Lệnh chờ mua khi vượt mức giá (đỉnh phiên hoặc pivot) chỉ khớp nếu giá chạm mức đó; nếu giá thủng stop trước thì bỏ. Ngày khớp mà giá chạm stop thì tính lỗ ngay.</li>
-        <li>Mỗi mã chỉ một lệnh mở cho mỗi phương pháp. Không tính phí, thuế, trượt giá. Lệnh của Martin chỉ vào khi stop không rộng hơn mức tối đa của bạn.</li>
+        <li>Quy tắc vào lệnh, stop, chốt từng phần, chốt hết và điều kiện thị trường giống hệt tab Mô phỏng (xem "Quy tắc đang áp dụng" ở đó). Mỗi mã chỉ một lệnh mở cho mỗi phương pháp, không giới hạn vốn. Trượt giá 0,1% mỗi lần khớp, không tính phí.</li>
         <li>Chỉ dùng các mã còn niêm yết hôm nay, nên kết quả có phần lạc quan hơn thực tế. Dữ liệu giá ngày, nên stop thực tế theo nến trong phiên có thể chặt hơn.</li>
         <li>Kết quả quá khứ không bảo đảm tương lai. Dùng để so sánh các phương pháp với nhau và theo thời gian, không phải để dự báo lợi nhuận.</li>
       </ul>
@@ -557,11 +573,13 @@
   <!-- HƯỚNG DẪN -->
   <section id="tab-guide" class="tab guide" role="tabpanel" hidden>
     <article class="card">
-      <h3>Đọc trang này mỗi sáng trong 3 bước</h3>
+      <h3>Đọc trang này mỗi sáng trong 5 bước</h3>
       <ol>
-        <li><b>Tổng quan:</b> điểm sức khỏe và màu cảnh báo cho biết nên tấn công hay phòng thủ. Điểm từ 70 trở lên và cảnh báo xanh là lúc tìm điểm mua.</li>
-        <li><b>Nhóm mạnh nhất &amp; Ngành:</b> dòng tiền đang ở đâu, nhóm dẫn đầu khỏe lên hay yếu đi.</li>
-        <li><b>Setup hôm nay:</b> chỉ dùng khi thị trường thuận lợi. Đặt lệnh chờ mua tại giá mua, stop tại giá stop, số cổ phiếu theo bảng.</li>
+        <li><b>Tổng quan → Kết luận hôm nay:</b> thị trường đang ở mức nào (Thời điểm vàng / Thuận lợi / Trung tính / Bất lợi) và mức vốn nên dùng.</li>
+        <li><b>Dòng tiền:</b> xem 6 bằng chứng của thời điểm vàng và bằng chứng nào còn thiếu. Một ngày tăng mạnh chưa đủ, cần nhiều bằng chứng độc lập.</li>
+        <li><b>Ngành:</b> chọn ngành Dẫn dắt hoặc Mới nổi; tránh ngành Suy yếu và Tụt hậu.</li>
+        <li><b>Hiệu quả setup → Tín hiệu hôm nay:</b> chỉ chọn setup có kỳ vọng dương trong điều kiện hiện tại, nhiều bằng chứng dòng tiền, stop trong mức cho phép. Bấm vào mã để xem 3 câu hỏi trước khi mua.</li>
+        <li><b>Nhật ký:</b> ghi lại mọi lệnh, kể cả lệnh bỏ qua, để biết hệ thống của chính bạn có hiệu quả không.</li>
       </ol>
     </article>
     <article class="card">
