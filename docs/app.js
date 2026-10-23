@@ -4,7 +4,7 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const LW = window.LightweightCharts;
-  const APP_VERSION = '2026.10.24-c'; // phải trùng với APP_VERSION trong pipeline/build.py
+  const APP_VERSION = '2026.10.24-d'; // phải trùng với APP_VERSION trong pipeline/build.py
   const S = { groups: null, flow: null, lab: null, cond: null, paper: null, cycle: null, backtest: null, latest: null, history: [], stocks: [], setups: [], extended: [], themes: [], basket: [], industries: [], patterns: null, charts: null };
   const ranges = {};          // khoảng thời gian của từng biểu đồ
   const built = new Set();    // tab đã vẽ
@@ -478,7 +478,7 @@
         { k: 'bo_hold', label: 'Giữ breakout', f: (r) => (isNum(r.bo_hold) ? `${r.bo_hold} phiên` : '—'), title: 'Breakout gần nhất vẫn giữ trên điểm breakout được bao nhiêu phiên' },
         { k: 'd21', label: 'So EMA 21', f: (r) => spct(r.d21), c: (r) => cls(r.d21) },
         { k: 'stage', label: 'Giai đoạn', f: (r) => (r.stage ? String(r.stage) : '—'), c: (r) => (r.stage === 2 ? 'up' : r.stage === 4 ? 'dn' : '') },
-        { k: 'setups', label: 'Ghi chú', l: true, f: (r) => { const f = tags(r); if (r.rsnh) f.append(el('span', { class: 'tag', text: 'RS đỉnh mới' })); return f; }, sv: (r) => (r.setups || []).length },
+        { k: 'setups', label: 'Ghi chú', l: true, f: (r) => { const f = tags(r); if (r.rslead) f.append(el('span', { class: 'tag ld', text: 'RS dẫn trước giá' })); else if (r.rsnh) f.append(el('span', { class: 'tag', text: 'RS đỉnh mới' })); return f; }, sv: (r) => (r.setups || []).length },
       ], S.basket, { sort: 'rs_pos', dir: 1, onRow: (r) => openChart(r.t) });
     },
     breadth() {
@@ -650,12 +650,13 @@
       const themes = [...new Set(S.stocks.map((s) => s.theme))].sort((a, b) => a.localeCompare(b, 'vi'));
       $('#sel-theme').append(...themes.map((t) => el('option', { value: t, text: t })));
       const draw = () => {
-        const q = $('#q').value.trim().toLowerCase(), th = $('#sel-theme').value, tt = $('#f-tt').checked, rn = $('#f-rsnh').checked;
-        const rows = S.stocks.filter((s) => (!q || (s.t + ' ' + s.theme + ' ' + (s.name || '')).toLowerCase().includes(q)) && (!th || s.theme === th) && (!tt || s.tt) && (!rn || s.rsnh));
+        const q = $('#q').value.trim().toLowerCase(), th = $('#sel-theme').value, tt = $('#f-tt').checked, rn = $('#f-rsnh').value, rmin = Number($('#f-rsmin').value || 0);
+        const rsOk = (s) => !rn || (rn === 'now' ? s.rsnh : rn === '5' ? (s.rsnh5 ?? s.rsnh) : !!s.rslead);
+        const rows = S.stocks.filter((s) => (!q || (s.t + ' ' + s.theme + ' ' + (s.name || '')).toLowerCase().includes(q)) && (!th || s.theme === th) && (!tt || s.tt) && rsOk(s) && (s.rs || 0) >= rmin);
         $('#search-count').textContent = `${rows.length} / ${S.stocks.length} mã`;
         table($('#tb-search'), stockCols(false, true), rows, { sort: 'rs', limit: 300, onRow: (r) => openChart(r.t) });
       };
-      ['#q', '#sel-theme', '#f-tt', '#f-rsnh'].forEach((s) => $(s).addEventListener('input', draw));
+      ['#q', '#sel-theme', '#f-tt', '#f-rsnh', '#f-rsmin'].forEach((s) => $(s).addEventListener('input', draw));
       draw();
     },
     patterns() {
@@ -1192,7 +1193,7 @@
       { k: 'd21', label: 'So EMA 21', f: (r) => spct(r.d21), c: (r) => cls(r.d21) },
     ];
     if (full) c.push({ k: 'offhigh', label: 'Cách đỉnh 52T', f: (r) => spct(r.offhigh) }, { k: 'gap921', label: 'EMA 9–21', f: (r) => pct(r.gap921) });
-    c.push({ k: 'setups', label: 'Ghi chú', l: true, f: (r) => { const f = tags(r); if (r.rsnh) f.append(el('span', { class: 'tag', text: 'RS đỉnh mới' })); return f; }, sv: (r) => (r.setups || []).length + (r.leader ? 10 : 0) });
+    c.push({ k: 'setups', label: 'Ghi chú', l: true, f: (r) => { const f = tags(r); if (r.rslead) f.append(el('span', { class: 'tag ld', text: 'RS dẫn trước giá' })); else if (r.rsnh) f.append(el('span', { class: 'tag', text: 'RS đỉnh mới' })); return f; }, sv: (r) => (r.setups || []).length + (r.leader ? 10 : 0) });
     return c;
   }
 
@@ -1311,6 +1312,7 @@
         { id: 'revup', label: 'Doanh thu tăng liên tiếp ít nhất', unit: 'quý', v: 3, step: 1, on: false, test: (s, v) => isNum(s.rev_up) && s.rev_up >= v },
         { id: 'st2', label: 'Đang ở giai đoạn 2', on: false, test: (s) => s.stage === 2 },
         { id: 'rsnh', label: 'Đường RS lập đỉnh mới', on: false, test: (s) => s.rsnh },
+        { id: 'rslead', label: 'RS dẫn trước giá (đường RS lập đỉnh trong 5 phiên, giá chưa lập đỉnh)', on: false, test: (s) => !!s.rslead },
         { id: 'dnb', label: 'Giữ giá tốt hơn QQQ khi thị trường giảm', on: false, test: (s) => isNum(s.dnb) && s.dnb > 0 },
         { id: 'cap', label: 'Vốn hóa không quá', unit: 'tỷ USD', v: 30, step: 5, on: false, test: (s, v) => isNum(s.mcap) && s.mcap <= v },
         { id: 'ipo', label: 'Mới niêm yết dưới 1 năm', on: false, test: (s) => isNum(s.ipo) },

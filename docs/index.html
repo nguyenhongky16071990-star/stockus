@@ -533,9 +533,11 @@
         <input type="search" id="q" placeholder="Gõ mã hoặc ngành…" aria-label="Tìm mã">
         <select id="sel-theme" aria-label="Lọc theo ngành"><option value="">Mọi ngành</option></select>
         <label class="chk"><input type="checkbox" id="f-tt"> Đạt Trend Template</label>
-        <label class="chk"><input type="checkbox" id="f-rsnh"> Đường RS lập đỉnh</label>
+        <select id="f-rsnh" aria-label="Lọc theo đường RS"><option value="">Đường RS: mọi mã</option><option value="now">Đường RS lập đỉnh 52 tuần hôm nay</option><option value="5">Đường RS lập đỉnh trong 5 phiên</option><option value="lead">RS dẫn trước giá (RS lập đỉnh, giá chưa)</option></select>
+        <select id="f-rsmin" aria-label="RS tối thiểu"><option value="0">Mọi RS</option><option value="70">RS ≥ 70</option><option value="80">RS ≥ 80</option><option value="90">RS ≥ 90</option></select>
         <span class="muted small" id="search-count"></span>
       </div>
+      <p class="note">Đường RS = giá cổ phiếu chia cho QQQ. <b>Đường RS lập đỉnh 52 tuần</b> nghĩa là cổ phiếu đang mạnh hơn thị trường nhiều nhất trong một năm. <b>RS dẫn trước giá</b> (đường RS lập đỉnh trong 5 phiên khi giá còn thấp hơn đỉnh 1 năm trên 3%) là tín hiệu Minervini và IBD ưa thích: cổ phiếu giữ sức mạnh khi thị trường điều chỉnh, thường bứt lên đầu tiên khi thị trường hồi phục.</p>
       <div class="tbl tall"><table id="tb-search"></table></div>
     </article>
   </section>
