@@ -27,7 +27,7 @@ DATA = ROOT / "docs" / "data"
 CONFIG = json.loads((ROOT / "pipeline" / "config.json").read_text(encoding="utf-8"))
 INDEXES = ["QQQ", "SPY", "IWM", "SMH", "IGV"]
 FIELDS = ["Open", "High", "Low", "Close", "Volume"]
-APP_VERSION = "2026.10.24-d"  # phải trùng với APP_VERSION trong docs/app.js
+APP_VERSION = "2026.10.25-d"  # phải trùng với APP_VERSION trong docs/app.js
 
 
 # ---------------------------------------------------------------- tải dữ liệu
@@ -330,6 +330,19 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
         "dd_qqq": dd.get("QQQ"), "dd_spy": dd.get("SPY"),
     }, index=dates)
 
+    # ---- bỏ giai đoạn "khởi động": khi lịch sử dữ liệu chưa đủ dài, các chỉ báo cần N phiên (MA200, đỉnh 52 tuần, lợi nhuận 1 quý…)
+    # sẽ ra 0 giả. Đặt chúng thành trống thay vì 0 để biểu đồ và thống kê không bị sai.
+    ds = int(np.argmax(C.notna().sum(axis=1).values > 0))
+    WARM = {20: ["nh20", "nl20", "up4", "dn4", "up4a", "dn4a", "net4", "net4a", "net4_10", "net4a_10", "m_nh", "m_w10", "m_w20", "bo_n",
+                 "b_bigdown", "b_down2_5d", "b_nh20", "b_w10", "b_w20", "b_nh52", "mcclellan", "leaders"],
+            40: ["pct_s40"], 50: ["pct_s50"], 63: ["q_up25", "q_dn25"], 210: ["pct_s200", "nh52", "nl52", "pct_tt"]}
+    for w_, cols_ in WARM.items():
+        cut_ = min(len(dates) - 1, ds + w_)
+        for c_ in cols_:
+            if c_ in hist:
+                hist.iloc[:cut_, hist.columns.get_loc(c_)] = np.nan
+    warm_all = min(len(dates) - 1, ds + 210)   # từ đây mọi chỉ báo tổng hợp mới đủ dữ liệu
+
     # ---- cảnh báo và điểm sức khỏe theo từng ngày
     lead_pct = hist["leaders"].rolling(120, min_periods=20).apply(lambda w: (w <= w[-1]).mean(), raw=True)
     alerts, levels, scores = [], [], []
@@ -363,13 +376,21 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
         scores.append(round(sq + sd + se + sl + sh + sr + sn))
     hist["alert"] = levels
     hist["score"] = scores
+    hist.iloc[:warm_all, hist.columns.get_loc("score")] = np.nan
+    hist.iloc[:warm_all, hist.columns.get_loc("alert")] = None
     hist["alert_reasons"] = alerts
 
     def stance(s):
         return "Tấn công" if s >= 70 else "Bình thường" if s >= 50 else "Thận trọng" if s >= 30 else "Phòng thủ"
 
     # ---- xếp hạng ngành (giống bảng 197 nhóm ngành của IBD): trung vị sức mạnh giá các mã trong ngành
-    ind_s = pd.Series({t: industry.get(t) or theme.get(t, "Khác") for t in stocks})
+    def _ind(t):
+        v = industry.get(t) if "industry" in universe else theme.get(t)
+        if v is None or (isinstance(v, float) and math.isnan(v)) or str(v).strip() in ("", "Khác", "nan"):
+            return None   # chưa phân loại: không đưa vào xếp hạng ngành
+        return str(v)
+    ind_s = pd.Series({t: _ind(t) for t in stocks}, dtype=object)
+    ind_cov = int(ind_s.notna().sum())
     g_perf = perf.where(valid).T.groupby(ind_s).median().T
     g_cnt = valid.T.groupby(ind_s).sum().T
     g_perf = g_perf.where(g_cnt >= 3)
@@ -573,7 +594,7 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
         try:
             fctx = dict(O=O, C=C, H=H, L=L, V=V, valid=valid, liquid=liquid, e21=e21, s50=s50, s200=s200, rs=rs, top=top, rs_nh=rs_nh,
                         v50=v50, dd_hi=dd_hi, udv=udv, hist=hist, qqq=qqq, spy=raw["SPY"]["Close"].reindex(dates) if "SPY" in raw else None,
-                        g_rank=g_rank, ind_s=ind_s, start=bt_start, keep=cfg["history_days"], rsline=rsline, adr=adr, dnb=dnb)
+                        g_rank=g_rank, ind_s=ind_s, start=bt_start, keep=cfg["history_days"], rsline=rsline, adr=adr, dnb=dnb, warm=warm_all)
             flow_out, fser = flow.compute(fctx)
             fctx.update(ev=fser["ev"], piv=fser["piv"])
             hist["flow_stage"] = fser["stage"]
@@ -589,6 +610,18 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
             import traceback
             traceback.print_exc()
             print("Money Flow Radar / setup lỗi:", e, file=sys.stderr)
+
+    # ---- chốt lãi thế nào: so sánh các cách bán trên cùng điểm mua thật
+    exits = {"exits": [], "notes": []}
+    if not light:
+        import exitlab
+        try:
+            exits = exitlab.analyze(dict(C=C, H=H, L=L, O=O, V=V, rs=rs, liquid=liquid, v50=v50),
+                                    hist["flow_stage"] if "flow_stage" in hist else None, max(60, warm_all - 80))
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print("Thống kê chốt lãi lỗi:", e, file=sys.stderr)
 
     # ---- điểm ngành dẫn
     groups_out = {"rows": []}
@@ -728,7 +761,7 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
     # ---- ngành
     themes = []
     df = pd.DataFrame(stk)
-    for th, g in df.groupby("theme"):
+    for th, g in df[df.theme != "Khác"].groupby("theme"):
         themes.append({"theme": th, "n": int(len(g)), "leaders": int(g.leader.sum()), "leaders5": int(g.leader5.sum()),
                        "tt": int(g.tt.sum()), "rs": r1(g.rs.mean(), 0), "above21": r1((g.d21 > 0).mean() * 100, 0),
                        "r5": r1(g.r5.mean()), "r21": r1(g.r21.mean()), "top": int(g.top.sum())})
@@ -801,6 +834,23 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
             print("Radar cổ phiếu lỗi:", e, file=sys.stderr)
     flow_out["radar"] = radar[:250]
     lab["plans"] = plans
+    # kỳ vọng R của các setup (tab Hiệu quả setup) trong từng giai đoạn / mức thời điểm mua: thước đo đúng cho người giao dịch breakout
+    try:
+        def agg_r(key):
+            out = {}
+            for s_ in lab.get("setups", []):
+                for b_, c_ in (s_.get("by", {}).get(key) or {}).items():
+                    if c_.get("n"):
+                        a_ = out.setdefault(b_, [0, 0.0, 0.0])
+                        a_[0] += c_["n"]; a_[1] += c_["n"] * (c_.get("exp") or 0); a_[2] += c_["n"] * (c_.get("fail3") or 0)
+            return {k: {"n": v[0], "exp": r1(v[1] / v[0], 2), "fail3": r1(v[2] / v[0], 0)} for k, v in out.items()}
+        rs_, rg_ = agg_r("stage"), agg_r("gold")
+        for v_ in flow_out.get("validation", []):
+            v_["setup"] = rs_.get(v_["stage"])
+        for v_ in (flow_out.get("golden") or {}).get("validation", []):
+            v_["setup"] = rg_.get(v_["level"])
+    except Exception as e:
+        print("Gắn kỳ vọng setup lỗi:", e, file=sys.stderr)
 
     # ---- biểu đồ từng mã (chỉ mã đáng chú ý để trang nhẹ)
     # quét toàn thị trường có thể ra hàng trăm mã, nên giới hạn khoảng 300 biểu đồ
@@ -864,6 +914,7 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
                     | {k + "_21": r1(hist[k].iloc[t0 - 21], 1) for k in ("b_nh52", "b_w20")},
         "config": cfg,
         "anchors": {k: {"d": v["d"], "qqq": v["qqq"]} for k, v in anchors.items()},
+        "ind_cov": ind_cov, "ind_total": len(stocks),
     }
 
     keep = hist.iloc[-cfg["history_days"]:].copy()
@@ -885,7 +936,7 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
     latest["notes_patterns"] = pattern_notes(pat_stats)
     patterns = {"stats": pat_stats, "dates": [d.strftime("%Y-%m-%d") for d in dates[-keep_n:]], "series": pat_series}
     return {"latest": latest, "history": history, "stocks": stk, "setups": setups, "extended": extended,
-            "themes": themes, "basket": basket, "charts": charts, "industries": industries, "patterns": patterns, "backtest": bt, "cycle": cyc, "cond": cond, "flow": flow_out, "lab": lab, "groups": groups_out}
+            "themes": themes, "basket": basket, "charts": charts, "industries": industries, "patterns": patterns, "backtest": bt, "cycle": cyc, "cond": cond, "flow": flow_out, "lab": lab, "groups": groups_out, "exits": exits}
 
 
 def _p(x, d=1):
@@ -1049,7 +1100,7 @@ def _jd(o):
 
 def write(out: dict) -> None:
     DATA.mkdir(parents=True, exist_ok=True)
-    for k in ("latest", "history", "stocks", "setups", "extended", "themes", "basket", "charts", "industries", "patterns", "backtest", "cycle", "cond", "flow", "lab", "groups", "paper"):
+    for k in ("latest", "history", "stocks", "setups", "extended", "themes", "basket", "charts", "industries", "patterns", "backtest", "cycle", "cond", "flow", "lab", "groups", "exits", "paper"):
         (DATA / f"{k}.json").write_text(json.dumps(out[k], ensure_ascii=False, separators=(",", ":"), default=_jd), encoding="utf-8")
     # lưu lại ảnh chụp setup + tổng quan mỗi ngày để thống kê về sau
     snap = DATA / "archive"

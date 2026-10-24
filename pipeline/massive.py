@@ -237,6 +237,46 @@ THEME_RULES = [
 ]
 
 
+SIC_VI = {
+    "SERVICES-PREPACKAGED SOFTWARE": "Phần mềm đóng gói", "SEMICONDUCTORS & RELATED DEVICES": "Bán dẫn & linh kiện",
+    "PHARMACEUTICAL PREPARATIONS": "Dược phẩm", "BIOLOGICAL PRODUCTS, (NO DIAGNOSTIC SUBSTANCES)": "Sinh phẩm (công nghệ sinh học)",
+    "IN VITRO & IN VIVO DIAGNOSTIC SUBSTANCES": "Chẩn đoán y khoa", "SURGICAL & MEDICAL INSTRUMENTS & APPARATUS": "Thiết bị y tế",
+    "ELECTROMEDICAL & ELECTROTHERAPEUTIC APPARATUS": "Thiết bị điện y tế", "ORTHOPEDIC, PROSTHETIC & SURGICAL APPLIANCES & SUPPLIES": "Thiết bị chỉnh hình",
+    "STATE COMMERCIAL BANKS": "Ngân hàng thương mại (bang)", "NATIONAL COMMERCIAL BANKS": "Ngân hàng thương mại (liên bang)",
+    "SAVINGS INSTITUTION, FEDERALLY CHARTERED": "Ngân hàng tiết kiệm", "REAL ESTATE INVESTMENT TRUSTS": "Quỹ tín thác BĐS (REIT)",
+    "CRUDE PETROLEUM & NATURAL GAS": "Khai thác dầu khí", "PETROLEUM REFINING": "Lọc dầu", "OIL & GAS FIELD SERVICES, NEC": "Dịch vụ mỏ dầu khí",
+    "NATURAL GAS TRANSMISSION": "Đường ống khí đốt", "ELECTRIC SERVICES": "Điện lực", "ELECTRIC & OTHER SERVICES COMBINED": "Điện & tiện ích tổng hợp",
+    "SERVICES-COMPUTER PROGRAMMING SERVICES": "Dịch vụ lập trình", "SERVICES-COMPUTER PROGRAMMING, DATA PROCESSING, ETC.": "Xử lý dữ liệu & internet",
+    "SERVICES-COMPUTER INTEGRATED SYSTEMS DESIGN": "Tích hợp hệ thống CNTT", "SERVICES-BUSINESS SERVICES, NEC": "Dịch vụ doanh nghiệp",
+    "COMPUTER COMMUNICATIONS EQUIPMENT": "Thiết bị mạng", "COMPUTER STORAGE DEVICES": "Thiết bị lưu trữ", "ELECTRONIC COMPUTERS": "Máy tính",
+    "TELEPHONE COMMUNICATIONS (NO RADIOTELEPHONE)": "Viễn thông", "RADIOTELEPHONE COMMUNICATIONS": "Viễn thông di động",
+    "SEMICONDUCTOR & RELATED DEVICES": "Bán dẫn & linh kiện", "PRINTED CIRCUIT BOARDS": "Bảng mạch in",
+    "ELECTRONIC COMPONENTS, NEC": "Linh kiện điện tử", "INSTRUMENTS FOR MEAS & TESTING OF ELECTRICITY & ELEC SIGNALS": "Thiết bị đo lường điện",
+    "GUIDED MISSILES & SPACE VEHICLES & PARTS": "Tên lửa & vũ trụ", "AIRCRAFT": "Máy bay", "AIRCRAFT PARTS & AUXILIARY EQUIPMENT, NEC": "Linh kiện hàng không",
+    "AIR TRANSPORTATION, SCHEDULED": "Hàng không", "MOTOR VEHICLES & PASSENGER CAR BODIES": "Ô tô", "MOTOR VEHICLE PARTS & ACCESSORIES": "Phụ tùng ô tô",
+    "RETAIL-EATING PLACES": "Nhà hàng", "RETAIL-CATALOG & MAIL-ORDER HOUSES": "Bán lẻ trực tuyến", "RETAIL-VARIETY STORES": "Bán lẻ tổng hợp",
+    "RETAIL-APPAREL & ACCESSORY STORES": "Bán lẻ thời trang", "APPAREL & OTHER FINISHD PDS OF FABRICS & SIMILAR MATL": "May mặc",
+    "SECURITY BROKERS, DEALERS & FLOTATION COMPANIES": "Chứng khoán & môi giới", "FIRE, MARINE & CASUALTY INSURANCE": "Bảo hiểm tài sản",
+    "LIFE INSURANCE": "Bảo hiểm nhân thọ", "INVESTMENT ADVICE": "Quản lý đầu tư", "FINANCE SERVICES": "Dịch vụ tài chính",
+    "SERVICES-MANAGEMENT CONSULTING SERVICES": "Tư vấn quản lý", "GOLD AND SILVER ORES": "Khai thác vàng bạc", "METAL MINING": "Khai khoáng kim loại",
+    "MINING & QUARRYING OF NONMETALLIC MINERALS (NO FUELS)": "Khai khoáng phi kim", "STEEL WORKS, BLAST FURNACES & ROLLING MILLS (COKE OVENS)": "Thép",
+    "INDUSTRIAL INORGANIC CHEMICALS": "Hóa chất vô cơ", "PLASTIC MATERIALS, SYNTH RESINS & NONVULCAN ELASTOMERS": "Nhựa & hóa chất",
+    "CONSTRUCTION SPECIAL TRADE CONTRACTORS": "Thầu xây dựng chuyên ngành", "HEAVY CONSTRUCTION OTHER THAN BLDG CONST - CONTRACTORS": "Xây dựng hạ tầng",
+    "OPERATIVE BUILDERS": "Xây nhà ở", "ELECTRICAL WORK": "Thi công điện", "SERVICES-HOSPITALS": "Bệnh viện", "HOSPITAL & MEDICAL SERVICE PLANS": "Bảo hiểm y tế",
+    "SERVICES-MEDICAL LABORATORIES": "Xét nghiệm y khoa", "WHOLESALE-DRUGS PROPRIETARIES & DRUGGISTS' SUNDRIES": "Phân phối dược",
+    "CABLE & OTHER PAY TELEVISION SERVICES": "Truyền hình cáp", "SERVICES-ADVERTISING": "Quảng cáo", "BLANK CHECKS": "Công ty SPAC",
+    "MISC INDUSTRIAL & COMMERCIAL MACHINERY & EQUIPMENT": "Máy móc công nghiệp", "GENERAL INDUSTRIAL MACHINERY & EQUIPMENT, NEC": "Máy móc công nghiệp",
+    "ELECTRONIC & OTHER ELECTRICAL EQUIPMENT (NO COMPUTER EQUIP)": "Thiết bị điện", "SEARCH, DETECTION, NAVIGATION, GUIDANCE, AERONAUTICAL SYS": "Hệ thống dẫn đường & quốc phòng",
+}
+
+
+def industry_vi(sic: str | None) -> str | None:
+    s = (sic or "").strip()
+    if not s:
+        return None
+    return SIC_VI.get(s.upper(), s.title())
+
+
 def theme_of(sic: str | None) -> str:
     s = (sic or "").upper()
     if not s:
@@ -318,8 +358,10 @@ def load(key: str, cfg: dict, curated: pd.DataFrame, indexes: list[str]):
     except Exception as e:
         print("Không tải được lịch chia tách cổ phiếu:", e, file=sys.stderr)
 
-    budget = int(cfg.get("info_per_run", 100000 if not per_min else 60))
-    info = ticker_info(cl, universe_t, budget, workers)
+    # ưu tiên lấy ngành cho mã thanh khoản lớn nhất trước; gói giới hạn lệnh gọi thì mỗi lần chạy lấy thêm một phần
+    budget = int(cfg.get("info_per_run", 100000 if not per_min else 400))
+    by_dv = sorted(universe_t, key=lambda t: -(stat.dv.get(t, 0) or 0))
+    info = ticker_info(cl, by_dv, budget, workers)
 
     raw = {}
     for t in want:
@@ -333,7 +375,11 @@ def load(key: str, cfg: dict, curated: pd.DataFrame, indexes: list[str]):
     for t in universe_t:
         v = (info.get(t) or []) + ["", "", None]
         nm, sic, sh = v[0], v[1], v[2]
+        # ngành chi tiết theo mã SIC cho mọi mã (kể cả mã trong danh sách tự chọn) để không trộn hai cách phân loại;
+        # mã chưa có SIC thì để trống (không xếp hạng ngành) thay vì gom vào "Khác"
         rows.append({"ticker": t, "theme": th_cur.get(t) or theme_of(sic), "name": nm or names.get(t, ""),
-                     "industry": sic.title() if sic else (th_cur.get(t) or "Khác"), "shares": sh})
+                     "industry": industry_vi(sic) or "", "shares": sh})
+    n_sic = sum(1 for r in rows if r["industry"])
+    print(f"Massive: {n_sic}/{len(rows)} mã đã có ngành (SIC)")
     print(f"Massive: {cl.calls} lệnh gọi API")
     return raw, pd.DataFrame(rows)

@@ -127,6 +127,9 @@ def compute(ctx: dict) -> dict:
     stage[down] = "Xu hướng giảm"
     stage[distrib & ~down] = "Phân phối / suy yếu"
     stage[confirmed] = "Uptrend xác nhận"
+    warm = int(ctx.get("warm", 0))   # trước mốc này dữ liệu chưa đủ dài: không xếp giai đoạn
+    for ser_ in (breadth, accum, lead, ft):
+        ser_.iloc[:warm] = np.nan
     stage[breadth.isna()] = None
 
     # ---- THỜI ĐIỂM VÀNG: nhiều bằng chứng độc lập cùng xác nhận, ưu tiên đầu chu kỳ tăng
@@ -157,32 +160,22 @@ def compute(ctx: dict) -> dict:
 
     # ---- kiểm định: sau mỗi giai đoạn, QQQ và breakout diễn biến ra sao (dùng tương lai, chỉ để thống kê)
     q_f21 = qc.shift(-21) / qc - 1
+    q_dd21 = qc[::-1].rolling(21, min_periods=21).min()[::-1].shift(-1) / qc - 1   # mức giảm sâu nhất trong 21 phiên sau
     ev_hold_day = (ev & (min5 >= piv)).sum(axis=1)
     ev_seen_day = (ev & min5.notna()).sum(axis=1)
-    start = int(ctx.get("start", 260))
-    vals = []
-    for s in STAGES:
-        m = (stage == s)
-        m.iloc[:start] = False
-        f = q_f21[m].dropna()
-        hs, ss = ev_hold_day[m].sum(), ev_seen_day[m].sum()
-        vals.append({"stage": s, "days": int(m.sum()), "q21": _r(f.mean() * 100, 2) if len(f) else None,
-                     "q21_up": _r((f > 0).mean() * 100, 0) if len(f) else None, "bo_hold": _r(hs / ss * 100, 0) if ss else None,
-                     "bo_n": int(ss)})
+    start = max(warm, 1)   # kiểm định trên toàn bộ lịch sử đã đủ dữ liệu (bỏ giai đoạn khởi động)
 
-    GL = ["Thời điểm vàng", "Thuận lợi", "Trung tính", "Bất lợi"]
-    gval = []
-    for g in GL:
-        m = (gold == g)
+    def vrow(m):
+        m = m.copy()
         m.iloc[:start] = False
-        f = q_f21[m].dropna()
+        f, dd = q_f21[m].dropna(), q_dd21[m].dropna()
         hs, ss = ev_hold_day[m].sum(), ev_seen_day[m].sum()
-        gval.append({"level": g, "days": int(m.sum()), "q21": _r(f.mean() * 100, 2) if len(f) else None,
-                     "q21_up": _r((f > 0).mean() * 100, 0) if len(f) else None, "bo_hold": _r(hs / ss * 100, 0) if ss else None, "bo_n": int(ss)})
-    m = gold_early.copy(); m.iloc[:start] = False
-    f = q_f21[m].dropna(); hs, ss = ev_hold_day[m].sum(), ev_seen_day[m].sum()
-    gval.insert(0, {"level": "Vàng + đầu chu kỳ", "days": int(m.sum()), "q21": _r(f.mean() * 100, 2) if len(f) else None,
-                    "q21_up": _r((f > 0).mean() * 100, 0) if len(f) else None, "bo_hold": _r(hs / ss * 100, 0) if ss else None, "bo_n": int(ss)})
+        return {"days": int(m.sum()), "q21": _r(f.mean() * 100, 2) if len(f) else None, "q21_up": _r((f > 0).mean() * 100, 0) if len(f) else None,
+                "dd21": _r(dd.mean() * 100, 1) if len(dd) else None, "dd5": _r((dd <= -0.05).mean() * 100, 0) if len(dd) else None,
+                "bo_hold": _r(hs / ss * 100, 0) if ss else None, "bo_n": int(ss)}
+    vals = [{"stage": st_, **vrow(stage == st_)} for st_ in STAGES]
+    GL = ["Thời điểm vàng", "Thuận lợi", "Trung tính", "Bất lợi"]
+    gval = [{"level": "Vàng + đầu chu kỳ", **vrow(gold_early)}] + [{"level": g, **vrow(gold == g)} for g in GL]
     # các cửa sổ vàng trong quá khứ (gộp khoảng ngắt ≤ 3 phiên, dài ≥ 3 phiên)
     windows, gv = [], (gold == "Thời điểm vàng").values
     k0 = None
@@ -322,7 +315,7 @@ def stock_radar(ctx: dict, sdict: dict, lab_today: dict) -> list[dict]:
     bo5 = ev.iloc[-5:].any()
     ind_cnt = {}
     for t in C.columns:
-        if bo5.get(t, False) or lab_today.get(t):
+        if (bo5.get(t, False) or lab_today.get(t)) and ind_s.get(t) is not None:
             ind_cnt[ind_s.get(t)] = ind_cnt.get(ind_s.get(t), 0) + 1
     out = []
     for t in C.columns:
@@ -362,7 +355,7 @@ def stock_radar(ctx: dict, sdict: dict, lab_today: dict) -> list[dict]:
             hold_txt = "Vẫn giữ trên pivot" if hold_ok else "Đã đóng cửa dưới pivot"
         add("bo", "Vượt pivot có khối lượng xác nhận", bo_ok, bo_txt)
         add("hold", "Giữ được pivot sau breakout", hold_ok, hold_txt)
-        k_ind = ind_cnt.get(g, 0)
+        k_ind = ind_cnt.get(g, 0) if g is not None else 0
         add("group", "Nhiều mã cùng ngành có setup", k_ind >= 3, f"{k_ind} mã cùng ngành có setup hoặc breakout trong 5 phiên")
         d_ = dnb[t].iloc[t0]
         add("res", "Giữ giá khi thị trường giảm", bool(np.isfinite(d_) and d_ > 0), f"Chênh lệch TB khi QQQ giảm: {d_:+.2f}%" if np.isfinite(d_) else "Chưa đủ dữ liệu")
