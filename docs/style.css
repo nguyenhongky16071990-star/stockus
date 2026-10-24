@@ -296,3 +296,13 @@ li.dn{color:var(--bad)}
 .vd-main{font-size:1.05rem;margin:6px 0 4px}
 .vd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,18rem),1fr));gap:14px}
 .vd-grid .small-list{color:var(--ink)}
+.help{margin:2px 0 8px;font-size:.84rem;border:1px dashed var(--line);border-radius:8px;padding:4px 10px;background:var(--soft)}
+.help summary{cursor:pointer;color:var(--accent);font-weight:600}
+.help p{margin:6px 0;line-height:1.5}
+.start{border-left:5px solid var(--accent)}
+.start ol{line-height:1.6}
+tr.lx-now td{background:color-mix(in srgb,var(--accent) 12%,transparent);font-weight:600}
+.grid2 > .card.full{grid-column:1/-1}
+.grid2 > .full-w{grid-column:1/-1}
+.ex-bar{display:inline-flex;align-items:center;gap:6px;min-width:9rem}
+.ex-bar i{display:inline-block;height:8px;background:var(--accent);border-radius:4px;min-width:1px}

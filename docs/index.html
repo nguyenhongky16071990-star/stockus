@@ -170,6 +170,18 @@
       <article class="card"><h3>Đỉnh mới và đáy mới 52 tuần</h3><p class="note">Xanh: số mã lập đỉnh 52 tuần. Đỏ: số mã lập đáy 52 tuần.</p><div class="range" data-chart="nhnl"></div><div class="chart" id="ch-nhnl"></div></article>
       <article class="card"><h3>Mã tăng/giảm ≥ 25% trong một quý</h3><p class="note">Xu hướng trung hạn: mã giảm vượt mã tăng là thị trường yếu.</p><div class="range" data-chart="q25"></div><div class="chart" id="ch-q25"></div></article>
       <article class="card"><h3>Số mã có đà tăng mạnh</h3><p class="note">Cột: số mã tăng ≥ 30% trong 1, 3 hoặc 6 tháng, trên EMA 21, biên độ ≥ 4% (tiêu chí của Martin). Danh sách dài ra là thị trường tốt. Đường: % top 100 còn trên EMA 9.</p><div class="range" data-chart="lead"></div><div class="chart" id="ch-lead"></div></article>
+      <article class="card full"><h3>Số mã đà mạnh: thống kê có dự báo được gì?</h3>
+        <p class="note">Cột: số mã có đà tăng mạnh mỗi ngày, tô màu theo khoảng cách tới đỉnh 60 phiên của chính nó (xanh: gần đỉnh, cam: thấp hơn 10–30%, đỏ: thấp hơn trên 30%). Đường (trục trái): QQQ. Bảng bên dưới tự tính từ dữ liệu lịch sử của trang: sau mỗi trạng thái, QQQ và nhóm top 100 diễn biến thế nào trong 1 tháng.</p>
+        <div class="range" data-chart="leadx"></div><div class="chart" id="ch-leadx"></div>
+        <p class="note" id="lx-now"></p>
+        <div class="tbl"><table id="tb-lx"></table></div>
+        <p class="note">Các ngày liền nhau có kết quả chồng lên nhau nên số "phiên" không phải là số lần độc lập. Kết quả phụ thuộc giai đoạn dữ liệu (ví dụ một thị trường tăng dài), hãy xem lại khi có thêm dữ liệu.</p></article>
+      <article class="card full"><h3>Chỉ báo nào báo sớm, chỉ báo nào báo muộn?</h3>
+        <p class="note">Tự đo lại mỗi ngày trên dữ liệu thật: ở mỗi đáy và đỉnh của QQQ (sóng từ 5%), mỗi chỉ báo quay đầu sớm hay muộn bao nhiêu phiên. Số âm = quay đầu TRƯỚC QQQ, số dương = SAU QQQ. Cột "Hôm nay" cho biết chỉ báo đang quay lên hay quay xuống.</p>
+        <p class="note" id="ll-sum"></p>
+        <div class="tbl"><table id="tb-ll"></table></div>
+        <p class="note" id="ll-pts"></p>
+        <p class="note">Quy tắc đo: "quay lên" là khi chỉ báo cao hơn đáy 10 phiên của nó ít nhất 30% biên độ 6 tháng và nằm trên trung bình 5 phiên; "đỉnh" là ngày chỉ báo cao nhất quanh đỉnh QQQ. Số đáy/đỉnh còn ít thì kết quả chỉ mang tính tham khảo.</p></article>
       <article class="card"><h3>Dao động McClellan</h3><p class="note">Dựa trên chênh lệch mã tăng và mã giảm trong danh sách. Trên 0 là động lượng tích cực.</p><div class="range" data-chart="mcc"></div><div class="chart" id="ch-mcc"></div></article>
     </div>
   </section>
@@ -282,7 +294,7 @@
       <p class="note">Thời điểm vàng = ít nhất 5/6 bằng chứng độc lập cùng xác nhận, trong đó bắt buộc có giai đoạn dòng tiền tốt và QQQ khỏe. Vàng nhất là khi điều đó xảy ra trong 40 phiên đầu sau một nhịp điều chỉnh (đầu chu kỳ tăng, lúc cổ phiếu dẫn dắt vượt nền đầu tiên).</p>
       <ul class="fl-evl gd-checks" id="gd-checks"></ul>
       <div class="grid2">
-        <div><h4 class="sub-h">Kiểm chứng: sau những phiên ở mỗi mức</h4><div class="tbl"><table id="tb-gd-val"></table></div></div>
+        <div class="full-w"><h4 class="sub-h">Kiểm chứng: sau những phiên ở mỗi mức</h4><p class="note">Xem cả cột rủi ro (giảm sâu nhất, % lần giảm trên 5%) và kỳ vọng setup (R), không chỉ lợi nhuận QQQ.</p><div class="tbl"><table id="tb-gd-val"></table></div></div>
         <div><h4 class="sub-h">Các cửa sổ vàng gần đây</h4><div class="tbl"><table id="tb-gd-win"></table></div></div>
       </div>
       <h4 class="sub-h">QQQ và thời điểm mua theo ngày</h4>
@@ -307,7 +319,7 @@
     </article>
     <article class="card">
       <h3>Kiểm định khung giai đoạn</h3>
-      <p class="note">Sau những phiên ở mỗi giai đoạn, QQQ 1 tháng sau thay đổi bao nhiêu và breakout xuất hiện trong các phiên đó giữ được pivot 5 phiên bao nhiêu %. Giai đoạn tốt phải cho kết quả tốt hơn rõ rệt; nếu không, khung phân loại cần sửa. Kỳ vọng theo R của từng setup trong mỗi giai đoạn nằm ở tab Hiệu quả setup.</p>
+      <p class="note"><b>Đọc đúng bảng này:</b> cột "QQQ 1 tháng sau" chỉ cho biết chỉ số có hồi lên không. Trong một thị trường tăng dài, mua chỉ số lúc yếu thường có lãi vì chỉ số hồi lại, nên cột này hay "đẹp" ở giai đoạn xấu. Với người mua breakout, các cột quan trọng hơn là <b>rủi ro</b> (giảm sâu nhất 1 tháng sau, % lần giảm trên 5%) và <b>kỳ vọng setup (R)</b>: giao dịch theo setup trong giai đoạn đó có lãi không. Giai đoạn tốt phải có rủi ro thấp hơn và kỳ vọng R cao hơn.</p>
       <div class="tbl"><table id="tb-fl-val"></table></div>
     </article>
     <article class="card">
@@ -350,6 +362,18 @@
       <p class="note">Đường cộng dồn R theo ngày đóng lệnh (1R mỗi lệnh). Dốc lên đều là ổn định.</p><div class="chart" id="ch-lb"></div>
       <h4 class="sub-h">Theo từng điều kiện lúc vào lệnh</h4>
       <div id="lb-dims"></div>
+    </article>
+    <article class="card">
+      <h3>Chốt lãi thế nào: chốt từng phần hay giữ tới khi thủng MA 20 / MA 50?</h3>
+      <p class="note">So sánh 10 cách bán trên CÙNG một tập điểm mua thật (RS ≥ 80, bứt phá đỉnh 20 phiên có khối lượng, mua giá đóng cửa, stop dưới đáy 10 phiên). Mỗi lệnh theo dõi đủ 150 phiên, trượt giá 0,1%. Kết quả tính theo R (1R = số tiền rủi ro).</p>
+      <ul class="small-list" id="ex-notes"></ul>
+      <div class="tbl"><table id="tb-ex"></table></div>
+      <p class="note">"Giữ lại khi có siêu cổ": với các lệnh từng lãi từ 3R trở lên, cách bán đó giữ lại được bao nhiêu % mức lãi cao nhất. "Top 10% tạo ra": phần trăm tổng lãi đến từ 10% lệnh tốt nhất.</p>
+      <h4 class="sub-h">Xu hướng sau điểm mua dài hay ngắn?</h4>
+      <div class="grid2">
+        <div class="tbl"><table id="tb-ex-dur"></table></div>
+        <div class="tbl"><table id="tb-ex-gain"></table></div>
+      </div>
     </article>
     <article class="card">
       <h3>Vì sao breakout thất bại, và có nên mua lại?</h3>
@@ -574,6 +598,36 @@
 
   <!-- HƯỚNG DẪN -->
   <section id="tab-guide" class="tab guide" role="tabpanel" hidden>
+    <article class="card start">
+      <h3>Mới xem lần đầu? Bắt đầu ở đây (10 phút)</h3>
+      <p><b>Ý tưởng chính:</b> trang này không chỉ tìm cổ phiếu có mẫu hình đẹp. Nó trả lời 3 câu hỏi trước khi mua, và tự kiểm chứng xem các câu trả lời đó trước đây có đúng không:</p>
+      <ol>
+        <li><b>Thị trường có ủng hộ mua không?</b> Xem nhóm Thị trường: Tổng quan → Kết luận hôm nay, Dòng tiền → Thời điểm vàng.</li>
+        <li><b>Tiền đang vào ngành nào, mã nào?</b> Xem tab Ngành → Điểm ngành dẫn, và Radar dòng tiền ở tab Dòng tiền.</li>
+        <li><b>Mua ở đâu, sai khi nào, và kiểu mua này có lợi thế không?</b> Xem tab Hiệu quả setup → Tín hiệu hôm nay, bấm vào mã để mở "Ba câu hỏi trước khi mua".</li>
+      </ol>
+      <h4 class="sub-h">7 điểm khác biệt so với các trang lọc cổ phiếu thông thường</h4>
+      <ol>
+        <li><b>Nhìn vào bên trong chỉ số.</b> Theo dõi riêng 100 mã mạnh nhất (tab Top 100). Các mã dẫn dắt thường gãy trước chỉ số, nên đây là hệ thống báo động sớm.</li>
+        <li><b>Hỏi xem thị trường có đang thưởng cho breakout không.</b> Biểu đồ "Breakout giữ giá bao lâu" và điểm Follow-through. Breakout thất bại hàng loạt là lúc đứng ngoài, dù chỉ số còn đẹp.</li>
+        <li><b>Không tin một chỉ báo.</b> Thời điểm vàng cần 5/6 bằng chứng độc lập; ngành dẫn cần 7 bằng chứng; mỗi cổ phiếu có 9 bằng chứng dòng tiền. Luôn có danh sách "bằng chứng còn thiếu".</li>
+        <li><b>Mọi tín hiệu đều được chấm điểm bằng lịch sử,</b> tính theo R (bội số rủi ro) sau trượt giá, có khoảng tin cậy và kết quả ngoài mẫu. Nếu một setup không có lợi thế trong điều kiện hiện tại, trang sẽ nói thẳng.</li>
+        <li><b>Kết quả thay đổi theo điều kiện thị trường.</b> Cùng một mẫu hình VCP có thể rất tốt khi thị trường khỏe và rất tệ khi thị trường yếu. Tab Hiệu quả setup và Theo thị trường chia rõ điều này.</li>
+        <li><b>8 huyền thoại giao dịch song song bằng tiền ảo</b> (tab Mô phỏng), mỗi người đúng quy tắc của mình, để thấy phong cách nào hợp thị trường hiện tại.</li>
+        <li><b>Tự cảnh báo khi chỉ số "lừa".</b> Ví dụ QQQ tăng nhưng số mã lập đáy nhiều hơn số mã lập đỉnh, hoặc chỉ vài mã vốn hóa lớn kéo cả chỉ số.</li>
+      </ol>
+      <h4 class="sub-h">Mỗi biểu đồ đều có nút "Cách đọc biểu đồ này"</h4>
+      <p>Bấm vào để xem: nhìn gì, thế nào là tốt, thế nào là xấu, và mẹo dùng. Rê chuột lên tiêu đề cột trong bảng để xem giải thích.</p>
+      <h4 class="sub-h">5 khái niệm cần nắm</h4>
+      <dl>
+        <dt>RS (sức mạnh giá) và đường RS</dt><dd>RS 1–99: xếp hạng mức tăng giá so với mọi mã khác, 99 là mạnh nhất. Đường RS = giá cổ phiếu chia cho QQQ; đường đi lên là cổ phiếu mạnh hơn thị trường.</dd>
+        <dt>R (bội số rủi ro)</dt><dd>1R = số tiền bạn chấp nhận mất nếu chạm stop. Lệnh lãi +2R là lãi gấp đôi số tiền rủi ro. Kỳ vọng +0,3R nghĩa là trung bình mỗi lệnh lãi 0,3 lần số tiền rủi ro.</dd>
+        <dt>Pivot, breakout</dt><dd>Pivot là đỉnh của nền giá. Breakout là khi giá vượt pivot, lý tưởng là kèm khối lượng lớn. Nếu giá rơi lại dưới pivot trong vài phiên là breakout thất bại.</dd>
+        <dt>Độ rộng thị trường</dt><dd>Bao nhiêu cổ phiếu cùng tăng. Thị trường khỏe khi nhiều cổ phiếu cùng tham gia, không chỉ vài mã lớn.</dd>
+        <dt>Ngày phân phối</dt><dd>Phiên chỉ số giảm với khối lượng cao hơn hôm trước: dấu hiệu tổ chức bán ra. Từ 5–6 ngày trong 25 phiên là cảnh báo (O'Neil).</dd>
+      </dl>
+      <p class="note">Đây là công cụ học tập và hỗ trợ ra quyết định, không phải khuyến nghị đầu tư. Kết quả quá khứ không bảo đảm tương lai.</p>
+    </article>
     <article class="card">
       <h3>Đọc trang này mỗi sáng trong 5 bước</h3>
       <ol>
