@@ -11,22 +11,21 @@ import numpy as np
 import pandas as pd
 
 SLIP = 0.001       # trượt giá mỗi lần khớp (0,1%)
-HOLD = 20          # số phiên tối đa giữ lệnh trong quy tắc thoát chuẩn
+HOLD = 120         # số phiên tối đa giữ lệnh (quy tắc thoát: chốt 1/3 tại +20%, 1/3 tại +40%, phần còn lại theo MA 50)
+T1, T2 = 0.20, 0.40   # hai mức chốt lãi từng phần — cách thoát cho kỳ vọng cao nhất trong bảng "Chốt lãi thế nào"
 MIN_N = 30         # dưới số lệnh này: chưa đủ tin cậy
 
 SETUP_INFO = {
     "VCP": {"kind": "base", "rule": "Đạt Trend Template; 3 đoạn 15 phiên có biên độ co dần, đoạn cuối < 10%; KL 10 phiên < 85% TB50; giá cách đỉnh 15 phiên ≤ 8%. Mua khi vượt đỉnh 15 phiên, stop đáy 10 phiên."},
     "Nền phẳng": {"kind": "base", "rule": "Nền 30 phiên biên độ ≤ 15% sau nhịp tăng ≥ 20%; giá trên MA50, RS ≥ 70, cách đỉnh nền ≤ 5%. Mua khi vượt đỉnh nền, stop đáy 10 phiên."},
     "Cốc tay cầm": {"kind": "base", "rule": "Gần đúng: cốc sâu 12–35% so với đỉnh 3–5 tháng trước, phục hồi về trong 10% đỉnh cũ; tay cầm 8–12 phiên sâu ≤ 12%, nằm ở nửa trên cốc, KL cạn. Mua khi vượt đỉnh tay cầm, stop đáy tay cầm."},
-    "Cờ cán cao (HTF)": {"kind": "base", "rule": "Tăng ≥ 90% trong khoảng 8 tuần; sau đó tích lũy 10 phiên biên độ ≤ 25%, cách đỉnh ≤ 20%. Mua khi vượt đỉnh cờ, stop đáy cờ."},
     "Breakout 20 phiên": {"kind": "close", "rule": "RS ≥ 70, đóng cửa vượt đỉnh 20 phiên lần đầu với KL ≥ 1,2× TB50. Mua cuối phiên bứt phá, stop đáy 10 phiên."},
-    "Pullback EMA21": {"kind": "pull", "rule": "RS ≥ 70, EMA21 dốc lên, giá trên EMA50 và cách đỉnh 60 phiên ≤ 20%; chạm EMA21 trong 3 phiên, đóng cửa trên EMA21, KL 5 phiên < TB50. Mua khi vượt đỉnh phiên tín hiệu, stop đáy 3 phiên."},
     "Lấy lại EMA21": {"kind": "pull", "rule": "RS ≥ 60, sau ≥ 3 phiên đóng cửa dưới EMA21 thì đóng cửa trở lại trên EMA21, EMA50 dốc lên. Mua khi vượt đỉnh phiên tín hiệu, stop đáy 5 phiên."},
     "Lấy lại MA50": {"kind": "pull", "rule": "RS ≥ 50, sau ≥ 3 phiên dưới MA50 thì đóng cửa trên MA50, MA200 dốc lên và giá trên MA200. Mua khi vượt đỉnh phiên tín hiệu, stop đáy 5 phiên."},
-    "Gap tăng mạnh (EP)": {"kind": "pull", "rule": "Gap ≥ 8% với KL ≥ 3× TB50, đóng cửa trên EMA50. Mua khi vượt đỉnh phiên gap (trong 3 phiên), stop đáy phiên gap."},
-    "Inside day": {"kind": "pull", "rule": "RS ≥ 70, trên EMA50, EMA21 dốc lên, phiên nằm trọn trong phiên trước. Mua khi vượt đỉnh, stop đáy phiên."},
 }
-BREAKOUT_SETUPS = ["VCP", "Nền phẳng", "Cốc tay cầm", "Cờ cán cao (HTF)", "Breakout 20 phiên"]
+BREAKOUT_SETUPS = ["VCP", "Nền phẳng", "Cốc tay cầm", "Breakout 20 phiên"]
+# Đã bỏ vì kiểm chứng thật (11/2025–10/2026, 0,1% trượt giá) đều lỗ cả trong và ngoài mẫu:
+# Inside day (−0,31R, 5.263 lệnh), Pullback EMA21 (−0,12R, 4.255 lệnh), Gap tăng mạnh EP (−0,18R), Cờ cán cao (−0,20R, mẫu quá ít).
 
 DIMS = [
     {"key": "stage", "label": "Giai đoạn dòng tiền"},
@@ -81,20 +80,12 @@ def signals(c: dict) -> dict:
     cup = ((dep >= 0.12) & (dep <= 0.35) & (Hh >= 0.9 * P) & (Hh <= 1.03 * P) & ((Hh - Lh) / Hh <= 0.12)
            & (Lh >= B + 0.5 * (P - B)) & (C.shift(45) <= 0.92 * P) & (v10 < v50))
     S["Cốc tay cầm"] = (base & cup & (rs >= 70) & (C > s50) & (C >= 0.95 * Hh) & (C < Hh), Hh, Lh, 5)
-    run = H.rolling(15).max() / L.rolling(40).min().shift(10) - 1
-    flag = (run >= 0.9) & (C >= 0.8 * H15) & (H.rolling(10).max() / L.rolling(10).min() - 1 <= 0.25)
-    S["Cờ cán cao (HTF)"] = (base & flag & (C < Hh), Hh, Lh, 5)
     hp = H.shift(1).rolling(20, min_periods=15).max()
     S["Breakout 20 phiên"] = (base & (rs >= 70) & (C > hp) & ~(C.shift(1) > hp.shift(1)) & (V >= 1.2 * v50), hp, L10, 0)
-    S["Pullback EMA21"] = (base & (rs >= 70) & (e21 > e21.shift(5)) & (C > e50) & (L3 <= e21 * 1.01) & (C > e21)
-                           & (V.rolling(5).mean() < v50) & (C >= 0.8 * H.rolling(60).max()), H, L3, 2)
     below21 = (C.shift(1) < e21.shift(1)) & (C.shift(2) < e21.shift(2)) & (C.shift(3) < e21.shift(3))
     S["Lấy lại EMA21"] = (base & (rs >= 60) & (C > e21) & below21 & (e50 > e50.shift(10)), H, L5, 2)
     below50 = (C.shift(1) < s50.shift(1)) & (C.shift(2) < s50.shift(2)) & (C.shift(3) < s50.shift(3))
     S["Lấy lại MA50"] = (base & (rs >= 50) & (C > s50) & below50 & (s200 > s200.shift(20)) & (C > s200), H, L5, 2)
-    S["Gap tăng mạnh (EP)"] = (base & (O / C.shift(1) - 1 >= 0.08) & (V >= 3 * v50) & (C > e50), H, L, 3)
-    inside = (H <= H.shift(1)) & (L >= L.shift(1))
-    S["Inside day"] = (base & (rs >= 70) & (C > e50) & (e21 > e21.shift(5)) & inside, H, L, 2)
     return S
 
 
@@ -116,9 +107,57 @@ def _bucket(key, v):
     return v
 
 
+def follow(O, H, L, C, M50, j, e, fill, sp, R, nd, brk=True, pv=None, same_bar_risk=True):
+    """Theo dõi một lệnh với quy tắc thoát chuẩn: stop ban đầu; chốt 1/3 khi lãi +20%, 1/3 khi +40% (sau lần chốt đầu dời stop
+    về hòa vốn); phần còn lại bán khi đóng cửa dưới MA 50. Lệnh chưa kết thúc được tính theo giá đóng cửa mới nhất (đang mở)."""
+    lv1, lv2 = fill * (1 + T1), fill * (1 + T2)
+    rem, realized, cur = 1.0, 0.0, sp
+    took1 = took2 = False
+    mfe = mae = 0.0
+    hit = {1: False, 2: False, 3: False}
+    fail3 = False
+    last = min(nd - 1, e + HOLD)
+    for q in range(e, last + 1):
+        o, h, l, cc = O[q, j], H[q, j], L[q, j], C[q, j]
+        if not np.isfinite(cc):
+            continue
+        o = o if np.isfinite(o) else cc
+        if q == e and same_bar_risk and l <= sp:
+            return {"r": (sp * (1 - SLIP) - fill) / R, "x": q, "why": "Chạm stop ngay phiên mua", "mfe": 0.0, "mae": -1.0, "hit": hit, "fail3": True, "open": False}
+        if q > e and l <= cur:
+            px = min(o, cur)
+            realized += rem * (px * (1 - SLIP) - fill) / R
+            mae = min(mae, (min(l, cur) - fill) / R)
+            return {"r": realized, "x": q, "why": "Hòa vốn" if took1 else "Chạm stop", "mfe": mfe, "mae": mae, "hit": hit,
+                    "fail3": fail3 or (q - e <= 3 and not took1), "open": False}
+        mfe = max(mfe, (h - fill) / R)
+        mae = min(mae, (l - fill) / R)
+        for k_ in (1, 2, 3):
+            if not hit[k_] and h >= fill + k_ * R:
+                hit[k_] = True
+        if q - e <= 3 and (cc < pv if (brk and pv is not None) else cc <= fill - 0.5 * R):
+            fail3 = True
+        if not took1 and h >= lv1:
+            took1, cur = True, max(cur, fill)
+            realized += (1 / 3) * (max(o, lv1) * (1 - SLIP) - fill) / R
+            rem -= 1 / 3
+        if took1 and not took2 and h >= lv2:
+            took2 = True
+            realized += (1 / 3) * (max(o, lv2) * (1 - SLIP) - fill) / R
+            rem -= 1 / 3
+        if took1 and q > e and np.isfinite(M50[q, j]) and cc < M50[q, j]:
+            realized += rem * (cc * (1 - SLIP) - fill) / R
+            return {"r": realized, "x": q, "why": "Đóng cửa dưới MA 50", "mfe": mfe, "mae": mae, "hit": hit, "fail3": fail3, "open": False}
+    realized += rem * (C[last, j] * (1 - SLIP) - fill) / R if np.isfinite(C[last, j]) else 0.0
+    still = e + HOLD > nd - 1
+    return {"r": realized, "x": last, "why": "Đang mở (tính theo giá hiện tại)" if still else f"Hết {HOLD} phiên", "mfe": mfe, "mae": mae,
+            "hit": hit, "fail3": fail3, "open": still}
+
+
 def simulate(c: dict, S: dict, ctxm: dict, start: int, max_stop: float = 12.0):
     O, H, L, C, V = (c[k].values for k in ("O", "H", "L", "C", "V"))
     e21, v50, rs = c["e21"].values, c["v50"].values, c["rs"].values
+    M50 = c["s50"].values
     nd, nt = C.shape
     stage, reg, btr = ctxm["stage"], ctxm["reg"], ctxm["btr"]
     indr = ctxm["ind_rank"].values
@@ -165,59 +204,10 @@ def simulate(c: dict, S: dict, ctxm: dict, start: int, max_stop: float = 12.0):
             if R <= 0 or stop_pct > max_stop:
                 busy[j] = e
                 continue
-            # theo dõi lệnh
-            mfe = mae = 0.0
-            hit = {1: False, 2: False, 3: False}
-            fail3 = False
-            half, be = False, False
-            cur_stop = sp
-            realized = 0.0
-            reason, x = None, None
-            done = False
-            last = min(nd - 1, e + HOLD)
-            for q in range(e, last + 1):
-                o, h, l, cc = O[q, j], H[q, j], L[q, j], C[q, j]
-                if not np.isfinite(cc):
-                    continue
-                o = o if np.isfinite(o) else cc
-                if q > e and l <= cur_stop:
-                    px = min(o, cur_stop)
-                    rem = 0.5 if half else 1.0
-                    realized += rem * (px * (1 - SLIP) - fill) / R
-                    mae = min(mae, (min(l, cur_stop) - fill) / R)
-                    reason, x, done = ("Hòa vốn" if be else "Chạm stop"), q, True
-                    if q - e <= 3:
-                        fail3 = True
-                    break
-                if q == e and l <= sp and wait != 0:   # khớp và chạm stop cùng phiên: giả định xấu nhất
-                    realized = (sp * (1 - SLIP) - fill) / R
-                    mae, reason, x, done, fail3 = -1.0, "Chạm stop ngay phiên mua", q, True, True
-                    break
-                mfe = max(mfe, (h - fill) / R)
-                mae = min(mae, (l - fill) / R)
-                for k_ in (1, 2, 3):
-                    if not hit[k_] and h >= fill + k_ * R:
-                        hit[k_] = True
-                if q - e <= 3 and (cc < pv if brk else cc <= fill - 0.5 * R):
-                    fail3 = True
-                if not half and hit[2]:
-                    half, be = True, True
-                    realized += 0.5 * 2.0 - 0.5 * fill * SLIP / R
-                    cur_stop = fill
-                if half and q - e >= 3 and np.isfinite(e21[q, j]) and cc < e21[q, j]:
-                    realized += 0.5 * (cc * (1 - SLIP) - fill) / R
-                    reason, x, done = "Đóng cửa dưới EMA21", q, True
-                    break
-            if not done:
-                if e + HOLD > nd - 1:   # chưa đủ thời gian: lệnh đang mở
-                    trades.append({"s": name, "j": j, "i": i, "e": e, "open": True, "fill": fill, "pv": pv, "sp": sp, "R": R})
-                    busy[j] = nd
-                    continue
-                cc = C[last, j]
-                rem = 0.5 if half else 1.0
-                realized += rem * (cc * (1 - SLIP) - fill) / R
-                reason, x = "Hết 20 phiên", last
-            busy[j] = x
+            # theo dõi lệnh (quy tắc thoát chuẩn ở hàm follow)
+            fr = follow(O, H, L, C, M50, j, e, fill, sp, R, nd, brk=brk, pv=pv, same_bar_risk=(wait != 0))
+            realized, x, reason, mfe, mae, hit, fail3 = fr["r"], fr["x"], fr["why"], fr["mfe"], fr["mae"], fr["hit"], fr["fail3"]
+            busy[j] = nd if fr["open"] else x
             vr = V[e, j] / v50[e, j] if np.isfinite(v50[e, j]) and v50[e, j] > 0 else np.nan
             rng = H[e, j] - L[e, j]
             cpos = (C[e, j] - L[e, j]) / rng if rng > 0 else 0.5
@@ -226,7 +216,7 @@ def simulate(c: dict, S: dict, ctxm: dict, start: int, max_stop: float = 12.0):
             gp = bool(gap5[max(0, e - 5):e + 1, j].any())
             st_i = stage[i]
             trades.append({
-                "s": name, "j": j, "i": i, "e": e, "x": x, "open": False, "fill": fill, "pv": pv, "sp": sp, "R": R,
+                "s": name, "j": j, "i": i, "e": e, "x": x, "open": bool(fr["open"] and nd - 1 - e < 10), "live": fr["open"], "fill": fill, "pv": pv, "sp": sp, "R": R,
                 "r": realized, "win": realized > 0, "h1": hit[1], "h2": hit[2], "h3": hit[3], "fail3": fail3, "mfe": mfe, "mae": mae,
                 "why": reason, "days": x - e,
                 "d": {"gold": ctxm["gold"][i] if isinstance(ctxm["gold"][i], str) else None, "stage": st_i if isinstance(st_i, str) else None, "reg": reg[i] if isinstance(reg[i], str) else None,
@@ -273,7 +263,7 @@ def reentries(c, trades, start):
     """Sau một breakout thất bại (đóng cửa dưới pivot trong 5 phiên), nếu trong 15 phiên giá đóng cửa lại trên pivot với KL > TB50
     thì mua lại cuối phiên đó, stop = đáy thấp nhất từ lúc thất bại. Cùng quy tắc thoát."""
     O, H, L, C, V = (c[k].values for k in ("O", "H", "L", "C", "V"))
-    e21, v50 = c["e21"].values, c["v50"].values
+    v50 = c["v50"].values
     nd = C.shape[0]
     out = []
     for t in trades:
@@ -292,30 +282,12 @@ def reentries(c, trades, start):
                 fill = C[q, j] * (1 + SLIP)
                 sp = np.nanmin(L[fq:q + 1, j]) * 0.999
                 R = fill - sp
-                if R <= 0 or R / fill > 0.12 or q + HOLD > nd - 1:
+                if R <= 0 or R / fill > 0.12 or nd - 1 - q < 10:
                     break
-                realized, half, cur, x, reason = 0.0, False, sp, None, None
-                for k in range(q + 1, q + HOLD + 1):
-                    o, h, l, cc = O[k, j], H[k, j], L[k, j], C[k, j]
-                    if not np.isfinite(cc):
-                        continue
-                    o = o if np.isfinite(o) else cc
-                    if l <= cur:
-                        realized += (0.5 if half else 1) * (min(o, cur) * (1 - SLIP) - fill) / R
-                        x, reason = k, "stop"
-                        break
-                    if not half and h >= fill + 2 * R:
-                        half, cur = True, fill
-                        realized += 1.0
-                    if half and k - q >= 3 and cc < e21[k, j]:
-                        realized += 0.5 * (cc * (1 - SLIP) - fill) / R
-                        x, reason = k, "ema"
-                        break
-                if x is None:
-                    x = q + HOLD
-                    realized += (0.5 if half else 1) * (C[x, j] * (1 - SLIP) - fill) / R
-                out.append({"s": t["s"], "j": j, "i": q, "e": q, "x": x, "r": realized, "h1": False, "h2": half, "h3": False,
-                            "fail3": False, "mfe": 0, "mae": 0, "days": x - q})
+                M50 = c["s50"].values
+                fr = follow(O, H, L, C, M50, j, q, fill, sp, R, nd, brk=False, same_bar_risk=False)
+                out.append({"s": t["s"], "j": j, "i": q, "e": q, "x": fr["x"], "r": fr["r"], "h1": fr["hit"][1], "h2": fr["hit"][2], "h3": fr["hit"][3],
+                            "fail3": False, "mfe": fr["mfe"], "mae": fr["mae"], "days": fr["x"] - q})
                 break
     return out
 
@@ -332,7 +304,7 @@ def analyze(c: dict, ctxm: dict, start: int, today_stage: str | None) -> dict:
         cut = int(e_min + 0.6 * (e_max - e_min))
     else:
         cut = nd
-    recent = nd - 1 - HOLD - 60
+    recent = nd - 1 - 80   # 80 phiên gần nhất (lệnh chưa kết thúc tính theo giá hiện tại)
     stages = ["Xu hướng giảm", "Hồi phục ban đầu", "Dòng tiền lan rộng", "Uptrend xác nhận", "Phân phối / suy yếu", "Chưa rõ ràng"]
     dims = []
     for d in DIMS:
@@ -344,6 +316,8 @@ def analyze(c: dict, ctxm: dict, start: int, today_stage: str | None) -> dict:
         row = {"name": name, "kind": info["kind"], "rule": info["rule"], "all": stats(ts, full=True),
                "ins": stats([t for t in ts if t["e"] < cut], full=True), "oos": stats([t for t in ts if t["e"] >= cut], full=True),
                "recent": stats([t for t in ts if t["e"] >= recent]), "by": {}}
+        a_, o_ = row["all"], row["oos"]
+        row["edge"] = bool(a_.get("n", 0) >= MIN_N and (a_.get("exp") or 0) > 0 and (o_.get("n", 0) < MIN_N or (o_.get("exp") or 0) > 0))
         for d in dims:
             row["by"][d["key"]] = {b: stats([t for t in ts if t["d"].get(d["key"]) == b]) for b in d["buckets"]}
         # tổ hợp quan trọng nhất: giai đoạn hiện tại × RS ≥ 80 × ngành nửa trên

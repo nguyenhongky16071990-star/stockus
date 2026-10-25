@@ -182,6 +182,70 @@ def analyze(c: dict, stage: pd.Series | None, start: int) -> dict:
         out["exits"].append(row)
     out["exits"].sort(key=lambda x: -(x["exp"] or -9))
 
+    # ---- HỆ THỐNG ĐỀ XUẤT: lọc điểm mua + cách bán kết hợp, kiểm chứng trên dữ liệu thật
+    e21 = M["e21"]
+    def sys_exit(k):
+        f_, r_ = fill[k], R[k]
+        stop, rem, res, done1, done2, peak = sp[k], 1.0, 0.0, False, False, f_
+        for t in range(T):
+            o, h, l, c = Oo[k, t], Hh[k, t], Ll[k, t], Cc[k, t]
+            if l <= stop:
+                res += rem * (min(o, stop) * (1 - SLIP) - f_) / r_
+                return res, t + 1
+            peak = max(peak, h)
+            if not done1 and h >= min(f_ + 2 * r_, f_ * 1.20):
+                px = max(o, min(f_ + 2 * r_, f_ * 1.20)); res += (px * (1 - SLIP) - f_) / r_ / 3; rem -= 1 / 3; done1 = True; stop = max(stop, f_)
+            if done1 and not done2 and h >= min(f_ + 4 * r_, f_ * 1.35):
+                px = max(o, min(f_ + 4 * r_, f_ * 1.35)); res += (px * (1 - SLIP) - f_) / r_ / 3; rem -= 1 / 3; done2 = True
+            if peak >= f_ * 1.20:
+                stop = max(stop, f_ * 1.10)   # lệnh từng lãi ≥ 20% không được quay về dưới +10%
+            if done1 and np.isfinite(e21[k, t]) and c < e21[k, t]:
+                res += rem * (c * (1 - SLIP) - f_) / r_
+                return res, t + 1
+            if not done1 and t >= 14 and h < f_ + r_ and c <= f_ * 1.02:
+                res += rem * (c * (1 - SLIP) - f_) / r_   # 15 phiên không đi đâu: bán
+                return res, t + 1
+        res += rem * (Cc[k, T - 1] * (1 - SLIP) - f_) / r_
+        return res, T
+    sysr = np.array([sys_exit(k)[0] for k in range(n)])
+    cpos = np.array([(Cv[i, j] - Lv[i, j]) / (Hv[i, j] - Lv[i, j]) if Hv[i, j] > Lv[i, j] else 0.5 for i, j in zip(I, J)])
+    vr = np.array([V.values[i, j] / v50.values[i, j] if v50.values[i, j] else np.nan for i, j in zip(I, J)])
+    stp = R / fill * 100
+    good = np.array([st_arr[i] in ("Uptrend xác nhận", "Dòng tiền lan rộng") for i in I]) if st_arr is not None else np.ones(n, bool)
+    bad = np.array([st_arr[i] in ("Phân phối / suy yếu", "Xu hướng giảm") for i in I]) if st_arr is not None else np.zeros(n, bool)
+    rs_e = np.array([rs.values[i, j] for i, j in zip(I, J)])
+    order_t = np.argsort(I, kind="stable")
+    cut = I[order_t][int(len(order_t) * 0.6)] if n else 0
+
+    def sstat(m, label, r=sysr):
+        if m.sum() < 5:
+            return {"label": label, "n": int(m.sum())}
+        x = r[m]; xi = I[m]; o_ = np.argsort(xi, kind="stable"); cum = np.cumsum(x[o_]); dd = float((cum - np.maximum.accumulate(np.r_[0, cum])[1:]).min())
+        w = x > 0
+        oos = m & (I >= cut)
+        acct = float(np.prod(1 + 0.005 * x[o_]) - 1) * 100
+        return {"label": label, "n": int(m.sum()), "win": _r(w.mean() * 100, 0), "exp": _r(x.mean()), "avg_w": _r(x[w].mean()) if w.any() else None,
+                "avg_l": _r(x[~w].mean()) if (~w).any() else None, "mdd": _r(dd, 1), "acct": _r(acct, 1),
+                "oos_n": int(oos.sum()), "oos_exp": _r(r[oos].mean()) if oos.sum() >= 5 else None}
+    allm = np.ones(n, bool)
+    filt = good & (cpos >= 0.6) & (vr >= 1.4) & (stp <= 6)
+    out["system"] = {
+        "desc": "Cách bán: chốt 1/3 khi lãi +2R hoặc +20% (cái nào tới trước) rồi dời stop về giá mua; chốt 1/3 khi +4R hoặc +35%; phần còn lại thoát khi đóng cửa dưới EMA 21; lệnh từng lãi ≥ 20% không được quay về dưới +10%; 15 phiên chưa lãi 1R thì bán.",
+        "cut": dates[cut].strftime("%Y-%m-%d") if n else None,
+        "rows": [sstat(allm, "Mọi điểm mua (chưa lọc)"),
+                 sstat(good, "Chỉ khi giai đoạn Uptrend xác nhận / Dòng tiền lan rộng"),
+                 sstat(bad, "Khi giai đoạn Phân phối / Xu hướng giảm (để so sánh)"),
+                 sstat(cpos >= 0.6, "Phiên mua đóng cửa ở 40% trên của biên độ"),
+                 sstat(vr >= 1.4, "Khối lượng phiên mua ≥ 1,4× TB50"),
+                 sstat(stp <= 6, "Stop ≤ 6%"),
+                 sstat(rs_e >= 90, "RS ≥ 90"),
+                 sstat(filt, "ĐỦ BỘ LỌC: giai đoạn tốt + đóng cửa mạnh + khối lượng + stop ≤ 6%"),
+                 sstat(filt & (rs_e >= 90), "Đủ bộ lọc + RS ≥ 90")],
+        "compare": [sstat(filt, "Cùng bộ lọc, giữ tới thủng MA 50", r=next_r) for next_r in [trail_only("s50")[0]]] +
+                   [sstat(filt, "Cùng bộ lọc, chốt 1/2 tại +2R, còn lại EMA 21", r=partials([(2, 0.5, "R")], "e21")[0])] +
+                   [sstat(filt, "Cùng bộ lọc, bán hết tại +3R", r=target(3)[0])],
+    }
+
     # ---- xu hướng của cổ phiếu sau điểm mua dài hay ngắn
     def dur(ma):
         t = _first(Cc < M[ma])

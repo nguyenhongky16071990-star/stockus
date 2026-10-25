@@ -27,7 +27,7 @@ DATA = ROOT / "docs" / "data"
 CONFIG = json.loads((ROOT / "pipeline" / "config.json").read_text(encoding="utf-8"))
 INDEXES = ["QQQ", "SPY", "IWM", "SMH", "IGV"]
 FIELDS = ["Open", "High", "Low", "Close", "Volume"]
-APP_VERSION = "2026.10.25-d"  # phải trùng với APP_VERSION trong docs/app.js
+APP_VERSION = "2026.10.26-d"  # phải trùng với APP_VERSION trong docs/app.js
 
 
 # ---------------------------------------------------------------- tải dữ liệu
@@ -636,17 +636,7 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
             print("Điểm ngành dẫn lỗi:", e, file=sys.stderr)
 
     # ---- mẫu hình / phong cách nào hiệu quả trong điều kiện thị trường nào
-    cond = {"items": [], "dims": [], "notes": []}
-    if not light:
-        import condstats
-        try:
-            cond = condstats.analyze(hist, cycle.phase_series(qc), {n: sg for n, (_, sg) in PATTERNS.items()}, C, L, bt_raw,
-                                     {"ml": "Martin Luk", "qm": "Qullamaggie", "mm": "Mark Minervini", "wo": "William O'Neil",
-                                      "sw": "Stan Weinstein", "pb": "Pradeep Bonde", "ok": "Oliver Kell", "vs": "VSA"},
-                                     vsa=bt_vsa, start=bt_start)
-        except Exception as e:
-            print("Thống kê theo điều kiện thị trường lỗi:", e, file=sys.stderr)
-            cond = {"items": [], "dims": [], "notes": ["Chưa tính được thống kê theo điều kiện thị trường."]}
+    cond = {}   # bảng 'Theo thị trường' đã bỏ (trùng với tab Hiệu quả setup)
 
     # ---- đỉnh và đáy gần nhất của QQQ (sóng ≥ 7%): đo mỗi mã, mỗi ngành đã đi được bao nhiêu từ đó
     import cycle as _cy
@@ -807,6 +797,12 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
                 for g in sigs:
                     pv, sp = g["pv"], g["sp"]
                     if not pv or not sp or sp >= pv:
+                        continue
+                    # chỉ đưa vào kế hoạch setup đã chứng minh có lợi thế (kỳ vọng dương cả toàn kỳ lẫn ngoài mẫu),
+                    # hoặc dương trong đúng giai đoạn dòng tiền hiện tại với đủ mẫu
+                    srow = next((x for x in lab["setups"] if x["name"] == g["s"]), {})
+                    sst = ((srow.get("by") or {}).get("stage") or {}).get(stg) or {}
+                    if not (srow.get("edge") or (sst.get("n", 0) >= setuplab.MIN_N and (sst.get("exp") or 0) > 0)):
                         continue
                     entry = pv if g["kind"] != "close" else c0
                     stop_pct = (entry - sp) / entry * 100
@@ -1100,7 +1096,7 @@ def _jd(o):
 
 def write(out: dict) -> None:
     DATA.mkdir(parents=True, exist_ok=True)
-    for k in ("latest", "history", "stocks", "setups", "extended", "themes", "basket", "charts", "industries", "patterns", "backtest", "cycle", "cond", "flow", "lab", "groups", "exits", "paper"):
+    for k in ("latest", "history", "stocks", "setups", "extended", "themes", "basket", "charts", "industries", "patterns", "backtest", "cycle", "flow", "lab", "groups", "exits", "paper"):
         (DATA / f"{k}.json").write_text(json.dumps(out[k], ensure_ascii=False, separators=(",", ":"), default=_jd), encoding="utf-8")
     # lưu lại ảnh chụp setup + tổng quan mỗi ngày để thống kê về sau
     snap = DATA / "archive"

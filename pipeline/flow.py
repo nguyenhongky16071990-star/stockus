@@ -139,7 +139,7 @@ def compute(ctx: dict) -> dict:
     dd_q = hist["dd_qqq"].fillna(0)
     G = {
         "stage": stage.isin(["Dòng tiền lan rộng", "Uptrend xác nhận"]),
-        "q25": (q25net > 0) & (q25net >= q25net.shift(10)),
+        "q25": (q25net <= 10) & (q25net > q25net.shift(10)),   # kiểm chứng thật: pha ĐẦU (chênh lệch còn thấp nhưng đang cải thiện) tốt hơn hẳn lúc xanh đã áp đảo
         "thrust": thrust,
         "ft": ft >= 50,
         "index": (qc > q_e21) & (dd_q <= 4),
@@ -200,7 +200,7 @@ def compute(ctx: dict) -> dict:
                         "q_in": _r((qc.iloc[k1] / qc.iloc[k0] - 1) * 100, 1), "q_after": _r((qc.iloc[k2] / qc.iloc[k0] - 1) * 100, 1) if k2 > k1 else None,
                         "early": bool(early.iloc[k0]), "open": bool(k1 >= len(dates) - 1)})
     win_out.reverse()
-    GLAB = {"stage": "Giai đoạn Dòng tiền lan rộng hoặc Uptrend xác nhận", "q25": "Mã tăng ≥25%/quý nhiều hơn mã giảm ≥25% và đang tăng lên",
+    GLAB = {"stage": "Giai đoạn Dòng tiền lan rộng hoặc Uptrend xác nhận", "q25": "Chênh lệch mã tăng/giảm ≥25% còn thấp (≤10% số mã) nhưng đang cải thiện so với 10 phiên trước",
             "thrust": "Có bùng nổ độ rộng trong 20 phiên (% mã trên EMA21 từ ≤35% lên ≥60% trong 10 phiên, hoặc tỷ lệ Stockbee 5 ngày ≥ 2,5)",
             "ft": "Breakout gần đây giữ được (điểm Follow-through ≥ 50)", "index": "QQQ trên EMA21 và tối đa 4 ngày phân phối",
             "lead": "Cổ phiếu dẫn dắt khỏe (điểm Dẫn dắt ≥ 50, ≥55% top 100 cách đỉnh dưới 10%)"}
