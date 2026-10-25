@@ -290,14 +290,14 @@ def theme_of(sic: str | None) -> str:
 def ticker_info(cl: Client, tickers: list[str], budget: int, workers: int) -> dict[str, list]:
     """Tên công ty, ngành (mã SIC) và số cổ phiếu lưu hành. Lưu trong tickers_info.json.
 
-    Mỗi mục: [tên, ngành SIC, số cổ phiếu, ngày tải]. Số cổ phiếu được làm mới sau 90 ngày.
+    Mỗi mục: [tên, ngành SIC, số cổ phiếu, ngày tải]. Số cổ phiếu được làm mới sau 365 ngày (ngành gần như không đổi).
     """
     info = json.loads(INFO_FILE.read_text(encoding="utf-8")) if INFO_FILE.exists() else {}
     today = datetime.now(timezone.utc).date()
 
     def stale(v):
         try:
-            return len(v) < 4 or (today - datetime.strptime(v[3], "%Y-%m-%d").date()).days > 90
+            return len(v) < 4 or (today - datetime.strptime(v[3], "%Y-%m-%d").date()).days > 365
         except Exception:
             return True
 
@@ -359,7 +359,7 @@ def load(key: str, cfg: dict, curated: pd.DataFrame, indexes: list[str]):
         print("Không tải được lịch chia tách cổ phiếu:", e, file=sys.stderr)
 
     # ưu tiên lấy ngành cho mã thanh khoản lớn nhất trước; gói giới hạn lệnh gọi thì mỗi lần chạy lấy thêm một phần
-    budget = int(cfg.get("info_per_run", 100000 if not per_min else 400))
+    budget = int(cfg.get("info_per_run", 100000 if not per_min else 60))   # gói 5 lệnh/phút: 60 mã ≈ 12 phút mỗi lần chạy
     by_dv = sorted(universe_t, key=lambda t: -(stat.dv.get(t, 0) or 0))
     info = ticker_info(cl, by_dv, budget, workers)
 

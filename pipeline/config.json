@@ -16,5 +16,6 @@
   "fund_top": 400,
   "fund_per_run": 400,
   "paper_bootstrap_days": 126,
-  "paper_slip_pct": 0.1
+  "paper_slip_pct": 0.1,
+  "info_per_run": 60
 }
