@@ -79,6 +79,7 @@ tr.click{cursor:pointer}
 tr.dim{opacity:.45}
 td.tk{font-weight:700;font-family:var(--mono)}
 .tag{display:inline-block;padding:0 7px;margin:0 3px 2px 0;border-radius:999px;font-size:.74rem;border:1px solid var(--line);background:var(--soft)}
+.tag.weak{text-decoration:line-through;opacity:.6;border-style:dashed}
 .tag.ld{border-color:var(--good);color:var(--good);background:transparent}
 .tag.tt{border-color:var(--c1);color:var(--c1);background:transparent}
 .chips{display:flex;flex-wrap:wrap;gap:6px}

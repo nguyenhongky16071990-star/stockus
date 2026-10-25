@@ -236,10 +236,12 @@
     <div id="setup-warning" class="banner warn" hidden></div>
     <article class="card">
       <h3>Setup mua hôm nay</h3>
-      <p class="note">Giá mua = đỉnh phiên vừa rồi, stop = đáy phiên. Đây là kế hoạch cho phiên tới: chỉ mua nếu giá vượt giá mua. Hàng mờ là stop rộng hơn mức tối đa.</p>
+      <p class="note">Giá mua = đỉnh phiên vừa rồi, stop = đáy phiên. Đây là kế hoạch cho phiên tới: chỉ mua nếu giá vượt giá mua. Hàng mờ là stop rộng hơn mức tối đa. Nhãn gạch ngang là setup mà kiểm chứng thật cho kết quả lỗ. Khi thị trường xấu, theo quy tắc phòng thủ của các huyền thoại, danh sách được ẩn: không mở lệnh mới.</p>
       <div class="tools"><select id="sel-setup" aria-label="Lọc theo setup"><option value="">Tất cả setup</option></select>
         <label class="chk"><input type="checkbox" id="only-ok" checked> Chỉ stop trong mức cho phép</label>
-        <label class="chk"><input type="checkbox" id="only-lead"> Chỉ mã top 100</label><span class="muted small" id="setup-count"></span>
+        <label class="chk"><input type="checkbox" id="only-lead"> Chỉ mã top 100</label>
+        <label class="chk" title="Bỏ các mã chỉ có setup mà kiểm chứng thật cho kết quả lỗ: Inside day, Lấy lại EMA 9, EMA crossback (pullback EMA 21), EP"><input type="checkbox" id="only-proven" checked> Bỏ setup kiểm chứng là lỗ</label>
+        <label class="chk" id="bad-wrap" hidden><input type="checkbox" id="show-bad"> Vẫn hiện khi thị trường xấu (chỉ để theo dõi)</label><span class="muted small" id="setup-count"></span>
         <button type="button" class="btn sm ghost" id="wl-setups" title="Tải file .txt rồi nhập vào TradingView: Watchlist → Import list">Xuất watchlist TradingView</button></div>
       <div class="tbl"><table id="tb-setups"></table></div>
     </article>
@@ -298,6 +300,17 @@
       <p class="note">Xu hướng trung hạn của cả danh sách. Đường xanh tách xa trên đường đỏ là tiền đang lan rộng (như tháng 5–6/2026); đường đỏ vượt lên là thị trường phân hóa, nên chọn lọc và giảm quy mô. Chỉ báo này đã được đưa vào điểm Độ rộng.</p>
       <p class="note" id="gd-q25"></p>
       <div class="range" data-chart="q25f"></div><div class="chart" id="ch-q25f"></div>
+    </article>
+    <article class="card" id="smi-card" hidden>
+      <h3>Điểm mua trung hạn: SMI tuần quá bán cắt lên (QQQ)</h3>
+      <p class="note">SMI tuần (10-3-3) xuống dưới −40 rồi cắt lên đường tín hiệu thường trùng đáy của các nhịp điều chỉnh. Kiểm chứng trên QQQ từ 1999: tín hiệu đáng tin khi giá còn cách đỉnh 52 tuần dưới 20% và là tín hiệu thứ 1–2 trong năm (mũi tên xanh). Cách đỉnh 20–30% gần như luôn thua (đỏ). Cách đỉnh trên 30% hoặc lần thứ 3 trở lên: chờ ngày xác nhận tăng (xám). Mua thì đặt stop dưới đáy của tuần tín hiệu.</p>
+      <p class="note" id="smi-now"></p>
+      <div class="chart" id="ch-smi"></div>
+      <div class="chart" id="ch-smi2" style="height:170px"></div>
+      <div class="tbl"><table id="tb-smi"></table></div>
+      <h4 class="sub-h">Các tín hiệu gần nhất</h4>
+      <div class="tbl"><table id="tb-smi-sig"></table></div>
+      <p class="note" id="smi-src"></p>
     </article>
     <article class="card">
       <h3>Bằng chứng hôm nay</h3>
@@ -428,7 +441,7 @@
       <h2>Phương pháp nào đang thật sự hiệu quả?</h2>
       <p>Mỗi ngày trong quá khứ, app tìm các mã đạt tiêu chí của từng huyền thoại, vào lệnh và bán đúng theo quy tắc của người đó, rồi cộng kết quả. Kết quả tính theo R: +2R nghĩa là lãi gấp đôi số tiền chấp nhận rủi ro cho lệnh đó.</p>
     </div>
-    <article class="card notes"><h3>Nhận xét</h3><ul id="bt-notes"></ul><p class="note" id="bt-range"></p></article>
+    <article class="card notes"><h3>Nhận xét</h3><ul id="bt-notes"></ul><p class="note" id="bt-range"></p><p class="note"><b>Có áp dụng quy tắc phòng thủ:</b> không mở lệnh mới khi xu hướng QQQ "Xấu" hoặc QQQ có từ 6 ngày phân phối; khi chỉ số mất điều kiện thị trường của từng người 2 phiên liên tiếp (ví dụ Minervini: QQQ dưới SMA 50; Weinstein: dưới đường 30 tuần; Kell: dưới EMA 21) thì bán hết và đứng ngoài. Cột "Nếu KHÔNG phòng thủ" cho thấy kết quả khi bỏ các quy tắc này.</p></article>
     <article class="card">
       <h3>Bảng tổng hợp</h3>
       <p class="note">Kỳ vọng dương và hệ số lợi nhuận trên 1,5 là phương pháp có lợi thế. Ba cột QQQ Tốt / Giằng co / Xấu: kỳ vọng và số lệnh khi vào lệnh trong từng trạng thái thị trường, để chọn kiểu chơi hợp với thị trường hiện tại.</p>
