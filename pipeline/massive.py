@@ -287,7 +287,69 @@ def theme_of(sic: str | None) -> str:
     return "Khác"
 
 
-def ticker_info(cl: Client, tickers: list[str], budget: int, workers: int) -> dict[str, list]:
+SEC_UA = "stockus-market-dashboard (github.com/nguyenhongky16071990-star/stockus)"
+
+
+def sec_industry(info: dict, tickers: list[str], cfg: dict, today) -> int:
+    """Lấy ngành (mã SIC) MIỄN PHÍ từ SEC EDGAR cho các mã chưa có ngành. SEC cho phép tới 10 lệnh/giây, không cần khóa,
+    nên vài nghìn mã chỉ mất vài phút (Massive gói miễn phí chỉ 5 lệnh/phút). Ngành SIC của SEC chính là nguồn mà Massive dùng,
+    nên cách phân loại không đổi. Trả về số mã đã bổ sung."""
+    need = [t for t in tickers if not ((info.get(t) or ["", ""]) + ["", ""])[1]]
+    if not need or cfg.get("sec_industry", True) is False:
+        return 0
+    ses = requests.Session()
+    ses.headers.update({"User-Agent": cfg.get("sec_user_agent") or SEC_UA, "Accept-Encoding": "gzip, deflate"})
+    try:
+        m = ses.get("https://www.sec.gov/files/company_tickers_exchange.json", timeout=30)
+        m.raise_for_status()
+        m = m.json()
+    except Exception as e:
+        print("SEC: không tải được danh sách mã:", e, file=sys.stderr)
+        return 0
+    fi = {f: k for k, f in enumerate(m.get("fields", []))}
+    cik = {}
+    for r in m.get("data", []):
+        tk = str(r[fi["ticker"]] or "").upper()
+        if tk:
+            cik.setdefault(tk, (r[fi["cik"]], r[fi["name"]]))
+            cik.setdefault(tk.replace("-", "."), (r[fi["cik"]], r[fi["name"]]))
+    todo = [t for t in need if t.upper() in cik]
+    t_end = time.time() + 60 * float(cfg.get("sec_minutes", 12))
+    done = errs = 0
+    by_cik = {}
+    for t in todo:
+        if time.time() > t_end:
+            break
+        c, nm = cik[t.upper()]
+        if c not in by_cik:
+            try:
+                r = ses.get(f"https://data.sec.gov/submissions/CIK{int(c):010d}.json", timeout=30)
+                if r.status_code in (403, 429):
+                    print(f"SEC từ chối truy cập ({r.status_code}). Có thể thêm \"sec_user_agent\": \"Tên bạn email@...\" vào config.json.", file=sys.stderr)
+                    break
+                r.raise_for_status()
+                j = r.json()
+                by_cik[c] = (str(j.get("sicDescription") or "").upper(), j.get("name") or nm)
+            except Exception:
+                errs += 1
+                by_cik[c] = ("", nm)
+                if errs > 50:
+                    break
+            time.sleep(0.12)
+        sic, nm2 = by_cik[c]
+        if not sic:
+            continue
+        v = info.get(t)
+        if v and len(v) >= 2:
+            v[1] = sic
+        else:
+            info[t] = [nm2 or "", sic, None, today.isoformat(), "sec"]
+        done += 1
+    print(f"SEC: bổ sung ngành cho {done}/{len(need)} mã còn thiếu")
+    return done
+
+
+def ticker_info(cl: Client, tickers: list[str], budget: int, workers: int, cfg: dict | None = None) -> dict[str, list]:
     """Tên công ty, ngành (mã SIC) và số cổ phiếu lưu hành. Lưu trong tickers_info.json.
 
     Mỗi mục: [tên, ngành SIC, số cổ phiếu, ngày tải]. Số cổ phiếu được làm mới sau 365 ngày (ngành gần như không đổi).
@@ -301,7 +363,14 @@ def ticker_info(cl: Client, tickers: list[str], budget: int, workers: int) -> di
         except Exception:
             return True
 
-    need = ([t for t in tickers if t not in info] + [t for t in tickers if t in info and stale(info[t])])[:budget]
+    # 1) ngành miễn phí từ SEC cho mọi mã còn thiếu (nhanh); 2) Massive (5 lệnh/phút) bổ sung số cổ phiếu lưu hành theo thứ tự thanh khoản
+    try:
+        if sec_industry(info, tickers, cfg or {}, today):
+            INFO_FILE.write_text(json.dumps(info, ensure_ascii=False, sort_keys=True, indent=0), encoding="utf-8")
+    except Exception as e:
+        print("SEC lỗi:", e, file=sys.stderr)
+    from_sec = lambda v: len(v) >= 5 and v[4] == "sec"
+    need = ([t for t in tickers if t not in info] + [t for t in tickers if t in info and (stale(info[t]) or from_sec(info[t]))])[:budget]
     if need:
         print(f"Massive: tải thông tin công ty cho {len(need)} mã")
 
@@ -309,7 +378,8 @@ def ticker_info(cl: Client, tickers: list[str], budget: int, workers: int) -> di
             try:
                 r = cl.get(f"/v3/reference/tickers/{t}").get("results") or {}
                 sh = r.get("weighted_shares_outstanding") or r.get("share_class_shares_outstanding")
-                return t, [r.get("name", ""), r.get("sic_description", ""), sh, today.isoformat()]
+                old = info.get(t) or ["", ""]
+                return t, [r.get("name", "") or old[0], r.get("sic_description", "") or (old[1] if len(old) > 1 else ""), sh, today.isoformat()]
             except Exception:
                 return t, None
 
@@ -361,7 +431,7 @@ def load(key: str, cfg: dict, curated: pd.DataFrame, indexes: list[str]):
     # ưu tiên lấy ngành cho mã thanh khoản lớn nhất trước; gói giới hạn lệnh gọi thì mỗi lần chạy lấy thêm một phần
     budget = int(cfg.get("info_per_run", 100000 if not per_min else 60))   # gói 5 lệnh/phút: 60 mã ≈ 12 phút mỗi lần chạy
     by_dv = sorted(universe_t, key=lambda t: -(stat.dv.get(t, 0) or 0))
-    info = ticker_info(cl, by_dv, budget, workers)
+    info = ticker_info(cl, by_dv, budget, workers, cfg)
 
     raw = {}
     for t in want:

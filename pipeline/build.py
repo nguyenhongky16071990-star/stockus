@@ -27,7 +27,7 @@ DATA = ROOT / "docs" / "data"
 CONFIG = json.loads((ROOT / "pipeline" / "config.json").read_text(encoding="utf-8"))
 INDEXES = ["QQQ", "SPY", "IWM", "SMH", "IGV"]
 FIELDS = ["Open", "High", "Low", "Close", "Volume"]
-APP_VERSION = "2026.10.26-e"  # phải trùng với APP_VERSION trong docs/app.js
+APP_VERSION = "2026.10.27-c"  # phải trùng với APP_VERSION trong docs/app.js
 
 
 # ---------------------------------------------------------------- tải dữ liệu
@@ -623,6 +623,17 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
             traceback.print_exc()
             print("Thống kê chốt lãi lỗi:", e, file=sys.stderr)
 
+    # ---- điểm mua trung hạn: SMI tuần quá bán cắt lên (QQQ, lịch sử dài từ Yahoo)
+    smi_out = {}
+    if not light:
+        import smi as _smi
+        try:
+            smi_out = _smi.compute(fallback=raw["QQQ"])
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print("SMI tuần lỗi:", e, file=sys.stderr)
+
     # ---- điểm ngành dẫn
     groups_out = {"rows": []}
     if not light:
@@ -932,7 +943,7 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
     latest["notes_patterns"] = pattern_notes(pat_stats)
     patterns = {"stats": pat_stats, "dates": [d.strftime("%Y-%m-%d") for d in dates[-keep_n:]], "series": pat_series}
     return {"latest": latest, "history": history, "stocks": stk, "setups": setups, "extended": extended,
-            "themes": themes, "basket": basket, "charts": charts, "industries": industries, "patterns": patterns, "backtest": bt, "cycle": cyc, "cond": cond, "flow": flow_out, "lab": lab, "groups": groups_out, "exits": exits}
+            "themes": themes, "basket": basket, "charts": charts, "industries": industries, "patterns": patterns, "backtest": bt, "cycle": cyc, "cond": cond, "flow": flow_out, "lab": lab, "groups": groups_out, "exits": exits, "smi": smi_out}
 
 
 def _p(x, d=1):
@@ -1096,7 +1107,7 @@ def _jd(o):
 
 def write(out: dict) -> None:
     DATA.mkdir(parents=True, exist_ok=True)
-    for k in ("latest", "history", "stocks", "setups", "extended", "themes", "basket", "charts", "industries", "patterns", "backtest", "cycle", "flow", "lab", "groups", "exits", "paper"):
+    for k in ("latest", "history", "stocks", "setups", "extended", "themes", "basket", "charts", "industries", "patterns", "backtest", "cycle", "flow", "lab", "groups", "exits", "smi", "paper"):
         (DATA / f"{k}.json").write_text(json.dumps(out[k], ensure_ascii=False, separators=(",", ":"), default=_jd), encoding="utf-8")
     # lưu lại ảnh chụp setup + tổng quan mỗi ngày để thống kê về sau
     snap = DATA / "archive"

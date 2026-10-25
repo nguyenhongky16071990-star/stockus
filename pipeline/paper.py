@@ -22,7 +22,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE = ROOT / "pipeline" / "state" / "paper.json"
-VERSION = 2
+VERSION = 3   # 3: thêm quy tắc phòng thủ (thị trường xấu thì bán hết và đứng ngoài)
 
 MARTIN = ["Lấy lại EMA 9", "Lấy lại AVWAP", "EMA hội tụ", "Inside day", "2 inside day"]
 TIGHT = ["Nền chặt", "VCP", "Inside day", "2 inside day", "EMA hội tụ"]
@@ -186,6 +186,48 @@ def market_ok(lid: str, Q: dict | None, L: dict) -> bool:
     if lid == "vs":
         return gt("s50")
     return True
+
+
+# ---------------------------------------------------------------- quy tắc phòng thủ của từng người
+# Khi chỉ số mất điều kiện thị trường của người đó 2 phiên liên tiếp: bán hết vị thế, hủy lệnh chờ, đứng ngoài
+# cho tới khi điều kiện vào lệnh trở lại. Thêm luật chung "thị trường xấu thì đứng ngoài": không mở lệnh mới
+# khi xu hướng QQQ "Xấu" hoặc QQQ có từ 6 ngày phân phối trong 25 phiên.
+DEFENSE = {
+    "ml": "QQQ đóng cửa dưới EMA 21 và EMA 9 cắt xuống EMA 21 (Martin: thị trường xấu thì tiền mặt)",
+    "qm": "QQQ dưới SMA 20 và SMA 10 dưới SMA 20 (Qullamaggie: chỉ giao dịch khi chỉ số trên các MA ngắn đang đi lên)",
+    "mm": "QQQ đóng cửa dưới SMA 50 (Minervini: thị trường mất xu hướng thì rút về tiền mặt)",
+    "wo": "QQQ dưới SMA 50 và dưới EMA 21 (O'Neil: thị trường điều chỉnh thì bán, giữ tiền mặt)",
+    "sw": "QQQ dưới đường 30 tuần (Weinstein: chỉ số vào giai đoạn 4 thì bán hết)",
+    "pb": "QQQ dưới SMA 20 (Stockbee: không giao dịch bứt phá khi thị trường yếu)",
+    "ok": "QQQ dưới EMA 21 (Kell: chỉ số mất EMA 21 thì giảm tỷ trọng về 0)",
+    "vs": "QQQ dưới SMA 50",
+}
+
+
+def market_bad(lid: str, Q: dict | None) -> bool:
+    if not Q or Q.get("Close") is None:
+        return False
+    c = Q["Close"]
+    lt = lambda k: Q.get(k) is not None and c < Q[k]
+    if lid == "ml":
+        return lt("e21") and Q.get("e9") is not None and Q.get("e21") is not None and Q["e9"] < Q["e21"]
+    if lid == "qm":
+        return lt("s20") and Q.get("s10") is not None and Q.get("s20") is not None and Q["s10"] < Q["s20"]
+    if lid in ("mm", "vs"):
+        return lt("s50")
+    if lid == "wo":
+        return lt("s50") and lt("e21")
+    if lid == "sw":
+        return lt("s150")
+    if lid == "pb":
+        return lt("s20")
+    if lid == "ok":
+        return lt("e21")
+    return False
+
+
+def common_ok(L: dict) -> bool:
+    return L.get("qqq_regime") != "Xấu" and (L.get("dd_qqq") or 0) < 6
 
 
 # ---------------------------------------------------------------- tiêu chí chọn mã (giống tab Lọc huyền thoại)
@@ -515,7 +557,16 @@ def _entry_day(acct, pos, b, d, P, cfg):
 def step_day(st, d, bars: Bars, cfg):
     """Xử lý một phiên d: lệnh đang giữ trước, rồi lệnh chờ khớp trong phiên d."""
     sl = _slip(cfg)
+    Q = bars.bar("QQQ", d)
     for lid, acct in st["accounts"].items():
+        acct["mbad"] = (acct.get("mbad", 0) + 1) if market_bad(lid, Q) else 0
+        if acct["mbad"] >= 2 and (acct["open"] or acct["pending"]):
+            for pos in list(acct["open"]):
+                b = bars.bar(pos["t"], d)
+                px = (b or {}).get("Close") or pos.get("last") or pos["entry"]
+                _exit_all(acct, pos, px * (1 - sl), d, "Phòng thủ: thị trường xấu, bán hết")
+            acct["open"], acct["pending"] = [], []
+            continue
         still = []
         for pos in acct["open"]:
             b = bars.bar(pos["t"], d)
@@ -569,7 +620,7 @@ def new_signals(st, d, stocks, latest, cfg, bars: Bars, boot=False, max_new=5):
     Q = bars.bar("QQQ", d)
     sl = _slip(cfg)
     for lid, acct in st["accounts"].items():
-        if not market_ok(lid, Q, L):
+        if not market_ok(lid, Q, L) or not common_ok(L) or acct.get("mbad", 0) >= 1:
             continue
         held = {p["t"] for p in acct["open"]} | {o["t"] for o in acct["pending"]}
         room = RULES[lid]["max_open"] - len(held)
@@ -631,7 +682,7 @@ def summary(st, raw):
             mdd = min(mdd, (v / peak - 1) * 100 if peak > 0 else 0)
         last_eq = eq[-1][1] if eq else st["capital"]
         out["accounts"][lid] = {
-            "name": NAMES[lid], "rules": RULES[lid]["text"], "equity": round(last_eq, 2), "ret": round((last_eq / st["capital"] - 1) * 100, 2),
+            "name": NAMES[lid], "rules": RULES[lid]["text"] + [f"Phòng thủ: khi {DEFENSE[lid]} 2 phiên liên tiếp thì bán hết và đứng ngoài; không mở lệnh mới khi xu hướng QQQ Xấu hoặc QQQ có từ 6 ngày phân phối."], "equity": round(last_eq, 2), "ret": round((last_eq / st["capital"] - 1) * 100, 2),
             "cash": round(a["cash"], 2), "n": len(cl), "win": round(len(wins) / len(cl) * 100, 1) if cl else None,
             "avg_win": round(np.mean([c["pct"] for c in wins]), 2) if wins else None,
             "avg_loss": round(np.mean([c["pct"] for c in losses]), 2) if losses else None,

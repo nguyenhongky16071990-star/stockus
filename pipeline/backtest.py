@@ -155,7 +155,7 @@ SLIP = 0.001
 MA_NAME = {"e9": "EMA 9", "e10": "EMA 10", "e21": "EMA 21", "s10": "SMA 10", "s20": "SMA 20", "s50": "SMA 50", "s150": "đường 30 tuần"}
 
 
-def simulate_rules(name, sig, spec, A, dates, regime, start):
+def simulate_rules(name, sig, spec, A, dates, regime, start, mexit=None):
     """Giống paper._step_position nhưng không giới hạn vốn: mỗi tín hiệu là một lệnh, tính theo R sau trượt giá."""
     O, H, L, C, V = A["O"], A["H"], A["L"], A["C"], A["V"]
     nd, nt = C.shape
@@ -299,6 +299,8 @@ def simulate_rules(name, sig, spec, A, dates, regime, start):
                         break
                 if hit:
                     sell(1, c * (1 - SLIP)); reason, x = f"Đóng cửa dưới {MA_NAME[hit]}", i; break
+            if mexit is not None and mexit[i]:
+                sell(1, c * (1 - SLIP)); reason, x = "Phòng thủ: thị trường xấu, bán hết", i; break
             if held >= spec["max_hold"]:
                 sell(1, c * (1 - SLIP)); reason, x = "Hết thời gian giữ", i; break
         open_ = x is None
@@ -423,10 +425,23 @@ def run(ctx: dict, cfg: dict) -> dict:
     start = min(start, nd - 30)
     recent_from = nd - 60
     tickers = list(C.columns)
+    # ---- quy tắc phòng thủ: chỉ số mất điều kiện của người đó 2 phiên liên tiếp thì bán hết; luật chung: thị trường xấu thì đứng ngoài
+    q_e9 = qc.ewm(span=9, adjust=False).mean()
+    BAD = {"ml": (qc < q_e21) & (q_e9 < q_e21), "qm": (qc < q_s20) & (q_s10 < q_s20), "mm": qc < q_s50, "wo": (qc < q_s50) & (qc < q_e21),
+           "sw": qc < q_s150, "pb": qc < q_s20, "ok": qc < q_e21, "vs": qc < q_s50}
+    gate = pd.Series((qreg != "Xấu") & (ddq.values < 6), index=dates)
     out, raw = {}, {}
     for k, (sig, spec) in S.items():
-        tr = simulate_rules(k, sig.fillna(False).astype(bool), spec, A, dates, qreg, start)
+        bad = BAD[k].fillna(False)
+        bad2 = (bad & bad.shift(1, fill_value=False)).values
+        sig_d = sig & bc(gate & ~bad)
+        tr = simulate_rules(k, sig_d.fillna(False).astype(bool), spec, A, dates, qreg, start, mexit=bad2)
+        tr0 = simulate_rules(k, sig.fillna(False).astype(bool), spec, A, dates, qreg, start)
         out[k] = summarize(tr, dates, tickers, recent_from)
+        s0 = summarize(tr0, dates, tickers, recent_from)
+        out[k]["nodef"] = {kk: s0.get(kk) for kk in ("n", "win", "exp", "pf", "total", "avg_win", "avg_loss")}
+        out[k]["nodef"]["recent"] = s0.get("recent")
+        out[k]["nodef"]["curve"] = s0.get("curve")
         raw[k] = tr
     vtypes = []
     for name, sg in vsa.items():
