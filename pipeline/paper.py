@@ -22,7 +22,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE = ROOT / "pipeline" / "state" / "paper.json"
-VERSION = 3   # 3: thêm quy tắc phòng thủ (thị trường xấu thì bán hết và đứng ngoài)
+VERSION = 4   # 4: điều kiện nền giá chặt cho Minervini/O'Neil/Qullamaggie/Weinstein; 3: 3: thêm quy tắc phòng thủ (thị trường xấu thì bán hết và đứng ngoài)
 
 MARTIN = ["Lấy lại EMA 9", "Lấy lại AVWAP", "EMA hội tụ", "Inside day", "2 inside day"]
 TIGHT = ["Nền chặt", "VCP", "Inside day", "2 inside day", "EMA hội tụ"]
@@ -46,7 +46,7 @@ RULES = {
         "risk": 0.5, "pos": 25, "max_open": 10,
         "text": [
             "Thị trường: chỉ mua khi QQQ trên SMA 20 và SMA 10 nằm trên SMA 20 (Nasdaq đang khỏe).",
-            "Chọn mã: tăng ≥ 30% trong 1 hoặc 3 tháng, biên độ ngày ≥ 4%, thanh khoản ≥ 20 triệu USD/ngày, nền chặt / inside day / EMA hội tụ hoặc gap tăng mạnh (EP).",
+            "Chọn mã: tăng ≥ 30% trong 1 hoặc 3 tháng, biên độ ngày ≥ 4%, thanh khoản ≥ 20 triệu USD/ngày; đang tích lũy 2–8 tuần sát đỉnh vùng tích lũy (sâu ≤ 25%), giá không quá 15% trên EMA 21, 5 phiên gần nhất co hẹp; hoặc gap tăng mạnh (EP). Không mua mã đang tăng thẳng không có nền.",
             "Mua: khi giá vượt đỉnh phiên trước (thay cho vượt đỉnh khung mở cửa), lệnh chờ 1 phiên, bỏ nếu gap cao hơn 5%.",
             "Stop: đáy phiên trước nhưng không rộng hơn 1 biên độ ngày (ADR). Cuối phiên mua, dời stop lên đáy của phiên mua.",
             "Vị thế: rủi ro 0,5% tài khoản, tối đa 25% tài khoản, tối đa 10 mã.",
@@ -57,7 +57,7 @@ RULES = {
         "risk": 1.25, "pos": 25, "max_open": 8,
         "text": [
             "Thị trường: chỉ mua khi QQQ đóng cửa trên SMA 50.",
-            "Chọn mã: đạt đủ Trend Template, RS ≥ 80, cách đỉnh 52 tuần ≤ 25%, có nền thắt chặt / VCP, EPS quý tăng ≥ 25%, không có báo cáo lợi nhuận trong 7 ngày tới.",
+            "Chọn mã: đạt đủ Trend Template, RS ≥ 80, cách đỉnh 52 tuần ≤ 25%, có VCP thật (nền ≥ 3 tuần, sâu ≤ 35%, 10 phiên cuối biên độ ≤ 10% và hẹp hơn đoạn trước, khối lượng cạn), giá trong 5% dưới pivot của nền, EPS quý tăng ≥ 25%, không có báo cáo lợi nhuận trong 7 ngày tới. Không mua mã đã chạy xa khỏi nền.",
             "Mua: khi giá vượt pivot (lệnh chờ 5 phiên), không mua nếu đã cao hơn pivot 5%.",
             "Khối lượng: nếu phiên bứt phá có khối lượng < 1,4 lần trung bình 50 phiên mà đóng cửa dưới giá mua, bán ngay cuối phiên.",
             "Stop: dưới đáy 10 phiên, tối đa 8% (Minervini không bao giờ để quá 10%).",
@@ -69,8 +69,8 @@ RULES = {
         "risk": None, "pos": 20, "max_open": 6,
         "text": [
             "Thị trường: chỉ mua khi đã có ngày xác nhận xu hướng (FTD), QQQ không tạo đáy mới và có tối đa 5 ngày phân phối.",
-            "Chọn mã (CAN SLIM): EPS quý ≥ 25%, EPS năm tăng ≥ 2 năm, doanh thu ≥ 20%, cách đỉnh ≤ 15%, khối lượng lên/xuống ≥ 1,1, RS ≥ 80, nhóm ngành top 20%.",
-            "Mua: khi giá vượt pivot (lệnh chờ 5 phiên), không mua cao hơn pivot 5%.",
+            "Chọn mã (CAN SLIM): EPS quý ≥ 25%, EPS năm tăng ≥ 2 năm, doanh thu ≥ 20%, cách đỉnh ≤ 15%, khối lượng lên/xuống ≥ 1,1, RS ≥ 80, nhóm ngành top 20%; phải có nền đúng nghĩa (≥ 5 tuần, sâu ≤ 33%) và giá trong 5% dưới pivot của nền.",
+            "Mua: khi giá vượt pivot của nền (lệnh chờ 5 phiên), không mua cao hơn pivot 5%.",
             "Khối lượng: phiên bứt phá phải có khối lượng ≥ 1,4 lần trung bình 50 phiên, nếu không và đóng cửa dưới giá mua thì bán cuối phiên.",
             "Stop: cắt lỗ cứng 7,5% dưới giá mua (quy tắc 7–8%).",
             "Vị thế: mỗi mã 20% tài khoản (danh mục tập trung 5–6 mã).",
@@ -81,7 +81,7 @@ RULES = {
         "risk": 1.0, "pos": 15, "max_open": 10,
         "text": [
             "Thị trường: chỉ mua khi QQQ ở giai đoạn 2, tức trên đường 30 tuần (SMA 150) và đường này đang đi lên.",
-            "Chọn mã: giai đoạn 2, RS ≥ 70, nhóm ngành nửa trên, khối lượng lên/xuống ≥ 1.",
+            "Chọn mã: giai đoạn 2, RS ≥ 70, nhóm ngành nửa trên, khối lượng lên/xuống ≥ 1, giá không quá 25% trên đường 30 tuần (tránh mua muộn).",
             "Mua: khi giá vượt kháng cự / pivot (lệnh chờ 5 phiên), không mua cao hơn 5%.",
             "Khối lượng: phiên bứt phá cần ≥ 1,5 lần trung bình, nếu không và đóng cửa dưới giá mua thì bán.",
             "Stop: dưới đường 30 tuần hoặc đáy gần nhất, tối đa 15%.",
@@ -191,7 +191,7 @@ def market_ok(lid: str, Q: dict | None, L: dict) -> bool:
 # ---------------------------------------------------------------- quy tắc phòng thủ của từng người
 # Khi chỉ số mất điều kiện thị trường của người đó 2 phiên liên tiếp: bán hết vị thế, hủy lệnh chờ, đứng ngoài
 # cho tới khi điều kiện vào lệnh trở lại. Thêm luật chung "thị trường xấu thì đứng ngoài": không mở lệnh mới
-# khi xu hướng QQQ "Xấu" hoặc QQQ có từ 6 ngày phân phối trong 25 phiên.
+# khi xu hướng QQQ "Xấu".
 DEFENSE = {
     "ml": "QQQ đóng cửa dưới EMA 21 và EMA 9 cắt xuống EMA 21 (Martin: thị trường xấu thì tiền mặt)",
     "qm": "QQQ dưới SMA 20 và SMA 10 dưới SMA 20 (Qullamaggie: chỉ giao dịch khi chỉ số trên các MA ngắn đang đi lên)",
@@ -227,7 +227,9 @@ def market_bad(lid: str, Q: dict | None) -> bool:
 
 
 def common_ok(L: dict) -> bool:
-    return L.get("qqq_regime") != "Xấu" and (L.get("dd_qqq") or 0) < 6
+    # chỉ dùng xu hướng QQQ: kiểm chứng thật cho thấy lệnh breakout của các huyền thoại khi QQQ "Xấu" lỗ rõ (Minervini −0,52R,
+    # O'Neil −0,57R, Stockbee −0,40R). Không chặn theo số ngày phân phối vì bộ đếm cũ đếm quá nhiều (chặn 70% số phiên).
+    return L.get("qqq_regime") != "Xấu"
 
 
 # ---------------------------------------------------------------- tiêu chí chọn mã (giống tab Lọc huyền thoại)
@@ -237,16 +239,19 @@ def passes(lid: str, s: dict, L: dict) -> bool:
         return (_le(s, "rs_pos", 100) and _ge(s, "adr", 4) and bool(s.get("e21up")) and _n(s.get("d9")) is not None
                 and abs(s["d9"]) <= 5 and _any(s.get("setups"), MARTIN))
     if lid == "qm":
+        qbase = bool(s.get("qb")) and _le(s, "d21", 15) and bool(s.get("tight5"))
         return ((_ge(s, "r21", 30) or _ge(s, "r63", 30)) and _ge(s, "adr", 4) and _ge(s, "dv", 20) and _ge(s, "d21", 0.0001)
-                and (_any(s.get("setups"), ["Nền chặt", "Inside day", "2 inside day", "EMA hội tụ", "EP"]) or _any(s.get("sig"), ["Gap tăng mạnh (EP)"])))
+                and (qbase or _any(s.get("setups"), ["EP"]) or _any(s.get("sig"), ["Gap tăng mạnh (EP)"])))
     if lid == "mm":
-        return (bool(s.get("tt")) and _ge(s, "rs", 80) and _ge(s, "dd", -25) and _any(s.get("setups"), TIGHT)
+        near = _n(s.get("bpiv")) and _n(s.get("close")) and s["close"] >= 0.95 * s["bpiv"]
+        return (bool(s.get("tt")) and _ge(s, "rs", 80) and _ge(s, "dd", -25) and bool(s.get("vcp")) and bool(near)
                 and _ge(s, "eps_yoy", 25) and _earn_ok(s, L["asof"]))
     if lid == "wo":
         return (_ge(s, "eps_yoy", 25) and _ge(s, "eps_a_up", 2) and _ge(s, "rev_yoy", 20) and _ge(s, "dd", -15) and _ge(s, "udv", 1.1)
-                and _ge(s, "rs", 80) and _le(s, "ind_rank", max(1, round(n_ind * 0.2))) and _earn_ok(s, L["asof"], 3))
+                and _ge(s, "rs", 80) and _le(s, "ind_rank", max(1, round(n_ind * 0.2))) and _earn_ok(s, L["asof"], 3)
+                and _ge(s, "bw", 25) and _le(s, "bdep", 33) and bool(_n(s.get("bpiv")) and s["close"] >= 0.95 * s["bpiv"]))
     if lid == "sw":
-        return s.get("stage") == 2 and _ge(s, "rs", 70) and _le(s, "ind_rank", n_ind / 2) and _ge(s, "udv", 1)
+        return s.get("stage") == 2 and _ge(s, "rs", 70) and _le(s, "ind_rank", n_ind / 2) and _ge(s, "udv", 1) and _le(s, "x150", 25)
     if lid == "pb":
         return (_any(s.get("sig"), ["Bứt phá 4%", "Gap tăng mạnh (EP)"]) and _n(s.get("r21")) is not None
                 and s["r21"] - (s.get("chg") or 0) <= 25 and _ge(s, "vr", 1.5) and _ge(s, "dv", 5))
@@ -265,6 +270,7 @@ def plan(lid: str, s: dict, cfg: dict):
     if None in (h, l, c):
         return None
     pv = (piv or h) * 1.001
+    bpv = (_n(s.get("bpiv")) or piv or h) * 1.001
     if lid == "ml":
         P = dict(kind="stop", lvl=h * 1.001, stop=l * 0.999, pending=1, chase=1.03, max_stop=float(cfg.get("max_stop_pct", 6)), lod=True,
                  partials=[["R", 2, 0.25, True], ["R", 4, 0.25, False]],
@@ -275,11 +281,11 @@ def plan(lid: str, s: dict, cfg: dict):
                  partials=[["day_profit", 3, 0.5, True]],
                  trail=[["s10" if adr >= 6 else "s20", "post"]], max_hold=150)
     elif lid == "mm":
-        P = dict(kind="stop", lvl=pv, stop=max(pv * 0.92, (lo10 or l) * 0.999), pending=5, chase=1.05, max_stop=8.5, vol=1.4,
+        P = dict(kind="stop", lvl=bpv, stop=max(bpv * 0.92, (lo10 or l) * 0.999), pending=5, chase=1.05, max_stop=8.5, vol=1.4,
                  be_r=2, partials=[["R", 3, 1 / 3, True], ["R", 5, 1 / 3, True]],
                  trail=[["s50", "pre"], ["s20", "post"]], trail_after=3, max_hold=150)
     elif lid == "wo":
-        P = dict(kind="stop", lvl=pv, stop=pv * 0.925, stop_pct=7.5, pending=5, chase=1.05, max_stop=8.5, vol=1.4,
+        P = dict(kind="stop", lvl=bpv, stop=bpv * 0.925, stop_pct=7.5, pending=5, chase=1.05, max_stop=8.5, vol=1.4,
                  oneil=True, max_hold=150)
     elif lid == "sw":
         base = s150 * 0.99 if s150 and s150 < pv else (lo10 or l) * 0.999
@@ -682,7 +688,7 @@ def summary(st, raw):
             mdd = min(mdd, (v / peak - 1) * 100 if peak > 0 else 0)
         last_eq = eq[-1][1] if eq else st["capital"]
         out["accounts"][lid] = {
-            "name": NAMES[lid], "rules": RULES[lid]["text"] + [f"Phòng thủ: khi {DEFENSE[lid]} 2 phiên liên tiếp thì bán hết và đứng ngoài; không mở lệnh mới khi xu hướng QQQ Xấu hoặc QQQ có từ 6 ngày phân phối."], "equity": round(last_eq, 2), "ret": round((last_eq / st["capital"] - 1) * 100, 2),
+            "name": NAMES[lid], "rules": RULES[lid]["text"] + [f"Phòng thủ: khi {DEFENSE[lid]} 2 phiên liên tiếp thì bán hết và đứng ngoài; không mở lệnh mới khi xu hướng QQQ Xấu."], "equity": round(last_eq, 2), "ret": round((last_eq / st["capital"] - 1) * 100, 2),
             "cash": round(a["cash"], 2), "n": len(cl), "win": round(len(wins) / len(cl) * 100, 1) if cl else None,
             "avg_win": round(np.mean([c["pct"] for c in wins]), 2) if wins else None,
             "avg_loss": round(np.mean([c["pct"] for c in losses]), 2) if losses else None,

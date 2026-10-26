@@ -386,23 +386,32 @@ def run(ctx: dict, cfg: dict) -> dict:
          "wo": mk, "sw": bc((qc > q_s150) & (q_s150 > q_s150.shift(20))), "pb": bc(qc > q_s20), "ok": bc(qc > q_e21), "vs": bc(qc > q_s50)}
     lo10 = L.rolling(10, min_periods=5).min()
     pv = piv20 * 1.001
+    import bases as _bases
+    BF = _bases.frames(H, L, C, V, v50)
+    bpv = BF["bpiv"] * 1.001
     S = {}
     S["ml"] = (liquid & top & (adr >= 4) & e21up & (d9.abs() <= 5) & (reclaim9 | inside | conv) & M["ml"],
                dict(entry="stop", lvl=H * 1.001, stop=L * 0.999, pending=1, chase=1.03, max_stop=cfg.get("max_stop_pct", 6), lod=True,
                     partials=[["R", 2, 0.25, True], ["R", 4, 0.25, False]], trail_list=[["e21", "pre"], ["e9", "post"]], max_hold=60))
     adrv = adr.values
-    S["qm"] = (liquid & ((ret[21] >= 0.3) | (ret[63] >= 0.3)) & (adr >= 4) & (dv >= 20e6) & (C > e21) & (tight | gap_ep) & M["qm"],
+    # Qullamaggie: sau nhịp tăng mạnh, tích lũy 2–8 tuần sát đỉnh vùng tích lũy, giá bám EMA 10/20 (không quá 15% trên EMA 21), nến co hẹp; hoặc EP
+    qbase = BF["qb"] & (C / e21 - 1 <= 0.15) & (rng5 < 0.7 * adr)
+    S["qm"] = (liquid & ((ret[21] >= 0.3) | (ret[63] >= 0.3)) & (adr >= 4) & (dv >= 20e6) & (C > e21) & (qbase | gap_ep) & M["qm"],
                dict(entry="stop", lvl=H * 1.001, stop=np.maximum(L * 0.999, H * 1.001 * (1 - adr / 100)), pending=1, chase=1.05, max_stop=12, lod=True,
                     partials=[["day_profit", 3, 0.5, True]], trail=lambda d, j: "s10" if adrv[d, j] >= 6 else "s20", trail_after=0, max_hold=150))
-    vcp = (rng5 < 0.7 * adr) & (C >= 0.9 * piv20) & (V.rolling(5).mean() < v50)
+    # Minervini: chỉ mua VCP thật (nền ≥ 3 tuần, co hẹp, khối lượng cạn), giá trong 5% dưới pivot của nền
+    vcp = BF["vcp"] & (C >= 0.95 * BF["bpiv"])
     S["mm"] = (liquid & tt & (rs >= 80) & (dd_hi >= -25) & vcp & M["mm"],
-               dict(entry="stop", lvl=pv, pending=5, chase=1.05, stop=np.maximum(pv * 0.92, lo10 * 0.999), max_stop=8.5, vol=1.4, be_r=2,
+               dict(entry="stop", lvl=bpv, pending=5, chase=1.05, stop=np.maximum(bpv * 0.92, lo10 * 0.999), max_stop=8.5, vol=1.4, be_r=2,
                     partials=[["R", 3, 1 / 3, True], ["R", 5, 1 / 3, True]], trail_list=[["s50", "pre"], ["s20", "post"]], trail_after=3, max_hold=150))
     grp20 = indr <= max(1, round(n_ind * 0.2))
-    S["wo"] = (liquid & (rs >= 80) & (dd_hi >= -15) & (udv >= 1.1) & grp20 & M["wo"],
-               dict(entry="stop", lvl=pv, pending=5, chase=1.05, stop=pv * 0.925, stop_pct=7.5, max_stop=8.5, vol=1.4, oneil=True, max_hold=150))
+    # O'Neil: phải có nền đúng nghĩa (≥ 5 tuần, sâu ≤ 33%), giá trong 5% dưới pivot
+    obase = (BF["blen"] >= 25) & (BF["bdep"] <= 33) & (C >= 0.95 * BF["bpiv"])
+    S["wo"] = (liquid & (rs >= 80) & (dd_hi >= -15) & (udv >= 1.1) & grp20 & obase & M["wo"],
+               dict(entry="stop", lvl=bpv, pending=5, chase=1.05, stop=bpv * 0.925, stop_pct=7.5, max_stop=8.5, vol=1.4, oneil=True, max_hold=150))
     s150b = (s150 * 0.99).where(s150 < pv, lo10 * 0.999)
-    S["sw"] = (liquid & (stage == 2) & (rs >= 70) & (indr <= n_ind / 2) & (udv >= 1) & M["sw"],
+    # Weinstein: giai đoạn 2 nhưng chưa quá xa đường 30 tuần (≤ 25%), tránh mua muộn
+    S["sw"] = (liquid & (stage == 2) & (rs >= 70) & (indr <= n_ind / 2) & (udv >= 1) & (C / s150 - 1 <= 0.25) & M["sw"],
                dict(entry="stop", lvl=pv, pending=5, chase=1.05, stop=np.maximum(s150b, pv * 0.85), max_stop=15.5, vol=1.5, weekly=True, max_hold=260))
     S["pb"] = (liquid & (ret[1] >= 0.04) & (V > V.shift(1)) & (V >= 1.5 * v50) & ((ret[21] - ret[1]) <= 0.25) & (dv >= 5e6) & M["pb"],
                dict(entry="close", stop=L * 0.999, max_stop=10, partials=[["pct", 8, 0.5, True]], nofollow=3, max_hold=5))
@@ -429,7 +438,7 @@ def run(ctx: dict, cfg: dict) -> dict:
     q_e9 = qc.ewm(span=9, adjust=False).mean()
     BAD = {"ml": (qc < q_e21) & (q_e9 < q_e21), "qm": (qc < q_s20) & (q_s10 < q_s20), "mm": qc < q_s50, "wo": (qc < q_s50) & (qc < q_e21),
            "sw": qc < q_s150, "pb": qc < q_s20, "ok": qc < q_e21, "vs": qc < q_s50}
-    gate = pd.Series((qreg != "Xấu") & (ddq.values < 6), index=dates)
+    gate = pd.Series(qreg != "Xấu", index=dates)
     out, raw = {}, {}
     for k, (sig, spec) in S.items():
         bad = BAD[k].fillna(False)

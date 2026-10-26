@@ -27,7 +27,7 @@ DATA = ROOT / "docs" / "data"
 CONFIG = json.loads((ROOT / "pipeline" / "config.json").read_text(encoding="utf-8"))
 INDEXES = ["QQQ", "SPY", "IWM", "SMH", "IGV"]
 FIELDS = ["Open", "High", "Low", "Close", "Volume"]
-APP_VERSION = "2026.10.27-c"  # phải trùng với APP_VERSION trong docs/app.js
+APP_VERSION = "2026.10.28-b"  # phải trùng với APP_VERSION trong docs/app.js
 
 
 # ---------------------------------------------------------------- tải dữ liệu
@@ -140,8 +140,21 @@ def regime(c: pd.Series) -> pd.Series:
 
 
 def distribution_days(c: pd.Series, v: pd.Series, window: int = 25) -> pd.Series:
-    dd = (c.pct_change() <= -0.002) & (v > v.shift(1))
-    return dd.rolling(window, min_periods=1).sum()
+    """Ngày phân phối theo O'Neil: chỉ số giảm ≥ 0,2% với khối lượng lớn hơn phiên trước. Mỗi ngày phân phối hết hiệu lực
+    sau 25 phiên, HOẶC khi chỉ số đã tăng 5% trên giá đóng cửa của ngày đó (quy tắc xóa ngày phân phối của IBD).
+    Bản cũ không có quy tắc xóa nên đếm quá nhiều (≥ 6 ngày tới 69% số phiên)."""
+    cv, vv = c.values.astype(float), v.values.astype(float)
+    n = len(cv)
+    out = np.zeros(n)
+    active = []   # (chỉ số phiên, giá đóng cửa)
+    for i in range(n):
+        if i > 0 and np.isfinite(cv[i]) and np.isfinite(cv[i - 1]) and cv[i - 1] > 0 and np.isfinite(vv[i]) and np.isfinite(vv[i - 1]):
+            if cv[i] / cv[i - 1] - 1 <= -0.002 and vv[i] > vv[i - 1]:
+                active.append((i, cv[i]))
+        if np.isfinite(cv[i]):
+            active = [(k, px) for k, px in active if i - k < window and cv[i] < px * 1.05]
+        out[i] = len(active)
+    return pd.Series(out, index=c.index)
 
 
 def follow_through(c: pd.Series, v: pd.Series):
@@ -664,11 +677,18 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
     # ---- ảnh chụp hôm nay
     t0 = -1
     last = dates[t0]
+    import bases as _bases
+    BF = _bases.frames(H, L, C, V, v50)
+    bl0, bp0, bd0, vc0, qb0, qp0 = (BF[k].iloc[t0] for k in ("blen", "bpiv", "bdep", "vcp", "qb", "qpiv"))
+    tight0 = (((H - L) / C * 100).rolling(5).mean() < 0.7 * adr).iloc[t0]
     stk = []
     for t in stocks:
         if not valid[t].iloc[t0]:
             continue
         stk.append({
+            "bw": int(bl0[t]) if pd.notna(bl0[t]) else 0, "bpiv": r1(bp0[t], 2), "bdep": r1(bd0[t]), "vcp": bool(vc0[t]),
+            "qb": bool(qb0[t]), "qpiv": r1(qp0[t], 2), "tight5": bool(tight0[t]),
+            "x150": r1((C[t].iloc[t0] / s150[t].iloc[t0] - 1) * 100) if pd.notna(s150[t].iloc[t0]) and s150[t].iloc[t0] else None,
             "t": t, "name": names.get(t) or None, "theme": theme.get(t, "Khác"), "close": r1(C[t].iloc[t0], 2),
             "chg": r1(ret[1][t].iloc[t0] * 100), "r5": r1(ret[5][t].iloc[t0] * 100),
             "r21": r1(ret[21][t].iloc[t0] * 100), "r63": r1(ret[63][t].iloc[t0] * 100),
