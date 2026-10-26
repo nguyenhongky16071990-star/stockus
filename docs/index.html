@@ -237,7 +237,9 @@
     <article class="card">
       <h3>Setup mua hôm nay</h3>
       <p class="note">Giá mua = đỉnh phiên vừa rồi, stop = đáy phiên. Đây là kế hoạch cho phiên tới: chỉ mua nếu giá vượt giá mua. Hàng mờ là stop rộng hơn mức tối đa. Nhãn gạch ngang là setup mà kiểm chứng thật cho kết quả lỗ. Khi thị trường xấu, theo quy tắc phòng thủ của các huyền thoại, danh sách được ẩn: không mở lệnh mới.</p>
+      <div class="banner" id="aplus-box"><b>Danh sách A+ (tối đa 5 mã/ngày).</b> Mã phải đạt TẤT CẢ: (1) QQQ không ở xu hướng Xấu; (2) có setup chưa bị kiểm chứng là lỗ (nền chặt, VCP, EMA hội tụ, lấy lại AVWAP); (3) RS ≥ 90; (4) Trend Template và giai đoạn 2; (5) cách đỉnh 52 tuần ≤ 15%; (6) stop ≤ mức tối đa của bạn; (7) không có báo cáo tài chính trong 7 ngày tới; (8) giá mua cách giá đóng cửa ≤ 3%; (9) EPS hoặc doanh thu tăng ≥ 20% (nếu có số liệu). Xếp theo RS. <b>Khi mua:</b> chỉ vào lệnh nếu phiên vượt giá mua có khối lượng ≥ 1,4× trung bình 50 phiên và đóng cửa ở nửa trên biên độ; không đạt thì bỏ.<br><span class="muted small" id="aplus-why"></span></div>
       <div class="tools"><select id="sel-setup" aria-label="Lọc theo setup"><option value="">Tất cả setup</option></select>
+        <label class="chk"><input type="checkbox" id="only-aplus" checked> Chỉ danh sách A+</label>
         <label class="chk"><input type="checkbox" id="only-ok" checked> Chỉ stop trong mức cho phép</label>
         <label class="chk"><input type="checkbox" id="only-lead"> Chỉ mã top 100</label>
         <label class="chk" title="Bỏ các mã chỉ có setup mà kiểm chứng thật cho kết quả lỗ: Inside day, Lấy lại EMA 9, EMA crossback (pullback EMA 21), EP"><input type="checkbox" id="only-proven" checked> Bỏ setup kiểm chứng là lỗ</label>
@@ -441,7 +443,7 @@
       <h2>Phương pháp nào đang thật sự hiệu quả?</h2>
       <p>Mỗi ngày trong quá khứ, app tìm các mã đạt tiêu chí của từng huyền thoại, vào lệnh và bán đúng theo quy tắc của người đó, rồi cộng kết quả. Kết quả tính theo R: +2R nghĩa là lãi gấp đôi số tiền chấp nhận rủi ro cho lệnh đó.</p>
     </div>
-    <article class="card notes"><h3>Nhận xét</h3><ul id="bt-notes"></ul><p class="note" id="bt-range"></p><p class="note"><b>Có áp dụng quy tắc phòng thủ:</b> không mở lệnh mới khi xu hướng QQQ "Xấu" hoặc QQQ có từ 6 ngày phân phối; khi chỉ số mất điều kiện thị trường của từng người 2 phiên liên tiếp (ví dụ Minervini: QQQ dưới SMA 50; Weinstein: dưới đường 30 tuần; Kell: dưới EMA 21) thì bán hết và đứng ngoài. Cột "Nếu KHÔNG phòng thủ" cho thấy kết quả khi bỏ các quy tắc này.</p></article>
+    <article class="card notes"><h3>Nhận xét</h3><ul id="bt-notes"></ul><p class="note" id="bt-range"></p><p class="note"><b>Có áp dụng quy tắc phòng thủ:</b> không mở lệnh mới khi xu hướng QQQ "Xấu"; khi chỉ số mất điều kiện thị trường của từng người 2 phiên liên tiếp (ví dụ Minervini: QQQ dưới SMA 50; Weinstein: dưới đường 30 tuần; Kell: dưới EMA 21) thì bán hết và đứng ngoài. Cột "Nếu KHÔNG phòng thủ" cho thấy kết quả khi bỏ các quy tắc này.</p></article>
     <article class="card">
       <h3>Bảng tổng hợp</h3>
       <p class="note">Kỳ vọng dương và hệ số lợi nhuận trên 1,5 là phương pháp có lợi thế. Ba cột QQQ Tốt / Giằng co / Xấu: kỳ vọng và số lệnh khi vào lệnh trong từng trạng thái thị trường, để chọn kiểu chơi hợp với thị trường hiện tại.</p>
