@@ -4,7 +4,7 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const LW = window.LightweightCharts;
-  const APP_VERSION = '2026.10.28-b'; // phải trùng với APP_VERSION trong pipeline/build.py
+  const APP_VERSION = '2026.10.29-a'; // phải trùng với APP_VERSION trong pipeline/build.py
   const S = { exits: null, groups: null, flow: null, lab: null, cond: null, paper: null, cycle: null, backtest: null, latest: null, history: [], stocks: [], setups: [], extended: [], themes: [], basket: [], industries: [], patterns: null, charts: null };
   const ranges = {};          // khoảng thời gian của từng biểu đồ
   const built = new Set();    // tab đã vẽ
@@ -47,6 +47,16 @@
   };
 
   // ------------------------------------------------------------ tab
+  // nút phóng to cho mọi bảng: mở cả thẻ chứa bảng ra toàn màn hình, Esc hoặc bấm lại để thu nhỏ
+  function addZoom() {
+    $$('.tbl').forEach((t) => {
+      const card = t.closest('.card'); if (!card || card.querySelector('.zoom-btn')) return;
+      const b = el('button', { type: 'button', class: 'btn sm ghost zoom-btn', title: 'Phóng to bảng (Esc để thu nhỏ)', text: '⤢ Phóng to' });
+      b.addEventListener('click', () => { const on = !card.classList.contains('fs'); $$('.card.fs').forEach((c) => { c.classList.remove('fs'); const z = c.querySelector('.zoom-btn'); if (z) z.textContent = '⤢ Phóng to'; }); if (on) { card.classList.add('fs'); b.textContent = '✕ Thu nhỏ'; } document.body.classList.toggle('fs-open', on); });
+      t.before(el('div', { class: 'zoom-bar' }, b));
+    });
+  }
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { $$('.card.fs').forEach((c) => { c.classList.remove('fs'); const z = c.querySelector('.zoom-btn'); if (z) z.textContent = '⤢ Phóng to'; }); document.body.classList.remove('fs-open'); } });
   function showTab(name) {
     if (!$('#tab-' + name)) name = 'overview';
     $$('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
@@ -56,6 +66,7 @@
     $$('.tab').forEach((t) => { t.hidden = t.id !== 'tab-' + name; });
     if (location.hash.slice(1) !== name) history.replaceState(null, '', '#' + name);
     if (S.latest && !built.has(name)) { built.add(name); BUILD[name] && BUILD[name](); }
+    addZoom();
     store.set('nk_tab', name);
   }
   $$('.tabs button').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
@@ -534,11 +545,13 @@
       ].filter(Boolean));
       const drawG = () => {
         const lab = $('#gr-lab').value, q = $('#gr-q').value.trim().toLowerCase();
-        const rows = GR.filter((r) => (!lab || r.label === lab) && (!q || r.ind.toLowerCase().includes(q)));
+        const mn = $('#gr-min').checked;
+        const rows = GR.filter((r) => (!lab || r.label === lab) && (!q || r.ind.toLowerCase().includes(q)) && (!mn || (r.n || 0) >= 5));
         $('#gr-count').textContent = `${rows.length}/${GR.length} ngành`;
         table($('#tb-gr'), [
           { k: 'ind', label: 'Ngành', l: true, f: (r) => { const f = document.createDocumentFragment(); f.append(r.ind); if (r.label) f.append(' ', el('span', { class: 'tag ' + (GL[r.label] || ''), text: r.label })); return f; } },
-          { k: 'score_all', label: 'Điểm', f: (r) => el('b', { class: (r.score_all ?? r.score) >= 70 ? 'up' : (r.score_all ?? r.score) < 30 ? 'dn' : '', text: n0(r.score_all ?? r.score) }), sv: (r) => r.score_all ?? r.score },
+          { k: 'n', label: 'Số mã', f: (r) => n0(r.n), c: (r) => ((r.n || 0) < 5 ? 'muted' : ''), title: 'Số cổ phiếu đủ thanh khoản trong ngành. Dưới 5 mã thì các tỷ lệ % kém tin cậy.' },
+          { k: 'score_all', label: 'Điểm', title: 'Điểm 0–100 gộp 7 bằng chứng. Mô tả ngành đang mạnh; kiểm chứng thật chưa cho thấy dự báo được ngành tăng hơn SPY tháng sau.', f: (r) => el('b', { class: (r.score_all ?? r.score) >= 70 ? 'up' : (r.score_all ?? r.score) < 30 ? 'dn' : '', text: n0(r.score_all ?? r.score) }), sv: (r) => r.score_all ?? r.score },
           { k: 'd21', label: '1 tháng trước', f: (r) => (isNum(r.score21) ? `${n0(r.score21)} (${r.score - r.score21 > 0 ? '+' : ''}${n0(r.score - r.score21)})` : '—'), c: (r) => cls(r.score - (r.score21 ?? r.score)), sv: (r) => r.score - (r.score21 ?? r.score) },
           { k: 'ev', label: 'Bằng chứng', f: (r) => el('span', { class: 'gr-dots', title: EVK.map((k) => `${G.labels[k]}: ${r.ev[k] ?? '—'}`).join('\n') + (r.miss && r.miss.length ? '\nCòn thiếu: ' + r.miss.join(', ') : '') },
             ...EVK.map((k) => { const v = r.ev[k]; return el('i', { style: isNum(v) ? `background:color-mix(in srgb,var(--good) ${Math.round(v)}%,var(--line))` : '' }); })), sv: (r) => (r.have || []).length },
@@ -553,7 +566,7 @@
           { k: 'best', label: 'Mã mạnh nhất', l: true, f: (r) => { const f = document.createDocumentFragment(); r.best.forEach((t) => f.append(el('button', { class: 'chip sm', type: 'button', text: t, onclick: () => openChart(t) }))); return f; }, sv: (r) => r.best.length },
         ], rows, { sort: 'score_all', onRow: (r) => { grOn.add(r.ind); drawChips(); drawGr(); $('#ch-gr').scrollIntoView({ behavior: 'smooth', block: 'center' }); }, limit: 200, empty: 'Không có ngành nào.' });
       };
-      $('#gr-lab').addEventListener('input', drawG); $('#gr-q').addEventListener('input', drawG);
+      $('#gr-lab').addEventListener('input', drawG); $('#gr-q').addEventListener('input', drawG); $('#gr-min').addEventListener('input', drawG);
       drawG();
       if (!grOn.size) GR.slice(0, 4).forEach((r) => grOn.add(r.ind));
       const COLS = ['--c1', '--c2', '--c3', '--c4', '--c5', '--c6', '--good', '--bad', '--warn'];
