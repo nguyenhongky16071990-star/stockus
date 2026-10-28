@@ -36,8 +36,7 @@
       <button role="tab" data-g="stk" data-tab="leaders">Ngành</button>
       <button role="tab" data-g="stk" data-tab="basket">Top 100</button>
       <button role="tab" data-g="stk" data-tab="setups">Setup hôm nay</button>
-      <button role="tab" data-g="stk" data-tab="screener">Lọc huyền thoại</button>
-      <button role="tab" data-g="stk" data-tab="search">Tìm mã</button>
+      <button role="tab" data-g="stk" data-tab="screener">Lọc &amp; tìm mã</button>
       <button role="tab" data-g="test" data-tab="lab">Hiệu quả setup</button>
       <button role="tab" data-g="test" data-tab="patterns">Mẫu hình</button>
       <button role="tab" data-g="test" data-tab="backtest">Kiểm chứng huyền thoại</button>
@@ -505,14 +504,23 @@
   <!-- LỌC SIÊU CỔ -->
   <section id="tab-screener" class="tab" role="tabpanel" hidden>
     <div class="intro">
-      <h2>Lọc cổ phiếu theo các huyền thoại</h2>
-      <p>Mỗi thẻ là bộ tiêu chí của một huyền thoại. Tích vào thẻ để dùng huyền thoại đó, mở "Điều kiện" để bật/tắt từng điều kiện và chỉnh ngưỡng. Mã đạt tiêu chí của huyền thoại nào sẽ có ký hiệu của huyền thoại đó, ở đây và ở mọi bảng khác. Bấm vào mã để xem điểm mua, stop và cách bán theo từng người.</p>
+      <h2>Lọc &amp; tìm cổ phiếu</h2>
+      <p>Gõ mã hoặc ngành, lọc Trend Template, đường RS và điểm RS ở khung kết quả bên dưới; kết hợp với các thẻ huyền thoại. Mỗi thẻ là bộ tiêu chí của một huyền thoại. Tích vào thẻ để dùng huyền thoại đó, mở "Điều kiện" để bật/tắt từng điều kiện và chỉnh ngưỡng. Mã đạt tiêu chí của huyền thoại nào sẽ có ký hiệu của huyền thoại đó, ở đây và ở mọi bảng khác. Bấm vào mã để xem điểm mua, stop và cách bán theo từng người.</p>
     </div>
     <div class="tools"><span class="muted small">Chọn nhanh:</span><button type="button" class="btn sm ghost" id="lg-all">Tất cả</button><button type="button" class="btn sm ghost" id="lg-none">Bỏ chọn hết</button>
       <span class="muted small">Kết hợp:</span><div class="seg" role="group" aria-label="Cách kết hợp"><button type="button" id="mode-any" aria-pressed="true">Đạt ít nhất 1 huyền thoại</button><button type="button" id="mode-all" aria-pressed="false">Đạt tất cả huyền thoại đã chọn</button></div>
       <button type="button" class="btn sm ghost" id="crit-reset">Về mặc định</button></div>
     <div class="strats" id="strats"></div>
     <article class="card">
+      <div class="tools">
+        <input type="search" id="q" placeholder="Gõ mã hoặc ngành…" aria-label="Tìm mã">
+        <select id="sel-theme" aria-label="Lọc theo ngành"><option value="">Mọi ngành</option></select>
+        <label class="chk"><input type="checkbox" id="f-tt"> Đạt Trend Template</label>
+        <select id="f-rsnh" aria-label="Lọc theo đường RS"><option value="">Đường RS: mọi mã</option><option value="now">Đường RS lập đỉnh 52 tuần hôm nay</option><option value="5">Đường RS lập đỉnh trong 5 phiên</option><option value="lead">RS dẫn trước giá (RS lập đỉnh, giá chưa)</option></select>
+        <select id="f-rsmin" aria-label="RS tối thiểu"><option value="0">Mọi RS</option><option value="70">RS ≥ 70</option><option value="80">RS ≥ 80</option><option value="90">RS ≥ 90</option></select>
+        <label class="chk" title="Bỏ qua các thẻ huyền thoại, chỉ dùng ô tìm và các bộ lọc trên dòng này cho toàn bộ cổ phiếu"><input type="checkbox" id="scr-all"> Tìm trong mọi mã (bỏ qua bộ lọc huyền thoại)</label>
+      </div>
+      <p class="note">Đường RS = giá cổ phiếu chia cho QQQ. <b>Đường RS lập đỉnh 52 tuần</b> nghĩa là cổ phiếu đang mạnh hơn thị trường nhiều nhất trong một năm. <b>RS dẫn trước giá</b> (đường RS lập đỉnh trong 5 phiên khi giá còn thấp hơn đỉnh 1 năm trên 3%) là tín hiệu Minervini và IBD ưa thích: cổ phiếu giữ sức mạnh khi thị trường điều chỉnh, thường bứt lên đầu tiên khi thị trường hồi phục.</p>
       <div class="tools"><label class="chk"><input type="checkbox" id="crit-near"> Hiện cả mã chỉ thiếu 1 điều kiện</label>
         <span class="muted small" id="scr-count"></span>
         <button type="button" class="btn sm ghost" id="wl-scr" title="Tải file .txt rồi nhập vào TradingView: Watchlist → Import list">Xuất watchlist TradingView</button></div>
@@ -522,21 +530,6 @@
     </article>
   </section>
 
-  <!-- TÌM MÃ -->
-  <section id="tab-search" class="tab" role="tabpanel" hidden>
-    <article class="card">
-      <div class="tools">
-        <input type="search" id="q" placeholder="Gõ mã hoặc ngành…" aria-label="Tìm mã">
-        <select id="sel-theme" aria-label="Lọc theo ngành"><option value="">Mọi ngành</option></select>
-        <label class="chk"><input type="checkbox" id="f-tt"> Đạt Trend Template</label>
-        <select id="f-rsnh" aria-label="Lọc theo đường RS"><option value="">Đường RS: mọi mã</option><option value="now">Đường RS lập đỉnh 52 tuần hôm nay</option><option value="5">Đường RS lập đỉnh trong 5 phiên</option><option value="lead">RS dẫn trước giá (RS lập đỉnh, giá chưa)</option></select>
-        <select id="f-rsmin" aria-label="RS tối thiểu"><option value="0">Mọi RS</option><option value="70">RS ≥ 70</option><option value="80">RS ≥ 80</option><option value="90">RS ≥ 90</option></select>
-        <span class="muted small" id="search-count"></span>
-      </div>
-      <p class="note">Đường RS = giá cổ phiếu chia cho QQQ. <b>Đường RS lập đỉnh 52 tuần</b> nghĩa là cổ phiếu đang mạnh hơn thị trường nhiều nhất trong một năm. <b>RS dẫn trước giá</b> (đường RS lập đỉnh trong 5 phiên khi giá còn thấp hơn đỉnh 1 năm trên 3%) là tín hiệu Minervini và IBD ưa thích: cổ phiếu giữ sức mạnh khi thị trường điều chỉnh, thường bứt lên đầu tiên khi thị trường hồi phục.</p>
-      <div class="tbl tall"><table id="tb-search"></table></div>
-    </article>
-  </section>
 
   <!-- NHẬT KÝ -->
   <section id="tab-journal" class="tab" role="tabpanel" hidden>

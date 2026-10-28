@@ -4,7 +4,7 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const LW = window.LightweightCharts;
-  const APP_VERSION = '2026.10.29-a'; // phải trùng với APP_VERSION trong pipeline/build.py
+  const APP_VERSION = '2026.10.29-b'; // phải trùng với APP_VERSION trong pipeline/build.py
   const S = { exits: null, groups: null, flow: null, lab: null, cond: null, paper: null, cycle: null, backtest: null, latest: null, history: [], stocks: [], setups: [], extended: [], themes: [], basket: [], industries: [], patterns: null, charts: null };
   const ranges = {};          // khoảng thời gian của từng biểu đồ
   const built = new Set();    // tab đã vẽ
@@ -58,6 +58,7 @@
   }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { $$('.card.fs').forEach((c) => { c.classList.remove('fs'); const z = c.querySelector('.zoom-btn'); if (z) z.textContent = '⤢ Phóng to'; }); document.body.classList.remove('fs-open'); } });
   function showTab(name) {
+    if (name === 'search') name = 'screener';
     if (!$('#tab-' + name)) name = 'overview';
     $$('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
     const tb = $(`.tabs button[data-tab="${name}"]`), g = tb ? tb.dataset.g : 'mkt';
@@ -690,19 +691,6 @@
       }
       drawSetups();
       $('#extended').replaceChildren(...(S.extended.length ? S.extended.map((s) => el('button', { class: 'chip', type: 'button', onclick: () => openChart(s.t) }, s.t, el('small', { text: `+${n1(s.d9)}% so với EMA 9` }))) : [el('span', { class: 'empty', text: 'Không có mã top 100 nào quá xa EMA 9.' })]));
-    },
-    search() {
-      const themes = [...new Set(S.stocks.map((s) => s.theme))].sort((a, b) => a.localeCompare(b, 'vi'));
-      $('#sel-theme').append(...themes.map((t) => el('option', { value: t, text: t })));
-      const draw = () => {
-        const q = $('#q').value.trim().toLowerCase(), th = $('#sel-theme').value, tt = $('#f-tt').checked, rn = $('#f-rsnh').value, rmin = Number($('#f-rsmin').value || 0);
-        const rsOk = (s) => !rn || (rn === 'now' ? s.rsnh : rn === '5' ? (s.rsnh5 ?? s.rsnh) : !!s.rslead);
-        const rows = S.stocks.filter((s) => (!q || (s.t + ' ' + s.theme + ' ' + (s.name || '')).toLowerCase().includes(q)) && (!th || s.theme === th) && (!tt || s.tt) && rsOk(s) && (s.rs || 0) >= rmin);
-        $('#search-count').textContent = `${rows.length} / ${S.stocks.length} mã`;
-        table($('#tb-search'), stockCols(false, true), rows, { sort: 'rs', limit: 300, onRow: (r) => openChart(r.t) });
-      };
-      ['#q', '#sel-theme', '#f-tt', '#f-rsnh', '#f-rsmin'].forEach((s) => $(s).addEventListener('input', draw));
-      draw();
     },
     patterns() {
       const P = S.patterns;
@@ -1487,10 +1475,18 @@
         box.append(card);
       }
     }
+    function extraOk(s) {
+      const q = $('#q').value.trim().toLowerCase(), th = $('#sel-theme').value, tt = $('#f-tt').checked, rn = $('#f-rsnh').value, rmin = Number($('#f-rsmin').value || 0);
+      const rsOk = !rn || (rn === 'now' ? s.rsnh : rn === '5' ? (s.rsnh5 ?? s.rsnh) : !!s.rslead);
+      return (!q || (s.t + ' ' + s.theme + ' ' + (s.ind || '') + ' ' + (s.name || '')).toLowerCase().includes(q)) && (!th || s.theme === th) && (!tt || s.tt) && rsOk && (s.rs || 0) >= rmin;
+    }
     function run() {
       const sel = LEGENDS.filter((L) => LG.sel[L.id]);
+      const all = $('#scr-all').checked;
       const rows = [];
       for (const s of S.stocks) {
+        if (!extraOk(s)) continue;
+        if (all) { rows.push(Object.assign({}, s, { _n: matchesOf(s.t).length, _near: false })); continue; }
         const ev = sel.map((L) => ({ L, e: evalLegend(s, L) }));
         const pass = ev.filter((x) => x.e.pass);
         const near = ev.filter((x) => !x.e.pass && x.e.n - x.e.ok === 1);
@@ -1500,13 +1496,15 @@
       }
       last = rows;
       const full = rows.filter((r) => !r._near).length;
-      $('#scr-count').textContent = `${full} mã đạt` + (LG.near ? ` · ${rows.length - full} mã thiếu 1 điều kiện` : '');
+      $('#scr-count').textContent = (all ? `${rows.length} / ${S.stocks.length} mã (tìm trong mọi mã)` : `${full} mã đạt` + (LG.near ? ` · ${rows.length - full} mã thiếu 1 điều kiện` : ''));
       $('#scr-note').textContent = `Số liệu doanh thu/EPS có cho ${n0(S.latest.fund_n)} mã (khoảng 400 mã mạnh nhất và các mã có setup), cập nhật hằng tuần; mã không có số liệu sẽ không đạt điều kiện tăng trưởng.` + (S.stocks.some((s) => isNum(s.mcap)) ? '' : ' Vốn hóa chỉ có khi dùng nguồn Massive.');
       table($('#tb-scr'), [
         { k: 't', label: 'Mã', tk: true },
         { k: '_n', label: 'Đạt tiêu chí', l: true, f: (r) => { const f = badges(r.t); if (r._near) f.append(el('span', { class: 'tag miss', text: r._nearTxt })); return f; }, sv: (r) => r._n * 10 - (r._near ? 5 : 0) },
+        { k: 'rs', label: 'RS', f: (r) => n0(r.rs) },
         { k: 'rs_pos', label: 'Hạng RS', f: (r) => n0(r.rs_pos) },
         { k: 'ind_rank', label: 'Hạng ngành', f: (r) => (isNum(r.ind_rank) ? `${r.ind_rank}/${S.latest.n_ind}` : '—') },
+        { k: 'stage', label: 'Giai đoạn', f: (r) => r.stage ?? '—' },
         { k: 'close', label: 'Giá', f: (r) => n2(r.close) },
         { k: 'chg', label: 'Phiên', f: (r) => spct(r.chg), c: (r) => cls(r.chg) },
         { k: 'r21', label: '1 tháng', f: (r) => spct(r.r21), c: (r) => cls(r.r21) },
@@ -1515,7 +1513,7 @@
         { k: 'rev_yoy', label: 'DT quý', f: (r) => spct(r.rev_yoy), c: (r) => cls(r.rev_yoy) },
         { k: 'eps_yoy', label: 'EPS quý', f: (r) => spct(r.eps_yoy), c: (r) => cls(r.eps_yoy) },
         { k: 'ind', label: 'Ngành', l: true, f: (r) => r.ind || r.theme },
-        { k: 'setups', label: 'Setup, tín hiệu', l: true, f: (r) => { const f = document.createDocumentFragment(); [...(r.setups || []), ...(r.sig || [])].forEach((t) => f.append(el('span', { class: 'tag', text: t }))); return f; }, sv: (r) => (r.setups || []).length + (r.sig || []).length },
+        { k: 'setups', label: 'Setup, tín hiệu', l: true, f: (r) => { const f = document.createDocumentFragment(); if (r.tt) f.append(el('span', { class: 'tag tt', text: 'Trend Template' })); [...(r.setups || []), ...(r.sig || [])].forEach((t) => f.append(el('span', { class: 'tag' + (WEAK_SETUPS.includes(t) ? ' weak' : ''), text: t }))); if (r.rslead) f.append(el('span', { class: 'tag ld', text: 'RS dẫn trước giá' })); else if (r.rsnh) f.append(el('span', { class: 'tag', text: 'RS đỉnh mới' })); return f; }, sv: (r) => (r.setups || []).length + (r.sig || []).length },
       ], rows, { sort: '_n', limit: 300, rowClass: (r) => (r._near ? 'dim' : ''), onRow: (r) => openChart(r.t), empty: 'Không có mã nào đạt. Thử chọn thêm huyền thoại, tắt bớt điều kiện hoặc nới ngưỡng.' });
     }
     function init() {
@@ -1523,6 +1521,9 @@
       const seg = (m) => { LG.mode = m; $('#mode-any').setAttribute('aria-pressed', String(m === 'any')); $('#mode-all').setAttribute('aria-pressed', String(m === 'all')); save(); };
       $('#mode-any').addEventListener('click', () => seg('any')); $('#mode-all').addEventListener('click', () => seg('all'));
       $('#mode-any').setAttribute('aria-pressed', String(LG.mode === 'any')); $('#mode-all').setAttribute('aria-pressed', String(LG.mode === 'all'));
+      const themes = [...new Set(S.stocks.map((s) => s.theme))].sort((a, b) => a.localeCompare(b, 'vi'));
+      $('#sel-theme').append(...themes.map((t) => el('option', { value: t, text: t })));
+      ['#q', '#sel-theme', '#f-tt', '#f-rsnh', '#f-rsmin', '#scr-all'].forEach((x) => $(x).addEventListener('input', run));
       $('#crit-near').checked = LG.near; $('#crit-near').addEventListener('input', () => { LG.near = $('#crit-near').checked; save(); });
       $('#lg-all').addEventListener('click', () => { LEGENDS.forEach((L) => { LG.sel[L.id] = true; }); form(); save(); });
       $('#lg-none').addEventListener('click', () => { LEGENDS.forEach((L) => { LG.sel[L.id] = false; }); form(); save(); });
