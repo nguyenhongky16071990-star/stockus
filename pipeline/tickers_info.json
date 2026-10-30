@@ -1265,6 +1265,12 @@ null,
 581822024,
 "2026-10-27"
 ],
+"ASB": [
+"Associated Banc-Corp",
+"STATE COMMERCIAL BANKS",
+185705763,
+"2026-10-30"
+],
 "ASML": [
 "ASML Holding NV",
 "",
@@ -1312,6 +1318,12 @@ null,
 "NATURAL GAS DISTRIBUTION",
 168988553,
 "2026-10-27"
+],
+"ATR": [
+"AptarGroup, Inc.",
+"PLASTICS PRODUCTS, NEC",
+63581129,
+"2026-10-30"
 ],
 "AU": [
 "AngloGold Ashanti plc",
@@ -1565,6 +1577,12 @@ null,
 458864265,
 "2026-10-29"
 ],
+"BFH": [
+"Bread Financial Holdings, Inc.",
+"PERSONAL CREDIT INSTITUTIONS",
+37961242,
+"2026-10-30"
+],
 "BG": [
 "Bunge Global SA",
 "FATS & OILS",
@@ -1595,17 +1613,35 @@ null,
 147753998,
 "2026-10-24"
 ],
+"BILL": [
+"BILL Holdings, Inc.",
+"SERVICES-PREPACKAGED SOFTWARE",
+85276782,
+"2026-10-30"
+],
 "BIO": [
 "Bio-Rad Laboratories, Inc.Class A",
 "LABORATORY ANALYTICAL INSTRUMENTS",
 26738175,
 "2026-10-29"
 ],
+"BIRK": [
+"Birkenstock Holding plc",
+"",
+165126204,
+"2026-10-30"
+],
 "BJ": [
 "BJs Wholesale Club Holdings, Inc. Common Stock",
 "RETAIL-VARIETY STORES",
 126314692,
 "2026-10-25"
+],
+"BKD": [
+"Brookdale Senior Living, Inc.",
+"SERVICES-NURSING & PERSONAL CARE FACILITIES",
+238817252,
+"2026-10-30"
 ],
 "BKH": [
 "Black Hills Corporation",
@@ -1961,6 +1997,12 @@ null,
 288196254,
 "2026-10-24"
 ],
+"CBRL": [
+"Cracker Barrel Old Country Store, Inc,.",
+"RETAIL-EATING PLACES",
+22352430,
+"2026-10-30"
+],
 "CBRS": [
 "Cerebras Systems Inc. Class A Common Stock",
 "SEMICONDUCTORS & RELATED DEVICES",
@@ -2116,6 +2158,12 @@ null,
 "SERVICES-HOME HEALTH CARE SERVICES",
 13069961,
 "2026-10-29"
+],
+"CHEF": [
+"The Chef's Warehouse Inc",
+"WHOLESALE-GROCERIES, GENERAL LINE",
+43462895,
+"2026-10-30"
 ],
 "CHKP": [
 "Check Point Software Technologies Ltd",
@@ -2302,6 +2350,12 @@ null,
 "",
 2061500000,
 "2026-10-25"
+],
+"CNX": [
+"CNX Resources Corporation",
+"CRUDE PETROLEUM & NATURAL GAS",
+142861133,
+"2026-10-30"
 ],
 "COCO": [
 "The Vita Coco Company, Inc. Common Stock",
@@ -2921,6 +2975,12 @@ null,
 445000000,
 "2026-10-24"
 ],
+"ECG": [
+"Everus Construction Group, Inc.",
+"OPERATIVE BUILDERS",
+51063836,
+"2026-10-30"
+],
 "ECHO": [
 "EchoStar Corporation",
 "COMMUNICATIONS SERVICES, NEC",
@@ -2944,6 +3004,12 @@ null,
 "ELECTRIC & OTHER SERVICES COMBINED",
 369828633,
 "2026-10-25"
+],
+"EEFT": [
+"Euronet Worldwide Inc",
+"FUNCTIONS RELATED TO DEPOSITORY BANKING, NEC",
+37403595,
+"2026-10-30"
 ],
 "EFX": [
 "Equifax, Incorporated",
@@ -3070,6 +3136,12 @@ null,
 "PLASTICS PRODUCTS, NEC",
 152800000,
 "2026-10-24"
+],
+"ENVA": [
+"Enova International, Inc.",
+"PERSONAL CREDIT INSTITUTIONS",
+24460078,
+"2026-10-30"
 ],
 "EOG": [
 "EOG Resources, Inc.",
@@ -3322,6 +3394,12 @@ null,
 "RETAIL-MISCELLANEOUS RETAIL",
 42887671,
 "2026-10-28"
+],
+"FCN": [
+"FTI Consulting, Inc.",
+"SERVICES-MANAGEMENT CONSULTING SERVICES",
+27254187,
+"2026-10-30"
 ],
 "FCNCA": [
 "First Citizens BancShares Inc",
@@ -3593,6 +3671,12 @@ null,
 159300000,
 "2026-10-27"
 ],
+"FSS": [
+"Federal Signal Corp.",
+"MOTOR VEHICLES & PASSENGER CAR BODIES",
+61041611,
+"2026-10-30"
+],
 "FTAI": [
 "FTAI Aviation Ltd. Common Stock",
 "SERVICES-MISCELLANEOUS EQUIPMENT RENTAL & LEASING",
@@ -3827,11 +3911,29 @@ null,
 12229934831,
 "2026-10-24"
 ],
+"GOOGM": [
+"Alphabet Inc. Depositary Shares representing a 1/20th Interest in a Share of Series A Mandatory Convertible Preferred Stock",
+"SERVICES-COMPUTER PROGRAMMING, DATA PROCESSING, ETC.",
+null,
+"2026-10-30"
+],
+"GOOGN": [
+"Alphabet Inc. Depositary Shares representing a 1/20th Interest in a Share of Series B Mandatory Convertible Preferred Stock",
+"SERVICES-COMPUTER PROGRAMMING, DATA PROCESSING, ETC.",
+null,
+"2026-10-30"
+],
 "GPC": [
 "Genuine Parts Company",
 "WHOLESALE-MOTOR VEHICLE SUPPLIES & NEW PARTS",
 137859758,
 "2026-10-27"
+],
+"GPI": [
+"Group 1 Automotive, Inc.",
+"RETAIL-AUTO DEALERS & GASOLINE STATIONS",
+11922225,
+"2026-10-30"
 ],
 "GPK": [
 "Graphic Packaging Holding Company",
@@ -3868,6 +3970,12 @@ null,
 "SECURITY BROKERS, DEALERS & FLOTATION COMPANIES",
 291171408,
 "2026-10-24"
+],
+"GSAT": [
+"Globalstar, Inc. Common Stock",
+"COMMUNICATIONS SERVICES, NEC",
+129563390,
+"2026-10-30"
 ],
 "GSK": [
 "GSK plc American Depositary Shares (Each representing two Ordinary Shares)",
@@ -4037,6 +4145,12 @@ null,
 80694417,
 "2026-10-26"
 ],
+"HOG": [
+"Harley-Davidson, Inc.",
+"MOTORCYCLES, BICYCLES & PARTS",
+104072507,
+"2026-10-30"
+],
 "HON": [
 "Honeywell International, Inc.",
 "AIRCRAFT ENGINES & ENGINE PARTS",
@@ -4151,11 +4265,23 @@ null,
 120080308,
 "2026-10-24"
 ],
+"HURN": [
+"Huron Consulting Group Inc.",
+"SERVICES-MANAGEMENT CONSULTING SERVICES",
+15910072,
+"2026-10-30"
+],
 "HUT": [
 "Hut 8 Corp. Common Stock",
 "FINANCE SERVICES",
 123259468,
 "2026-10-24"
+],
+"HWC": [
+"Hancock Whitney Corporation Common Stock",
+"STATE COMMERCIAL BANKS",
+80223058,
+"2026-10-30"
 ],
 "HWM": [
 "Howmet Aerospace Inc.",
@@ -4222,6 +4348,12 @@ null,
 "ELECTRIC SERVICES",
 57842043,
 "2026-10-28"
+],
+"IDCC": [
+"InterDigital, Inc.",
+"PATENT OWNERS & LESSORS",
+25753242,
+"2026-10-30"
 ],
 "IDXX": [
 "Idexx Laboratories Inc",
@@ -4421,6 +4553,12 @@ null,
 33997068,
 "2026-10-28"
 ],
+"ITRI": [
+"Itron Inc",
+"INSTRUMENTS FOR MEAS & TESTING OF ELECTRICITY & ELEC SIGNALS",
+43860429,
+"2026-10-30"
+],
 "ITT": [
 "ITT Inc.",
 "PUMPS & PUMPING EQUIPMENT",
@@ -4547,6 +4685,12 @@ null,
 60762736,
 "2026-10-30"
 ],
+"KBR": [
+"KBR, Inc.",
+"HEAVY CONSTRUCTION OTHER THAN BLDG CONST - CONTRACTORS",
+126108987,
+"2026-10-30"
+],
 "KDP": [
 "Keurig Dr Pepper Inc.",
 "BEVERAGES",
@@ -4648,6 +4792,12 @@ null,
 "FIRE, MARINE & CASUALTY INSURANCE",
 22509945,
 "2026-10-28"
+],
+"KNTK": [
+"Kinetik Holdings Inc.",
+"NATURAL GAS TRANSMISSION",
+80442263,
+"2026-10-30"
 ],
 "KNX": [
 "Knight-Swift Transportation Holdings Inc. Class A Common Stock",
@@ -4913,6 +5063,12 @@ null,
 142030272,
 "2026-10-25"
 ],
+"LSTR": [
+"Landstar System Inc",
+"TRUCKING (NO LOCAL)",
+33708943,
+"2026-10-30"
+],
 "LTH": [
 "Life Time Group Holdings, Inc.",
 "SERVICES-MEMBERSHIP SPORTS & RECREATION CLUBS",
@@ -5045,10 +5201,22 @@ null,
 285700000,
 "2026-10-27"
 ],
+"MATX": [
+"Matsons, Inc.",
+"WATER TRANSPORTATION",
+29903458,
+"2026-10-30"
+],
 "MBGL": [
 "Mobility Global Inc.",
 "SERVICES-BUSINESS SERVICES, NEC",
 320000000,
+"2026-10-30"
+],
+"MC": [
+"MOELIS & COMPANY",
+"INVESTMENT ADVICE",
+74080893,
 "2026-10-30"
 ],
 "MCD": [
@@ -5128,6 +5296,12 @@ null,
 "SERVICES-COMPUTER PROGRAMMING, DATA PROCESSING, ETC.",
 2547506225,
 "2026-10-24"
+],
+"MFC": [
+"Manulife Financial Corp.",
+"",
+1654296392,
+"2026-10-30"
 ],
 "MGA": [
 "Magna International",
@@ -5212,6 +5386,12 @@ null,
 "SURGICAL & MEDICAL INSTRUMENTS & APPARATUS",
 515722417,
 "2026-10-24"
+],
+"MMSI": [
+"Merit Medical Systems Inc",
+"SURGICAL & MEDICAL INSTRUMENTS & APPARATUS",
+59710420,
+"2026-10-30"
 ],
 "MNDY": [
 "monday.com Ltd. Ordinary Shares",
@@ -5327,6 +5507,18 @@ null,
 7425545491,
 "2026-10-24"
 ],
+"MSGK": [
+"MSG Knickerbockers Corp.",
+"SERVICES-MISCELLANEOUS AMUSEMENT & RECREATION",
+24079941,
+"2026-10-30"
+],
+"MSGR": [
+"MSG Rangers Corp.",
+"",
+9840755,
+"2026-10-30"
+],
 "MSGS": [
 "Madison Square Garden Sports Corp.",
 "SERVICES-MISCELLANEOUS AMUSEMENT & RECREATION",
@@ -5386,6 +5578,12 @@ null,
 "SURETY INSURANCE",
 205124840,
 "2026-10-29"
+],
+"MTH": [
+"Meritage Homes Corporation",
+"OPERATIVE BUILDERS",
+64423225,
+"2026-10-30"
 ],
 "MTN": [
 "Vail Resorts, Inc.",
@@ -5447,6 +5645,12 @@ null,
 15569250,
 "2026-10-29"
 ],
+"NAVN": [
+"Navan, Inc. Class A Common Stock",
+"SERVICES-PREPACKAGED SOFTWARE",
+260410493,
+"2026-10-30"
+],
 "NBIS": [
 "Nebius Group N.V. Class A Ordinary Shares",
 "",
@@ -5476,6 +5680,12 @@ null,
 "GENERAL INDUSTRIAL MACHINERY & EQUIPMENT, NEC",
 55699366,
 "2026-10-28"
+],
+"NE": [
+"Noble Corporation plc",
+"DRILLING OIL & GAS WELLS",
+159661815,
+"2026-10-30"
 ],
 "NEE": [
 "NextEra Energy, Inc.",
@@ -5573,17 +5783,35 @@ null,
 356512491,
 "2026-10-29"
 ],
+"NOVT": [
+"Novanta Inc. Common Stock",
+"MISCELLANEOUS ELECTRICAL MACHINERY, EQUIPMENT & SUPPLIES",
+37817770,
+"2026-10-30"
+],
 "NOW": [
 "SERVICENOW, INC.",
 "SERVICES-PREPACKAGED SOFTWARE",
 1033862000,
 "2026-10-24"
 ],
+"NPO": [
+"Enpro Inc.",
+"GASKETS, PACKG & SEALG DEVICES & RUBBER & PLASTICS HOSE",
+21167681,
+"2026-10-30"
+],
 "NRG": [
 "NRG Energy, Inc.",
 "ELECTRIC SERVICES",
 210210483,
 "2026-10-24"
+],
+"NRIX": [
+"Nurix Therapeutics, Inc. Common stock",
+"PHARMACEUTICAL PREPARATIONS",
+109249814,
+"2026-10-30"
 ],
 "NSC": [
 "Norfolk Southern Corp.",
@@ -5945,6 +6173,12 @@ null,
 65662873,
 "2026-10-27"
 ],
+"PAGS": [
+"PagSeguro Digital Ltd.",
+"",
+275646022,
+"2026-10-30"
+],
 "PANW": [
 "Palo Alto Networks, Inc. Common Stock",
 "COMPUTER PERIPHERAL EQUIPMENT, NEC",
@@ -5974,6 +6208,12 @@ null,
 "SERVICES-ENGINEERING, ACCOUNTING, RESEARCH, MANAGEMENT",
 355980473,
 "2026-10-24"
+],
+"PB": [
+"Prosperity Bancshares Inc",
+"STATE COMMERCIAL BANKS",
+119713000,
+"2026-10-30"
 ],
 "PBF": [
 "PBF ENERGY INC.",
@@ -6281,6 +6521,12 @@ null,
 108632228,
 "2026-10-24"
 ],
+"PTCT": [
+"PTC Therapeutics, Inc.",
+"PHARMACEUTICAL PREPARATIONS",
+83460802,
+"2026-10-30"
+],
 "PTEN": [
 "Patterson-UTI Energy Inc",
 "DRILLING OIL & GAS WELLS",
@@ -6389,6 +6635,12 @@ null,
 110640008,
 "2026-10-28"
 ],
+"RAMP": [
+"LiveRamp Holdings, Inc. Common Stock",
+"SERVICES-COMPUTER PROCESSING & DATA PREPARATION",
+60794982,
+"2026-10-30"
+],
 "RBA": [
 "RB Global, Inc.",
 "SERVICES-BUSINESS SERVICES, NEC",
@@ -6454,6 +6706,12 @@ null,
 "",
 1735633770,
 "2026-10-28"
+],
+"RELY": [
+"Remitly Global, Inc. Common Stock",
+"SERVICES-BUSINESS SERVICES, NEC",
+211684054,
+"2026-10-30"
 ],
 "REXR": [
 "REXFORD INDUSTRIAL REALTY, INC.",
@@ -6563,6 +6821,12 @@ null,
 59582239,
 "2026-10-26"
 ],
+"RLI": [
+"RLI Corp.",
+"FIRE, MARINE & CASUALTY INSURANCE",
+91772970,
+"2026-10-30"
+],
 "RMBS": [
 "Rambus Inc",
 "SEMICONDUCTORS & RELATED DEVICES",
@@ -6659,6 +6923,12 @@ null,
 306212978,
 "2026-10-25"
 ],
+"RSI": [
+"Rush Street Interactive, Inc.",
+"SERVICES-MISCELLANEOUS AMUSEMENT & RECREATION",
+115348275,
+"2026-10-30"
+],
 "RTX": [
 "RTX Corporation",
 "AIRCRAFT ENGINES & ENGINE PARTS",
@@ -6718,6 +6988,12 @@ null,
 "REAL ESTATE INVESTMENT TRUSTS",
 297567291,
 "2026-10-29"
+],
+"RYTM": [
+"Rhythm Pharmaceuticals, Inc. Common Stock",
+"PHARMACEUTICAL PREPARATIONS",
+68852082,
+"2026-10-30"
 ],
 "S": [
 "SentinelOne, Inc.",
@@ -6838,6 +7114,12 @@ null,
 "SECURITY BROKERS, DEALERS & FLOTATION COMPANIES",
 118587861,
 "2026-10-29"
+],
+"SEZL": [
+"Sezzle Inc. Common Stock",
+"SERVICES-BUSINESS SERVICES, NEC",
+33783402,
+"2026-10-30"
 ],
 "SF": [
 "Stifel Financial Corp.",
@@ -7025,6 +7307,12 @@ null,
 144527564,
 "2026-10-24"
 ],
+"SNEX": [
+"StoneX Group Inc. Common Stock",
+"SECURITY & COMMODITY BROKERS, DEALERS, EXCHANGES & SERVICES",
+120616735,
+"2026-10-30"
+],
 "SNOW": [
 "Snowflake Inc.",
 "SERVICES-PREPACKAGED SOFTWARE",
@@ -7145,6 +7433,12 @@ null,
 96974534,
 "2026-10-29"
 ],
+"SSD": [
+"Simpson Manufacturing Co., Inc.",
+"CUTLERY, HANDTOOLS & GENERAL HARDWARE",
+40984682,
+"2026-10-30"
+],
 "SSNC": [
 "SS&C Technologies Inc",
 "SERVICES-PREPACKAGED SOFTWARE",
@@ -7156,6 +7450,12 @@ null,
 "MINERAL ROYALTY TRADERS",
 203909312,
 "2026-10-29"
+],
+"ST": [
+"Sensata Technologies Holding plc",
+"INDUSTRIAL INSTRUMENTS FOR MEASUREMENT, DISPLAY, AND CONTROL",
+145562402,
+"2026-10-30"
 ],
 "STE": [
 "STERIS plc",
@@ -7258,6 +7558,12 @@ null,
 "SEMICONDUCTORS & RELATED DEVICES",
 235165549,
 "2026-10-24"
+],
+"SWX": [
+"Southwest Gas Holdings, Inc.",
+"NATURAL GAS TRANSMISSION & DISTRIBUTION",
+72445853,
+"2026-10-30"
 ],
 "SYF": [
 "SYNCHRONY FINANCIAL",
@@ -7432,6 +7738,18 @@ null,
 "SERVICES-GENERAL MEDICAL & SURGICAL HOSPITALS, NEC",
 80519000,
 "2026-10-27"
+],
+"THG": [
+"The Hanover Insurance Group, Inc.",
+"FIRE, MARINE & CASUALTY INSURANCE",
+34500000,
+"2026-10-30"
+],
+"THO": [
+"Thor Industries, Inc.",
+"MOTOR HOMES",
+51614361,
+"2026-10-30"
 ],
 "THRM": [
 "Gentherm Inc",
@@ -7624,6 +7942,12 @@ null,
 "SERVICES-PREPACKAGED SOFTWARE",
 96467903,
 "2026-10-27"
+],
+"TTC": [
+"Toro Company (The)",
+"LAWN & GARDEN TRACTORS & HOME LAWN & GARDENS EQUIP",
+94663378,
+"2026-10-30"
 ],
 "TTD": [
 "The Trade Desk, Inc.",
@@ -7889,6 +8213,12 @@ null,
 4255762795,
 "2026-10-24"
 ],
+"VCTR": [
+"Victory Capital Holdings, Inc. Class A Common Stock",
+"INVESTMENT ADVICE",
+61509572,
+"2026-10-30"
+],
 "VEEV": [
 "Veeva Systems Inc.",
 "SERVICES-PREPACKAGED SOFTWARE",
@@ -7935,6 +8265,12 @@ null,
 "Virtu Financial, Inc. Class A",
 "SECURITY BROKERS, DEALERS & FLOTATION COMPANIES",
 88300678,
+"2026-10-30"
+],
+"VIST": [
+"Vista Energy S.A.B. de C.V.",
+"",
+110617404,
 "2026-10-30"
 ],
 "VKTX": [
@@ -7984,6 +8320,12 @@ null,
 "CRUDE PETROLEUM & NATURAL GAS",
 194405049,
 "2026-10-28"
+],
+"VOD": [
+"Vodafone Group PLC",
+"",
+2316725673,
+"2026-10-30"
 ],
 "VOYA": [
 "VOYA FINANCIAL, INC.",
@@ -8351,6 +8693,12 @@ null,
 507442979,
 "2026-10-24"
 ],
+"XPEV": [
+"XPeng Inc. American depositary shares, each representing two Class A ordinary shares",
+"",
+957976730,
+"2026-10-30"
+],
 "XPO": [
 "XPO, Inc.",
 "TRANSPORTATION SERVICES",
@@ -8368,6 +8716,12 @@ null,
 "SERVICES-PREPACKAGED SOFTWARE",
 600795000,
 "2026-10-24"
+],
+"YMM": [
+"Full Truck Alliance Co. Ltd. American Depositary Shares (each representing 20 Class A Ordinary Shares)",
+"",
+1037544329,
+"2026-10-30"
 ],
 "YUM": [
 "Yum! Brands, Inc.",
