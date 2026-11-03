@@ -1151,6 +1151,12 @@ null,
 350351510,
 "2026-10-25"
 ],
+"APAM": [
+"ARTISAN PARTNERS ASSET MANAGEMENT INC.",
+"INVESTMENT ADVICE",
+71019106,
+"2026-11-03"
+],
 "APD": [
 "Air Products & Chemicals, Inc.",
 "INDUSTRIAL INORGANIC CHEMICALS",
@@ -1192,6 +1198,12 @@ null,
 "SERVICES-PREPACKAGED SOFTWARE",
 35455776,
 "2026-10-28"
+],
+"APPN": [
+"Appian Corporation Class A Common Stock",
+"SERVICES-PREPACKAGED SOFTWARE",
+71627597,
+"2026-11-03"
 ],
 "APTV": [
 "Aptiv PLC",
@@ -1282,6 +1294,12 @@ null,
 "",
 581822024,
 "2026-10-27"
+],
+"ASAN": [
+"Asana, Inc. Class A Common Stock",
+"SERVICES-PREPACKAGED SOFTWARE",
+228970117,
+"2026-11-03"
 ],
 "ASB": [
 "Associated Banc-Corp",
@@ -1517,6 +1535,12 @@ null,
 1597251633,
 "2026-10-27"
 ],
+"BAND": [
+"Bandwidth Inc. Class A Common Stock",
+"SERVICES-PREPACKAGED SOFTWARE",
+32383411,
+"2026-11-03"
+],
 "BAP": [
 "Credicorp LTD",
 "",
@@ -1534,6 +1558,12 @@ null,
 "SERVICES-PREPACKAGED SOFTWARE",
 587032279,
 "2026-10-27"
+],
+"BBAI": [
+"BigBear.ai Holdings, Inc.",
+"SERVICES-PREPACKAGED SOFTWARE",
+481390957,
+"2026-11-03"
 ],
 "BBD": [
 "Banco Bradesco S.A. American Depositary Shares (Each representing one Preferred Shares)",
@@ -1727,6 +1757,12 @@ null,
 992674071,
 "2026-10-24"
 ],
+"BKV": [
+"BKV Corporation",
+"CRUDE PETROLEUM & NATURAL GAS",
+109437830,
+"2026-11-03"
+],
 "BLDR": [
 "Builders FirstSource, Inc.",
 "RETAIL-LUMBER & OTHER BUILDING MATERIALS DEALERS",
@@ -1810,6 +1846,12 @@ null,
 "RETAIL-SHOE STORES",
 30284844,
 "2026-10-28"
+],
+"BORR": [
+"Borr Drilling Limited",
+"",
+309262741,
+"2026-11-03"
 ],
 "BOX": [
 "BOX, INC.",
@@ -1996,6 +2038,12 @@ null,
 "NATIONAL COMMERCIAL BANKS",
 1677436783,
 "2026-10-24"
+],
+"CACC": [
+"Credit Acceptance Corp",
+"PERSONAL CREDIT INSTITUTIONS",
+10137465,
+"2026-11-03"
 ],
 "CACI": [
 "CACI INTERNATIONAL CLA",
@@ -2357,6 +2405,12 @@ null,
 87898234,
 "2026-10-28"
 ],
+"CLRO": [
+"ClearOne, Inc. Common Stock",
+"TELEPHONE & TELEGRAPH APPARATUS",
+2675412,
+"2026-11-03"
+],
 "CLS": [
 "Celestica, Inc.",
 "PRINTED CIRCUIT BOARDS",
@@ -2519,11 +2573,23 @@ null,
 282902268,
 "2026-10-29"
 ],
+"COLM": [
+"Columbia Sportswear Co",
+"APPAREL & OTHER FINISHD PRODS OF FABRICS & SIMILAR MATL",
+51193194,
+"2026-11-03"
+],
 "COMP": [
 "Compass, Inc.",
 "REAL ESTATE AGENTS & MANAGERS (FOR OTHERS)",
 767644630,
 "2026-10-27"
+],
+"CON": [
+"Concentra Group Holdings Parent, Inc.",
+"SERVICES-SPECIALTY OUTPATIENT FACILITIES, NEC",
+127517736,
+"2026-11-03"
 ],
 "COO": [
 "The Cooper Companies, Inc. Common Stock",
@@ -2723,6 +2789,12 @@ null,
 236293199,
 "2026-10-28"
 ],
+"CTRI": [
+"Centuri Holdings, Inc.",
+"NATURAL GAS TRANSMISSION & DISTRIBUTION",
+100963053,
+"2026-11-03"
+],
 "CTSH": [
 "Cognizant Technology Solutions",
 "SERVICES-COMPUTER PROGRAMMING SERVICES",
@@ -2855,6 +2927,12 @@ null,
 217442619,
 "2026-10-28"
 ],
+"DCI": [
+"Donaldson Company, Inc.",
+"INDUSTRIAL & COMMERCIAL FANS & BLOWERS & AIR PURIFYING EQUIP",
+115820533,
+"2026-11-03"
+],
 "DD": [
 "DuPont de Nemours, Inc. Common Stock",
 "PLASTIC MATERIALS, SYNTH RESINS & NONVULCAN ELASTOMERS",
@@ -2938,6 +3016,12 @@ null,
 "PIPE LINES (NO NATURAL GAS)",
 177783849,
 "2026-10-25"
+],
+"DIOD": [
+"Diodes Inc",
+"SEMICONDUCTORS & RELATED DEVICES",
+46051705,
+"2026-11-03"
 ],
 "DIS": [
 "The Walt Disney Company",
@@ -3023,17 +3107,41 @@ null,
 104415000,
 "2026-10-31"
 ],
+"DPC": [
+"DPC Holdings PLC",
+"NONFERROUS FOUNDRIES (CASTINGS)",
+149393016,
+"2026-11-03"
+],
 "DPZ": [
 "Domino's Pizza Inc.",
 "WHOLESALE-GROCERIES & RELATED PRODUCTS",
 32896056,
 "2026-10-25"
 ],
+"DRH": [
+"Diamondrock Hospitality Company Common Stock",
+"REAL ESTATE INVESTMENT TRUSTS",
+204605681,
+"2026-11-03"
+],
 "DRI": [
 "Darden Restaurants, Inc.",
 "RETAIL-EATING PLACES",
 113143224,
 "2026-10-25"
+],
+"DRS": [
+"Leonardo DRS, Inc. Common Stock",
+"SEARCH, DETECTION, NAVIGATION, GUIDANCE, AERONAUTICAL SYS",
+266621085,
+"2026-11-03"
+],
+"DSGX": [
+"Descartes Systems Group Inc",
+"",
+85548553,
+"2026-11-03"
 ],
 "DT": [
 "Dynatrace, Inc.",
@@ -3148,6 +3256,12 @@ null,
 "ELECTRIC & OTHER SERVICES COMBINED",
 369828633,
 "2026-10-25"
+],
+"EDU": [
+"New Oriental Education and Technology Group, Inc. American Depositary Shares (each representing ten (10) Common Shares)",
+"",
+155029580,
+"2026-11-03"
 ],
 "EEFT": [
 "Euronet Worldwide Inc",
@@ -3316,6 +3430,12 @@ null,
 "NATURAL GAS TRANSMISSION",
 2159477169,
 "2026-10-27"
+],
+"EPR": [
+"EPR Properties",
+"REAL ESTATE INVESTMENT TRUSTS",
+76647122,
+"2026-11-03"
 ],
 "EPRT": [
 "Essential Properties Realty Trust, Inc.",
@@ -3497,6 +3617,12 @@ null,
 247781692,
 "2026-10-27"
 ],
+"EXK": [
+"Endeavour Silver Corp.",
+"",
+296144479,
+"2026-11-03"
+],
 "EXLS": [
 "ExlService Holdings, Inc.",
 "SERVICES-BUSINESS SERVICES, NEC",
@@ -3634,6 +3760,12 @@ null,
 "STATE COMMERCIAL BANKS",
 121681352,
 "2026-10-30"
+],
+"FHI": [
+"Federated Hermes, Inc.",
+"INVESTMENT ADVICE",
+73930682,
+"2026-11-03"
 ],
 "FHN": [
 "First Horizon Corporation",
@@ -4073,6 +4205,12 @@ null,
 167967391,
 "2026-11-03"
 ],
+"GLND": [
+"Greenland Energy Company Common Stock",
+"DRILLING OIL & GAS WELLS",
+43730194,
+"2026-11-03"
+],
 "GLNG": [
 "Golar LNG Ltd",
 "",
@@ -4259,6 +4397,12 @@ null,
 47100942,
 "2026-10-24"
 ],
+"GXO": [
+"GXO Logistics, Inc.",
+"TRANSPORTATION SERVICES",
+114684579,
+"2026-11-03"
+],
 "H": [
 "Hyatt Hotels Corporation",
 "HOTELS & MOTELS",
@@ -4444,6 +4588,12 @@ null,
 "SECURITY BROKERS, DEALERS & FLOTATION COMPANIES",
 899082273,
 "2026-10-24"
+],
+"HP": [
+"Helmerich & Payne, Inc.",
+"DRILLING OIL & GAS WELLS",
+99938945,
+"2026-11-03"
 ],
 "HPE": [
 "Hewlett Packard Enterprise Company",
@@ -4666,6 +4816,12 @@ null,
 "LABORATORY ANALYTICAL INSTRUMENTS",
 151000000,
 "2026-10-24"
+],
+"IMAX": [
+"Imax Corp",
+"PHOTOGRAPHIC EQUIPMENT & SUPPLIES",
+54842114,
+"2026-11-03"
 ],
 "IMO": [
 "Imperial Oil Limited",
@@ -4919,6 +5075,12 @@ null,
 3289961848,
 "2026-10-29"
 ],
+"JBTM": [
+"JBT Marel Corporation",
+"SPECIAL INDUSTRY MACHINERY (NO METALWORKING MACHINERY)",
+51876817,
+"2026-11-03"
+],
 "JCI": [
 "Johnson Controls International plc",
 "AIR-COND & WARM AIR HEATG EQUIP & COMM & INDL REFRIG EQUIP",
@@ -5081,6 +5243,12 @@ null,
 379160066,
 "2026-10-30"
 ],
+"KLIC": [
+"Kulicke & Soffa Industries Inc",
+"SEMICONDUCTORS & RELATED DEVICES",
+52329115,
+"2026-11-03"
+],
 "KMB": [
 "Kimberly-Clark Corp.",
 "CONVERTED PAPER & PAPERBOARD PRODS (NO CONTANERS/BOXES)",
@@ -5218,6 +5386,12 @@ null,
 "REAL ESTATE INVESTMENT TRUSTS",
 101549684,
 "2026-10-28"
+],
+"LAUR": [
+"Laureate Education, Inc. Common Stock",
+"SERVICES-EDUCATIONAL SERVICES",
+135745894,
+"2026-11-03"
 ],
 "LAZ": [
 "Lazard, Inc.",
@@ -5375,6 +5549,12 @@ null,
 65299875,
 "2026-10-28"
 ],
+"LOAR": [
+"Loar Holdings Inc.",
+"AIRCRAFT PARTS & AUXILIARY EQUIPMENT, NEC",
+93688471,
+"2026-11-03"
+],
 "LOGI": [
 "Logitech International SA",
 "COMPUTER PERIPHERAL EQUIPMENT, NEC",
@@ -5525,6 +5705,12 @@ null,
 283559375,
 "2026-10-29"
 ],
+"MAIR": [
+"Madison Air Solutions Corporation",
+"INDUSTRIAL & COMMERCIAL FANS & BLOWERS & AIR PURIFYING EQUIP",
+501722612,
+"2026-11-03"
+],
 "MAN": [
 "ManpowerGroup",
 "SERVICES-HELP SUPPLY SERVICES",
@@ -5578,6 +5764,12 @@ null,
 "SERVICES-BUSINESS SERVICES, NEC",
 320000000,
 "2026-10-30"
+],
+"MBLY": [
+"Mobileye Global Inc. Class A Common Stock",
+"SERVICES-PREPACKAGED SOFTWARE",
+850171859,
+"2026-11-03"
 ],
 "MC": [
 "MOELIS & COMPANY",
@@ -5698,6 +5890,12 @@ null,
 "CARPETS & RUGS",
 67738145,
 "2026-10-27"
+],
+"MHO": [
+"M/I Homes, Inc.",
+"OPERATIVE BUILDERS",
+25283031,
+"2026-11-03"
 ],
 "MI": [
 "NFT Limited",
@@ -5855,6 +6053,12 @@ null,
 1013858251,
 "2026-10-29"
 ],
+"MPT": [
+"Medical Properties Trust, Inc.",
+"REAL ESTATE INVESTMENT TRUSTS",
+597157000,
+"2026-11-03"
+],
 "MPWR": [
 "Monolithic Power Systems, Inc.",
 "SEMICONDUCTORS & RELATED DEVICES",
@@ -5890,6 +6094,12 @@ null,
 "SEMICONDUCTORS & RELATED DEVICES",
 898704613,
 "2026-10-24"
+],
+"MRX": [
+"Marex Group Limited Ordinary Shares",
+"",
+71930870,
+"2026-11-03"
 ],
 "MS": [
 "Morgan Stanley",
@@ -6179,6 +6389,12 @@ null,
 142064489,
 "2026-10-24"
 ],
+"NOG": [
+"Northern Oil and Gas, Inc.",
+"CRUDE PETROLEUM & NATURAL GAS",
+106549128,
+"2026-11-03"
+],
 "NOK": [
 "Nokia Corporation",
 "",
@@ -6347,6 +6563,12 @@ null,
 262555476,
 "2026-10-26"
 ],
+"NWE": [
+"NorthWestern Energy Group, Inc. Common Stock",
+"ELECTRIC & OTHER SERVICES COMBINED",
+61517850,
+"2026-11-03"
+],
 "NWG": [
 "NatWest Group plc American Depositary Shares, (each representing two (2) Ordinary Shares)",
 "",
@@ -6358,6 +6580,12 @@ null,
 "NEWSPAPERS: PUBLISHING OR PUBLISHING & PRINTING",
 538436332,
 "2026-10-28"
+],
+"NXE": [
+"NexGen Energy Ltd.",
+"",
+670506101,
+"2026-11-03"
 ],
 "NXPI": [
 "NXP Semiconductors N.V.",
@@ -6406,6 +6634,12 @@ null,
 "ELECTRIC SERVICES",
 206581287,
 "2026-10-28"
+],
+"OGS": [
+"ONE GAS, INC.",
+"NATURAL GAS DISTRIBUTION",
+62856270,
+"2026-11-03"
 ],
 "OHI": [
 "Omega Healthcare Investors Inc.",
@@ -6731,6 +6965,12 @@ null,
 111694079,
 "2026-11-03"
 ],
+"PECO": [
+"Phillips Edison & Company, Inc. Common Stock",
+"REAL ESTATE INVESTMENT TRUSTS",
+129000000,
+"2026-11-03"
+],
 "PEG": [
 "Public Service Enterprise Group Incorporated",
 "ELECTRIC & OTHER SERVICES COMBINED",
@@ -6808,6 +7048,12 @@ null,
 "ELECTRONIC COMPONENTS, NEC",
 30554413,
 "2026-10-29"
+],
+"PII": [
+"Polaris Inc.",
+"MISCELLANEOUS TRANSPORTATION EQUIPMENT",
+56925967,
+"2026-11-03"
 ],
 "PINS": [
 "Pinterest, Inc. Class A Common Stock",
@@ -7097,6 +7343,18 @@ null,
 348758065,
 "2026-10-26"
 ],
+"QTWO": [
+"Q2 Holdings Inc",
+"SERVICES-PREPACKAGED SOFTWARE",
+61781542,
+"2026-11-03"
+],
+"QUBT": [
+"Quantum Computing Inc. Common",
+"SERVICES-PREPACKAGED SOFTWARE",
+226346861,
+"2026-11-03"
+],
 "QXO": [
 "QXO, Inc.",
 "WHOLESALE-LUMBER & OTHER CONSTRUCTION MATERIALS",
@@ -7192,6 +7450,12 @@ null,
 "GUIDED MISSILES & SPACE VEHICLES & PARTS",
 249992609,
 "2026-10-28"
+],
+"REAL": [
+"The RealReal, Inc. Common Stock",
+"RETAIL-MISCELLANEOUS RETAIL",
+124713031,
+"2026-11-03"
 ],
 "REG": [
 "Regency Centers Corporation",
@@ -7577,6 +7841,12 @@ null,
 3516593233,
 "2026-10-28"
 ],
+"SBSW": [
+"Sibanye-Stillwater American Depositary Shares, each representing four ordinary shares",
+"",
+707641816,
+"2026-11-03"
+],
 "SBUX": [
 "Starbucks Corp",
 "RETAIL-EATING & DRINKING PLACES",
@@ -7655,6 +7925,12 @@ null,
 93247625,
 "2026-10-27"
 ],
+"SG": [
+"Sweetgreen, Inc.",
+"RETAIL-EATING PLACES",
+119041315,
+"2026-11-03"
+],
 "SGI": [
 "Somnigroup International Inc.",
 "HOUSEHOLD FURNITURE",
@@ -7684,6 +7960,12 @@ null,
 "",
 2842204226,
 "2026-10-24"
+],
+"SHOO": [
+"Steven Madden Ltd",
+"FOOTWEAR, (NO RUBBER)",
+73177095,
+"2026-11-03"
 ],
 "SHOP": [
 "Shopify Inc. Class A subordinate voting shares",
@@ -7745,6 +8027,12 @@ null,
 7288665960,
 "2026-10-24"
 ],
+"SKY": [
+"Champion Homes, Inc.",
+"MOBILE HOMES",
+54280134,
+"2026-11-03"
+],
 "SKYD": [
 "Skydance Corporation",
 "TELEVISION BROADCASTING STATIONS",
@@ -7767,6 +8055,12 @@ null,
 "SL Green Realty Corp.",
 "REAL ESTATE INVESTMENT TRUSTS",
 70944985,
+"2026-11-03"
+],
+"SLGN": [
+"Silgan Holdings Inc",
+"METAL CANS",
+105682020,
 "2026-11-03"
 ],
 "SLM": [
@@ -7949,6 +8243,12 @@ null,
 205584205,
 "2026-10-24"
 ],
+"SPSC": [
+"SPS Commerce, Inc.",
+"SERVICES-PREPACKAGED SOFTWARE",
+35440926,
+"2026-11-03"
+],
 "SPXC": [
 "SPX Technologies, Inc.",
 "METALWORKG MACHINERY & EQUIPMENT",
@@ -8099,6 +8399,12 @@ null,
 409764897,
 "2026-10-25"
 ],
+"SUPN": [
+"Supernus Pharmaceuticals, Inc.",
+"PHARMACEUTICAL PREPARATIONS",
+58235716,
+"2026-11-03"
+],
 "SW": [
 "Smurfit Westrock plc",
 "PAPERBOARD CONTAINERS & BOXES",
@@ -8243,6 +8549,12 @@ null,
 115116000,
 "2026-10-29"
 ],
+"TDW": [
+"Tidewater, Inc.",
+"WATER TRANSPORTATION",
+49756231,
+"2026-11-03"
+],
 "TDY": [
 "Teledyne Technologies Incorporated",
 "SEARCH, DETECTION, NAVIGATION, GUIDANCE, AERONAUTICAL SYS",
@@ -8314,6 +8626,12 @@ null,
 "NATIONAL COMMERCIAL BANKS",
 1221626188,
 "2026-10-24"
+],
+"TFII": [
+"TFI International Inc.",
+"",
+82193031,
+"2026-11-03"
 ],
 "TFX": [
 "Teleflex Incorporated",
@@ -8735,6 +9053,12 @@ null,
 42757471,
 "2026-10-25"
 ],
+"UMAC": [
+"Unusual Machines, Inc.",
+"RADIO & TV BROADCASTING & COMMUNICATIONS EQUIPMENT",
+49956505,
+"2026-11-03"
+],
 "UMBF": [
 "UMB Financial Corp",
 "NATIONAL COMMERCIAL BANKS",
@@ -8842,6 +9166,12 @@ null,
 "",
 4255762795,
 "2026-10-24"
+],
+"VC": [
+"VISTEON CORPORATION",
+"MOTOR VEHICLE PARTS & ACCESSORIES",
+24707936,
+"2026-11-03"
 ],
 "VCTR": [
 "Victory Capital Holdings, Inc. Class A Common Stock",
@@ -8956,6 +9286,12 @@ null,
 "REAL ESTATE INVESTMENT TRUSTS",
 773779120,
 "2026-10-25"
+],
+"VNO": [
+"Vornado Realty Trust",
+"REAL ESTATE INVESTMENT TRUSTS",
+186720531,
+"2026-11-03"
 ],
 "VNOM": [
 "Viper Energy, Inc. Class A Common Stock",
@@ -9143,6 +9479,12 @@ null,
 720572011,
 "2026-10-24"
 ],
+"WEN": [
+"The Wendy's Company",
+"RETAIL-EATING & DRINKING PLACES",
+190669930,
+"2026-11-03"
+],
 "WES": [
 "Western Midstream Partners, LP",
 "NATURAL GAS TRANSMISSION",
@@ -9305,6 +9647,12 @@ null,
 67465967,
 "2026-10-28"
 ],
+"WTM": [
+"White Mountains Insurance Group Ltd.",
+"FIRE, MARINE & CASUALTY INSURANCE",
+2386721,
+"2026-11-03"
+],
 "WTRG": [
 "Essential Utilities, Inc.",
 "WATER SUPPLY",
@@ -9322,6 +9670,12 @@ null,
 "INSURANCE AGENTS, BROKERS & SERVICE",
 92871937,
 "2026-10-27"
+],
+"WU": [
+"The Western Union Company",
+"SERVICES-BUSINESS SERVICES, NEC",
+311878981,
+"2026-11-03"
 ],
 "WULF": [
 "TeraWulf Inc. Common Stock",
@@ -9370,6 +9724,12 @@ null,
 "SERVICES-BUSINESS SERVICES, NEC",
 57323573,
 "2026-10-29"
+],
+"XNCR": [
+"Xencor, Inc.",
+"PHARMACEUTICAL PREPARATIONS",
+74353397,
+"2026-11-03"
 ],
 "XOM": [
 "ExxonMobil Holdings Corporation",
