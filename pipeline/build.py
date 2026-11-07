@@ -27,7 +27,7 @@ DATA = ROOT / "docs" / "data"
 CONFIG = json.loads((ROOT / "pipeline" / "config.json").read_text(encoding="utf-8"))
 INDEXES = ["QQQ", "SPY", "IWM", "SMH", "IGV"]
 FIELDS = ["Open", "High", "Low", "Close", "Volume"]
-APP_VERSION = "2026.11.08-a"  # phải trùng với APP_VERSION trong docs/app.js
+APP_VERSION = "2026.11.08-b"  # phải trùng với APP_VERSION trong docs/app.js
 
 
 # ---------------------------------------------------------------- tải dữ liệu
@@ -1257,7 +1257,7 @@ def main():
         tick = [t for t in raw if t not in INDEXES]
         Cf = pd.DataFrame({t: raw[t]["Close"] for t in tick})
         Vf = pd.DataFrame({t: raw[t]["Volume"] for t in tick}).reindex_like(Cf)
-        out["q25long"] = longq25.compute(tick, fallback=(Cf, Vf), demo=a.demo)
+        out["q25long"] = longq25.compute(tick, fallback=(Cf, Vf, raw["QQQ"]["Close"]), demo=a.demo)
     except Exception as e:
         print("Lịch sử dài q25 lỗi:", e, file=sys.stderr)
         out["q25long"] = {}
