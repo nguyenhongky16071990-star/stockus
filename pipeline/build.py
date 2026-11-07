@@ -27,7 +27,7 @@ DATA = ROOT / "docs" / "data"
 CONFIG = json.loads((ROOT / "pipeline" / "config.json").read_text(encoding="utf-8"))
 INDEXES = ["QQQ", "SPY", "IWM", "SMH", "IGV"]
 FIELDS = ["Open", "High", "Low", "Close", "Volume"]
-APP_VERSION = "2026.10.29-b"  # phải trùng với APP_VERSION trong docs/app.js
+APP_VERSION = "2026.11.08-a"  # phải trùng với APP_VERSION trong docs/app.js
 
 
 # ---------------------------------------------------------------- tải dữ liệu
@@ -1127,8 +1127,8 @@ def _jd(o):
 
 def write(out: dict) -> None:
     DATA.mkdir(parents=True, exist_ok=True)
-    for k in ("latest", "history", "stocks", "setups", "extended", "themes", "basket", "charts", "industries", "patterns", "backtest", "cycle", "flow", "lab", "groups", "exits", "smi", "paper"):
-        (DATA / f"{k}.json").write_text(json.dumps(out[k], ensure_ascii=False, separators=(",", ":"), default=_jd), encoding="utf-8")
+    for k in ("latest", "history", "stocks", "setups", "extended", "themes", "basket", "charts", "industries", "patterns", "backtest", "cycle", "flow", "lab", "groups", "exits", "smi", "paper", "q25long"):
+        (DATA / f"{k}.json").write_text(json.dumps(out.get(k, {}), ensure_ascii=False, separators=(",", ":"), default=_jd), encoding="utf-8")
     # lưu lại ảnh chụp setup + tổng quan mỗi ngày để thống kê về sau
     snap = DATA / "archive"
     snap.mkdir(exist_ok=True)
@@ -1251,6 +1251,16 @@ def main():
                                 "avl": [None] * len(tail), "avg": [None] * len(tail)}
     except Exception as e:
         print("Biểu đồ danh mục mô phỏng lỗi:", e, file=sys.stderr)
+    # lịch sử dài của "mã tăng / giảm ≥ 25% trong một quý" (từ 2020)
+    try:
+        import longq25
+        tick = [t for t in raw if t not in INDEXES]
+        Cf = pd.DataFrame({t: raw[t]["Close"] for t in tick})
+        Vf = pd.DataFrame({t: raw[t]["Volume"] for t in tick}).reindex_like(Cf)
+        out["q25long"] = longq25.compute(tick, fallback=(Cf, Vf), demo=a.demo)
+    except Exception as e:
+        print("Lịch sử dài q25 lỗi:", e, file=sys.stderr)
+        out["q25long"] = {}
     write(out)
     L = out["latest"]
     print(f"{L['asof']}: điểm {L['score']} ({L['stance']}), cảnh báo {L['alert']}, dẫn đầu {L['leaders']}, setup đạt chuẩn {L['n_setups']}")
