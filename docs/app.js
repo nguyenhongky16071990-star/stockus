@@ -4,7 +4,7 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const LW = window.LightweightCharts;
-  const APP_VERSION = '2026.10.29-b'; // phải trùng với APP_VERSION trong pipeline/build.py
+  const APP_VERSION = '2026.11.08-a'; // phải trùng với APP_VERSION trong pipeline/build.py
   const S = { exits: null, groups: null, flow: null, lab: null, cond: null, paper: null, cycle: null, backtest: null, latest: null, history: [], stocks: [], setups: [], extended: [], themes: [], basket: [], industries: [], patterns: null, charts: null };
   const ranges = {};          // khoảng thời gian của từng biểu đồ
   const built = new Set();    // tab đã vẽ
@@ -236,7 +236,16 @@
       band.setData(rows.filter((r) => r.flow_gold).map((r) => ({ time: r.d, value: 1, color: css(GDC[r.flow_gold] || '--muted') })));
       c.priceScale('band').applyOptions({ scaleMargins: { top: 0.9, bottom: 0 }, visible: false });
     },
-    q25f(c, rows) { CHARTS.q25(c, rows); },
+    q25f(c, rows) {
+      const LQ = (S.q25long || {}).rows || [];
+      if (ranges.q25f !== -1 || !LQ.length) { CHARTS.q25(c, rows); return; }
+      // Từ 2020: phần trước khi trang có dữ liệu lấy từ lịch sử dài (nét đứt), phần sau là dữ liệu của trang (nét liền)
+      const first = (S.history.find((r) => isNum(r.q_up25)) || {}).d || '9999';
+      const old = LQ.filter((r) => r[0] < first);
+      c.addLineSeries({ color: css('--good'), lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, title: 'Tăng ≥25% (lịch sử dài)' }).setData(old.map((r) => ({ time: r[0], value: r[1] })));
+      c.addLineSeries({ color: css('--bad'), lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, title: 'Giảm ≥25% (lịch sử dài)' }).setData(old.map((r) => ({ time: r[0], value: r[2] })));
+      CHARTS.q25(c, S.history);
+    },
     flow(c, rows) {
       [['flow_breadth', '--c1', 'Độ rộng'], ['flow_accum', '--c2', 'Tích lũy'], ['flow_lead', '--c3', 'Dẫn dắt'], ['flow_ft', '--c5', 'Follow-through']].forEach(([k, col, t]) =>
         c.addLineSeries({ color: css(col), lineWidth: 2, priceLineVisible: false, title: t }).setData(ser(rows, k)));
@@ -313,7 +322,7 @@
     if (!box || box.closest('.tab').hidden) return;
     if (live[key]) { live[key].remove(); delete live[key]; }
     const days = ranges[key] ?? 126;
-    const rows = days ? S.history.slice(-days) : S.history;
+    const rows = days > 0 ? S.history.slice(-days) : S.history;
     const c = baseChart(box);
     CHARTS[key](c, rows);
     c.timeScale().fitContent();
@@ -323,7 +332,7 @@
     $$('.range').forEach((r) => {
       const key = r.dataset.chart;
       ranges[key] = ranges[key] ?? 126;
-      r.replaceChildren(...[[63, '3T'], [126, '6T'], [252, '1N'], [0, 'Tất cả']].map(([d, t]) =>
+      r.replaceChildren(...[[63, '3T'], [126, '6T'], [252, '1N'], [0, 'Tất cả']].concat(key === 'q25f' && ((S.q25long || {}).rows || []).length ? [[-1, 'Từ 2020']] : []).map(([d, t]) =>
         el('button', { type: 'button', 'aria-pressed': String(ranges[key] === d), text: t, onclick: (ev) => {
           ranges[key] = d; $$('button', r).forEach((b) => b.setAttribute('aria-pressed', String(b === ev.currentTarget))); drawHistChart(key);
         } })));
@@ -839,6 +848,7 @@
         ], G.windows || [], { sort: 'from', empty: 'Chưa có cửa sổ vàng nào trong dữ liệu.' });
         const q = G.q25 || {};
         $('#gd-q25').textContent = isNum(q.up) ? `Hôm nay: ${n0(q.up)} mã tăng ≥25% / ${n0(q.dn)} mã giảm ≥25% trong một quý (chênh lệch ${spct(q.net)} số mã, 10 phiên trước ${spct(q.net10)}). ${q.net <= 10 && q.net > q.net10 ? 'Chênh lệch còn thấp và đang cải thiện: pha đầu, đã kiểm chứng là thuận lợi nhất.' : q.net > 10 && q.net > q.net10 ? 'Bên tăng đã áp đảo và còn tăng thêm: thị trường đã nóng, giữ lệnh, đừng mua đuổi.' : q.up > q.dn ? 'Bên tăng còn nhiều hơn nhưng đang yếu đi.' : 'Bên giảm nhiều hơn và chưa cải thiện: chờ.'}` : '';
+        { const LQ = S.q25long || {}; if ((LQ.rows || []).length) $('#q25-long-note').textContent = `Nút "Từ 2020": phần nét đứt là lịch sử dài tính từ ${LQ.src} (${n0(LQ.n_tickers)} mã), từ ${fdate(LQ.rows[0][0])}; phần nét liền là dữ liệu của trang. ${LQ.note || ''}`; }
         drawHistChart('gold'); drawHistChart('q25f'); drawSmi();
       }
       table($('#tb-fl-val'), [
@@ -1920,7 +1930,7 @@
       S.latest = await (await fetch(`data/latest.json?t=${Date.now()}`, { cache: 'no-store' })).json();
       ver = S.latest.generated || String(Date.now());
       [S.history, S.stocks, S.setups, S.extended, S.themes, S.basket] = await Promise.all(['history', 'stocks', 'setups', 'extended', 'themes', 'basket'].map(get));
-      [S.industries, S.patterns, S.backtest, S.cycle, S.paper, S.flow, S.lab, S.groups, S.exits, S.smi] = await Promise.all(['industries', 'patterns', 'backtest', 'cycle', 'paper', 'flow', 'lab', 'groups', 'exits', 'smi'].map((k) => get(k).catch(() => null)));
+      [S.industries, S.patterns, S.backtest, S.cycle, S.paper, S.flow, S.lab, S.groups, S.exits, S.smi, S.q25long] = await Promise.all(['industries', 'patterns', 'backtest', 'cycle', 'paper', 'flow', 'lab', 'groups', 'exits', 'smi', 'q25long'].map((k) => get(k).catch(() => null)));
       S.paper = S.paper || { accounts: {} };
       S.cycle = S.cycle || { notes: [] };
       S.backtest = S.backtest || { strategies: {}, vsa_types: [], notes: [] };
