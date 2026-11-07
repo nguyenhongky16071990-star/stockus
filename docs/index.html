@@ -157,6 +157,13 @@
       <article class="card"><h3>Stockbee: mã tăng/giảm ≥ 4% kèm khối lượng</h3><p class="note">Xanh: số mã tăng ≥ 4%. Đỏ: số mã giảm ≥ 4%. Đường: tỷ lệ 10 ngày (trên 1 là bên mua mạnh hơn).</p><p class="note" id="sbn-note"></p><div class="range" data-chart="sb"></div><div class="chart" id="ch-sb"></div></article>
       <article class="card"><h3>% cổ phiếu trên các đường trung bình</h3><p class="note">SMA 40 dưới 20% thường là vùng quá bán gần đáy; trên 70% là hưng phấn.</p><div class="range" data-chart="pct"></div><div class="chart" id="ch-pct"></div></article>
       <article class="card"><h3>Đỉnh mới và đáy mới 52 tuần</h3><p class="note">Xanh: số mã lập đỉnh 52 tuần. Đỏ: số mã lập đáy 52 tuần.</p><div class="range" data-chart="nhnl"></div><div class="chart" id="ch-nhnl"></div></article>
+      <article class="card full" id="lb-card" hidden><h3>Độ rộng dài hạn (từ 2020): các chỉ báo kiểu Stockbee</h3>
+        <p class="note">Chọn một chỉ báo để xem cùng QQQ (đường đen, trục trái). Bảng bên dưới tự kiểm chứng TẤT CẢ chỉ báo trên toàn bộ lịch sử: mức chỉ báo hôm nay liên quan thế nào tới QQQ 1 tháng và 3 tháng sau. Chỉ báo nào không có giá trị dự báo sẽ ghi rõ để bỏ.</p>
+        <div class="tools"><select id="lb-sel" aria-label="Chọn chỉ báo"></select><div class="range" id="lb-range"></div></div>
+        <p class="note" id="lb-guide"></p>
+        <div class="chart tall-ch" id="ch-lbr"></div>
+        <div class="tbl"><table id="tb-lbv"></table></div>
+        <p class="note" id="lb-src"></p></article>
       <article class="card full"><h3>Số mã đà mạnh: thống kê có dự báo được gì?</h3>
         <p class="note">Cột: số mã có đà tăng mạnh mỗi ngày, tô màu theo khoảng cách tới đỉnh 60 phiên của chính nó (xanh: gần đỉnh, cam: thấp hơn 10–30%, đỏ: thấp hơn trên 30%). Đường (trục trái): QQQ. Bảng bên dưới tự tính từ dữ liệu lịch sử của trang: sau mỗi trạng thái, QQQ và nhóm top 100 diễn biến thế nào trong 1 tháng.</p>
         <div class="range" data-chart="leadx"></div><div class="chart" id="ch-leadx"></div>

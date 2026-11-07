@@ -4,7 +4,7 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const LW = window.LightweightCharts;
-  const APP_VERSION = '2026.11.08-a'; // phải trùng với APP_VERSION trong pipeline/build.py
+  const APP_VERSION = '2026.11.08-b'; // phải trùng với APP_VERSION trong pipeline/build.py
   const S = { exits: null, groups: null, flow: null, lab: null, cond: null, paper: null, cycle: null, backtest: null, latest: null, history: [], stocks: [], setups: [], extended: [], themes: [], basket: [], industries: [], patterns: null, charts: null };
   const ranges = {};          // khoảng thời gian của từng biểu đồ
   const built = new Set();    // tab đã vẽ
@@ -242,8 +242,8 @@
       // Từ 2020: phần trước khi trang có dữ liệu lấy từ lịch sử dài (nét đứt), phần sau là dữ liệu của trang (nét liền)
       const first = (S.history.find((r) => isNum(r.q_up25)) || {}).d || '9999';
       const old = LQ.filter((r) => r[0] < first);
-      c.addLineSeries({ color: css('--good'), lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, title: 'Tăng ≥25% (lịch sử dài)' }).setData(old.map((r) => ({ time: r[0], value: r[1] })));
-      c.addLineSeries({ color: css('--bad'), lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, title: 'Giảm ≥25% (lịch sử dài)' }).setData(old.map((r) => ({ time: r[0], value: r[2] })));
+      c.addLineSeries({ color: css('--good'), lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, title: 'Tăng ≥25% (lịch sử dài)' }).setData(old.map((r) => ({ time: r[0], value: r[2] })));
+      c.addLineSeries({ color: css('--bad'), lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, title: 'Giảm ≥25% (lịch sử dài)' }).setData(old.map((r) => ({ time: r[0], value: r[3] })));
       CHARTS.q25(c, S.history);
     },
     flow(c, rows) {
@@ -315,6 +315,79 @@
       { k: 'mdd13', label: 'Giảm thêm', f: (r) => spct(r.mdd13) },
     ], (M.signals || []).slice().reverse().slice(0, 15), { sort: null });
     $('#smi-src').textContent = `Nguồn: ${M.src}, giá tuần ${fdate(M.from)} – ${fdate(M.to)}. Mẫu nhỏ (vài chục tín hiệu) nên chỉ để tham khảo; các tín hiệu trong cùng một đợt giảm không độc lập với nhau.`;
+  }
+
+  // ---- độ rộng dài hạn (từ 2020): chỉ báo kiểu Stockbee + tự kiểm chứng
+  const LBI = [
+    { id: 'm13', name: 'Tăng / giảm ≥ 13% trong 34 phiên', up: 'up13', dn: 'dn13', lvl: (r) => (r.up13 - r.dn13) / r.n * 100,
+      guide: 'Chỉ báo động lượng trung hạn chính của Stockbee, nhanh hơn bản 25%/quý. Xanh vượt đỏ và tách xa là động lượng lan rộng; đỏ đạt đỉnh rồi quay xuống thường là cuối nhịp giảm.' },
+    { id: 'm25m', name: 'Tăng / giảm ≥ 25% trong 1 tháng', up: 'up25m', dn: 'dn25m', lvl: (r) => (r.up25m - r.dn25m) / r.n * 100,
+      guide: 'Đỏ vọt lên là bán tháo cực điểm (thường gần đáy). Xanh vọt lên sau một đợt đỏ là lực mua mạnh của đầu nhịp tăng.' },
+    { id: 'm50', name: 'Tăng ≥ 50% trong 1 tháng (đầu cơ)', one: 'up50m', lvl: (r) => r.up50m / r.n * 100,
+      guide: 'Số mã tăng gấp rưỡi trong 1 tháng: đo mức đầu cơ. Rất cao là thị trường hưng phấn, dễ gần đỉnh ngắn hạn.' },
+    { id: 't2108', name: '% mã trên MA 40 ngày (T2108)', one: 't2108', lvl: (r) => r.t2108, bands: [20, 70],
+      guide: 'Dưới 20% là quá bán toàn thị trường (thường gần đáy); trên 70% là hưng phấn. Stockbee dùng ngưỡng 20% để tìm vùng mua.' },
+    { id: 'nhnl', name: 'Đỉnh mới − đáy mới 52 tuần (cộng dồn)', cum: (r) => r.nh - r.nl, lvl20: (R, i) => R.slice(Math.max(0, i - 19), i + 1).reduce((s, r) => s + r.nh - r.nl, 0) / R[i].n * 100,
+      guide: 'Cộng dồn mỗi ngày số mã lập đỉnh 52 tuần trừ số mã lập đáy. Chỉ số lập đỉnh mới mà đường này đi xuống là phân kỳ: ít mã còn khỏe.' },
+    { id: 'ad', name: 'Đường tăng / giảm (A/D, cộng dồn)', cum: (r) => r.adv - r.dec, lvl20: (R, i) => R.slice(Math.max(0, i - 19), i + 1).reduce((s, r) => s + r.adv - r.dec, 0) / R[i].n * 100,
+      guide: 'Cộng dồn số mã tăng trừ số mã giảm mỗi phiên. Đường này đi cùng QQQ là xu hướng khỏe; QQQ tăng mà A/D đi xuống là độ rộng yếu dần.' },
+    { id: 'm25q', name: 'Tăng / giảm ≥ 25% trong 1 quý (để so sánh)', up: 'up25q', dn: 'dn25q', lvl: (r) => (r.up25q - r.dn25q) / r.n * 100,
+      guide: 'Chỉ báo đang dùng ở tab Dòng tiền, đặt đây để so với các chỉ báo khác trên cùng giai đoạn dài.' },
+  ];
+  let lbRange = 0;
+  function longRows() { const L = S.q25long || {}; const C = L.cols || []; return (L.rows || []).map((r) => Object.fromEntries(C.map((k, i) => [k, r[i]]))); }
+  function lbValidate(R) {
+    const rank = (a) => { const ix = a.map((v, i) => [v, i]).sort((x, y) => x[0] - y[0]); const r = new Array(a.length); ix.forEach(([, i], k) => (r[i] = k)); return r; };
+    const ic = (x, y) => { const p = x.map((v, i) => [v, y[i]]).filter(([a, b]) => isNum(a) && isNum(b)); if (p.length < 120) return null; const rx = rank(p.map((z) => z[0])), ry = rank(p.map((z) => z[1])); const m = (rx.length - 1) / 2; let c = 0, vx = 0, vy = 0; rx.forEach((a, i) => { c += (a - m) * (ry[i] - m); vx += (a - m) ** 2; vy += (ry[i] - m) ** 2; }); return c / Math.sqrt(vx * vy); };
+    const n = R.length, q = R.map((r) => r.qqq);
+    const f = (k) => R.map((_, i) => (i + k < n && isNum(q[i]) && isNum(q[i + k]) ? (q[i + k] / q[i] - 1) * 100 : null));
+    const F21 = f(21), F63 = f(63);
+    return LBI.map((I) => {
+      const x = R.map((r, i) => { try { const v = I.lvl20 ? I.lvl20(R, i) : I.lvl(r); return isFinite(v) ? v : null; } catch (e) { return null; } });
+      const a = ic(x, F21), b = ic(x, F63);
+      const pts = x.map((v, i) => [v, F63[i]]).filter(([u, w]) => isNum(u) && isNum(w)).sort((u, w) => u[0] - w[0]);
+      const k = Math.floor(pts.length / 5), avg = (s) => (s.length ? s.reduce((t, z) => t + z[1], 0) / s.length : null), win = (s) => (s.length ? s.filter((z) => z[1] > 0).length / s.length * 100 : null);
+      const lo = pts.slice(0, k), hi = pts.slice(-k);
+      const best = Math.max(Math.abs(a ?? 0), Math.abs(b ?? 0));
+      const strong = (v) => isNum(v) && Math.abs(v) >= 0.15;
+      const use = !isNum(a) ? 'Chưa đủ dữ liệu' : best < 0.15 ? 'Không có giá trị dự báo — nên bỏ' : (strong(a) && strong(b) && Math.sign(a) !== Math.sign(b)) ? 'Mâu thuẫn giữa 1 và 3 tháng — chưa tin được' : ((strong(b) ? b : a) < 0 ? 'Nhiệt kế ngược: thấp = vùng mua, cao = thị trường đã nóng' : 'Theo xu hướng: cao = tiếp tục tốt');
+      return { name: I.name, a, b, lo: avg(lo), low: win(lo), hi: avg(hi), hiw: win(hi), use };
+    });
+  }
+  function drawLong() {
+    const R = longRows(); if (R.length < 200) return;
+    $('#lb-card').hidden = false;
+    const sel = $('#lb-sel');
+    if (!sel.options.length) { sel.append(...LBI.map((I) => el('option', { value: I.id, text: I.name }))); sel.addEventListener('input', drawLong);
+      $('#lb-range').replaceChildren(...[[252, '1N'], [756, '3N'], [0, 'Tất cả']].map(([d, t]) => el('button', { type: 'button', 'aria-pressed': String(lbRange === d), text: t, onclick: (ev) => { lbRange = d; $$('#lb-range button').forEach((b) => b.setAttribute('aria-pressed', String(b === ev.currentTarget))); drawLong(); } })));
+      const V = lbValidate(R), f2 = (v) => (isNum(v) ? (v > 0 ? '+' : '') + n2(v) : '—');
+      table($('#tb-lbv'), [
+        { k: 'name', label: 'Chỉ báo', l: true },
+        { k: 'a', label: 'Tương quan với QQQ 1 tháng sau', f: (r) => f2(r.a), c: (r) => (!isNum(r.a) || Math.abs(r.a) < 0.15 ? 'muted' : r.a > 0 ? 'up' : 'dn') },
+        { k: 'b', label: '3 tháng sau', f: (r) => f2(r.b), c: (r) => (!isNum(r.b) || Math.abs(r.b) < 0.15 ? 'muted' : r.b > 0 ? 'up' : 'dn') },
+        { k: 'lo', label: 'QQQ 3 tháng sau khi chỉ báo THẤP NHẤT (20%)', f: (r) => (isNum(r.lo) ? `${spct(r.lo)} · thắng ${n0(r.low)}%` : '—'), c: (r) => cls(r.lo) },
+        { k: 'hi', label: 'Khi CAO NHẤT (20%)', f: (r) => (isNum(r.hi) ? `${spct(r.hi)} · thắng ${n0(r.hiw)}%` : '—'), c: (r) => cls(r.hi) },
+        { k: 'use', label: 'Kết luận', l: true, c: (r) => (r.use.startsWith('Không') ? 'dn' : '') },
+      ], V, { sort: null });
+    }
+    const I = LBI.find((x) => x.id === sel.value) || LBI[0];
+    $('#lb-guide').textContent = I.guide;
+    if (live.lbr) { live.lbr.remove(); delete live.lbr; }
+    const rows = lbRange ? R.slice(-lbRange) : R;
+    const c = baseChart($('#ch-lbr'));
+    c.addLineSeries({ color: css('--ink'), lineWidth: 1, priceScaleId: 'left', priceLineVisible: false, title: 'QQQ' }).setData(rows.filter((r) => isNum(r.qqq)).map((r) => ({ time: r.d, value: r.qqq })));
+    if (I.up) {
+      c.addLineSeries({ color: css('--good'), lineWidth: 2, priceLineVisible: false, title: 'Tăng' }).setData(rows.map((r) => ({ time: r.d, value: r[I.up] })));
+      c.addLineSeries({ color: css('--bad'), lineWidth: 2, priceLineVisible: false, title: 'Giảm' }).setData(rows.map((r) => ({ time: r.d, value: r[I.dn] })));
+    } else if (I.one) {
+      const s = c.addLineSeries({ color: css('--c1'), lineWidth: 2, priceLineVisible: false, title: I.name.split(' (')[0] }); s.setData(rows.filter((r) => isNum(r[I.one])).map((r) => ({ time: r.d, value: r[I.one] })));
+      (I.bands || []).forEach((b, k) => s.createPriceLine({ price: b, color: css(k ? '--bad' : '--good'), lineStyle: 2, lineWidth: 1, title: k ? 'Hưng phấn' : 'Quá bán' }));
+    } else {
+      let cum = 0; c.addLineSeries({ color: css('--c1'), lineWidth: 2, priceLineVisible: false, title: 'Cộng dồn' }).setData(rows.map((r) => ({ time: r.d, value: (cum += I.cum(r)) })));
+    }
+    c.applyOptions({ leftPriceScale: { visible: true } }); c.timeScale().fitContent(); live.lbr = c;
+    const L = S.q25long;
+    $('#lb-src').textContent = (L.split ? `Trước ${fdate(L.split)}: tính từ ${L.src} (${n0(L.n_tickers)} mã). Từ ${fdate(L.split)}: dữ liệu của trang. ` : `Nguồn: ${L.src}. `) + (L.note || '') + ' Các phiên liền nhau chồng lên nhau nên số lần độc lập ít hơn nhiều so với số phiên; chỉ coi là tham khảo.';
   }
 
   function drawHistChart(key) {
@@ -538,7 +611,7 @@
       tile(T, 'Mã trên SMA 40', pct(L.pct_s40, 0), L.pct_s40 < 20 ? 'quá bán' : L.pct_s40 > 70 ? 'hưng phấn' : '', L.pct_s40 < 20 ? 'up' : L.pct_s40 > 70 ? 'wa' : '');
       tile(T, 'Mã trên SMA 200', pct(L.pct_s200, 0), 'xu hướng dài hạn');
       tile(T, 'Tăng / giảm ≥ 25% trong quý', `${L.q_up25} / ${L.q_dn25}`, '');
-      ['sb', 'pct', 'nhnl', 'leadx'].forEach(drawHistChart);
+      ['sb', 'pct', 'nhnl', 'leadx'].forEach(drawHistChart); drawLong();
     },
     leaders() {
       const G = S.groups || { rows: [] }, GR = G.rows || [];
