@@ -4,7 +4,7 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const LW = window.LightweightCharts;
-  const APP_VERSION = '2026.11.08-b'; // phải trùng với APP_VERSION trong pipeline/build.py
+  const APP_VERSION = '2026.11.09-a'; // phải trùng với APP_VERSION trong pipeline/build.py
   const S = { exits: null, groups: null, flow: null, lab: null, cond: null, paper: null, cycle: null, backtest: null, latest: null, history: [], stocks: [], setups: [], extended: [], themes: [], basket: [], industries: [], patterns: null, charts: null };
   const ranges = {};          // khoảng thời gian của từng biểu đồ
   const built = new Set();    // tab đã vẽ
@@ -319,40 +319,41 @@
 
   // ---- độ rộng dài hạn (từ 2020): chỉ báo kiểu Stockbee + tự kiểm chứng
   const LBI = [
-    { id: 'm13', name: 'Tăng / giảm ≥ 13% trong 34 phiên', up: 'up13', dn: 'dn13', lvl: (r) => (r.up13 - r.dn13) / r.n * 100,
-      guide: 'Chỉ báo động lượng trung hạn chính của Stockbee, nhanh hơn bản 25%/quý. Xanh vượt đỏ và tách xa là động lượng lan rộng; đỏ đạt đỉnh rồi quay xuống thường là cuối nhịp giảm.' },
-    { id: 'm25m', name: 'Tăng / giảm ≥ 25% trong 1 tháng', up: 'up25m', dn: 'dn25m', lvl: (r) => (r.up25m - r.dn25m) / r.n * 100,
-      guide: 'Đỏ vọt lên là bán tháo cực điểm (thường gần đáy). Xanh vọt lên sau một đợt đỏ là lực mua mạnh của đầu nhịp tăng.' },
     { id: 'm50', name: 'Tăng ≥ 50% trong 1 tháng (đầu cơ)', one: 'up50m', lvl: (r) => r.up50m / r.n * 100,
-      guide: 'Số mã tăng gấp rưỡi trong 1 tháng: đo mức đầu cơ. Rất cao là thị trường hưng phấn, dễ gần đỉnh ngắn hạn.' },
+      guide: 'Số mã tăng gấp rưỡi trong 1 tháng. Kiểm chứng thật 2020–2026: khi vượt 3% số mã (thường ngay sau một đáy lớn: 4/2020, 11/2020, 5/2025, 4/2026) QQQ 3 tháng sau tăng trung bình +7,5%, 9/10 lần tăng. Đây là tín hiệu BÙNG NỔ đầu nhịp tăng, không phải tín hiệu đỉnh.' },
     { id: 't2108', name: '% mã trên MA 40 ngày (T2108)', one: 't2108', lvl: (r) => r.t2108, bands: [20, 70],
-      guide: 'Dưới 20% là quá bán toàn thị trường (thường gần đáy); trên 70% là hưng phấn. Stockbee dùng ngưỡng 20% để tìm vùng mua.' },
-    { id: 'nhnl', name: 'Đỉnh mới − đáy mới 52 tuần (cộng dồn)', cum: (r) => r.nh - r.nl, lvl20: (R, i) => R.slice(Math.max(0, i - 19), i + 1).reduce((s, r) => s + r.nh - r.nl, 0) / R[i].n * 100,
-      guide: 'Cộng dồn mỗi ngày số mã lập đỉnh 52 tuần trừ số mã lập đáy. Chỉ số lập đỉnh mới mà đường này đi xuống là phân kỳ: ít mã còn khỏe.' },
-    { id: 'ad', name: 'Đường tăng / giảm (A/D, cộng dồn)', cum: (r) => r.adv - r.dec, lvl20: (R, i) => R.slice(Math.max(0, i - 19), i + 1).reduce((s, r) => s + r.adv - r.dec, 0) / R[i].n * 100,
-      guide: 'Cộng dồn số mã tăng trừ số mã giảm mỗi phiên. Đường này đi cùng QQQ là xu hướng khỏe; QQQ tăng mà A/D đi xuống là độ rộng yếu dần.' },
+      guide: '% cổ phiếu trên MA 40 ngày. Kiểm chứng thật 2020–2026: xuống dưới 20% hoặc cắt lên lại trên 20% thì QQQ 3 tháng sau trung bình +9,5% (so với +5,4% nếu mua bất kỳ lúc nào), nhưng chỉ 2/3 số lần thắng và có thể giảm thêm ~7% trước khi hồi: vùng bắt đáy, cần stop. Trên 70% không có ý nghĩa (như bình thường).' },
+    { id: 'adp', name: 'Tăng − giảm mỗi phiên (% số mã, TB 10 phiên)', ser: (R) => { const v = R.map((r) => (r.adv - r.dec) / r.n * 100); return v.map((_, i) => (i < 9 ? null : v.slice(i - 9, i + 1).reduce((s, x) => s + x, 0) / 10)); }, bands: [-20, 20],
+      guide: 'Đường A/D đổi sang % số mã (trung bình 10 phiên) để không còn đi song song với QQQ. Kiểm chứng thật 2020–2026: xuống dưới −20% (bán tháo diện rộng, 5% số ngày thấp nhất) thì QQQ 3 tháng sau trung bình +8,3% (so với +5,4%), nhưng chỉ 2/3 số lần thắng: vùng bắt đáy, cần stop. Lên trên +20% (lực mua áp đảo) KHÔNG cho kết quả tốt hơn bình thường.' },
+    { id: 'hlp', name: 'Đỉnh mới − đáy mới 52 tuần (% số mã)', ser: (R) => R.map((r) => (r.nh - r.nl) / r.n * 100), bands: [-10, 10], warnLow: true,
+      guide: 'Số mã lập đỉnh 52 tuần trừ số mã lập đáy, tính theo % số mã. Kiểm chứng thật 2020–2026: một phiên có đáy mới vượt đỉnh mới quá 10% số mã là TÍN HIỆU CẢNH BÁO: QQQ 3 tháng sau trung bình −1,6%, chỉ 1/3 số lần tăng, giảm thêm trung bình −11% (đa số rơi vào năm 2022). Khác T2108: đây không phải vùng bắt đáy mà là dấu hiệu thị trường giá xuống.' },
     { id: 'm25q', name: 'Tăng / giảm ≥ 25% trong 1 quý (để so sánh)', up: 'up25q', dn: 'dn25q', lvl: (r) => (r.up25q - r.dn25q) / r.n * 100,
       guide: 'Chỉ báo đang dùng ở tab Dòng tiền, đặt đây để so với các chỉ báo khác trên cùng giai đoạn dài.' },
   ];
   let lbRange = 0;
   function longRows() { const L = S.q25long || {}; const C = L.cols || []; return (L.rows || []).map((r) => Object.fromEntries(C.map((k, i) => [k, r[i]]))); }
+  // Kiểm chứng theo SỰ KIỆN (lần đầu chạm ngưỡng, cách nhau ≥ 20 phiên) — các chỉ báo này chỉ có ý nghĩa ở vùng cực,
+  // tương quan theo mức (dùng ở bản trước) gần như bằng 0 nên không đo được giá trị đó.
+  const LBE = [
+    { name: 'T2108 xuống dưới 20% (quá bán)', on: (R, i) => R[i].t2108 < 20 },
+    { name: 'T2108 cắt lên lại trên 20%', on: (R, i) => R[i].t2108 >= 20 && i > 0 && R[i - 1].t2108 < 20 },
+    { name: 'T2108 lên trên 70% (hưng phấn)', on: (R, i) => R[i].t2108 > 70 },
+    { name: 'Tăng ≥ 50%/tháng vượt 3% số mã (bùng nổ)', on: (R, i) => R[i].up50m / R[i].n * 100 > 3 },
+    { name: 'Mã giảm ≥ 25%/quý vượt 20% số mã', on: (R, i) => R[i].dn25q / R[i].n * 100 > 20 },
+    { name: 'Tăng − giảm (TB 10 phiên) xuống dưới −20% số mã', on: (R, i) => i >= 9 && R.slice(i - 9, i + 1).reduce((s, r) => s + (r.adv - r.dec) / r.n * 100, 0) / 10 < -20 },
+    { name: 'Đáy mới − đỉnh mới 52 tuần vượt 10% số mã (một phiên)', on: (R, i) => (R[i].nh - R[i].nl) / R[i].n * 100 < -10 },
+  ];
   function lbValidate(R) {
-    const rank = (a) => { const ix = a.map((v, i) => [v, i]).sort((x, y) => x[0] - y[0]); const r = new Array(a.length); ix.forEach(([, i], k) => (r[i] = k)); return r; };
-    const ic = (x, y) => { const p = x.map((v, i) => [v, y[i]]).filter(([a, b]) => isNum(a) && isNum(b)); if (p.length < 120) return null; const rx = rank(p.map((z) => z[0])), ry = rank(p.map((z) => z[1])); const m = (rx.length - 1) / 2; let c = 0, vx = 0, vy = 0; rx.forEach((a, i) => { c += (a - m) * (ry[i] - m); vx += (a - m) ** 2; vy += (ry[i] - m) ** 2; }); return c / Math.sqrt(vx * vy); };
     const n = R.length, q = R.map((r) => r.qqq);
-    const f = (k) => R.map((_, i) => (i + k < n && isNum(q[i]) && isNum(q[i + k]) ? (q[i + k] / q[i] - 1) * 100 : null));
-    const F21 = f(21), F63 = f(63);
-    return LBI.map((I) => {
-      const x = R.map((r, i) => { try { const v = I.lvl20 ? I.lvl20(R, i) : I.lvl(r); return isFinite(v) ? v : null; } catch (e) { return null; } });
-      const a = ic(x, F21), b = ic(x, F63);
-      const pts = x.map((v, i) => [v, F63[i]]).filter(([u, w]) => isNum(u) && isNum(w)).sort((u, w) => u[0] - w[0]);
-      const k = Math.floor(pts.length / 5), avg = (s) => (s.length ? s.reduce((t, z) => t + z[1], 0) / s.length : null), win = (s) => (s.length ? s.filter((z) => z[1] > 0).length / s.length * 100 : null);
-      const lo = pts.slice(0, k), hi = pts.slice(-k);
-      const best = Math.max(Math.abs(a ?? 0), Math.abs(b ?? 0));
-      const strong = (v) => isNum(v) && Math.abs(v) >= 0.15;
-      const use = !isNum(a) ? 'Chưa đủ dữ liệu' : best < 0.15 ? 'Không có giá trị dự báo — nên bỏ' : (strong(a) && strong(b) && Math.sign(a) !== Math.sign(b)) ? 'Mâu thuẫn giữa 1 và 3 tháng — chưa tin được' : ((strong(b) ? b : a) < 0 ? 'Nhiệt kế ngược: thấp = vùng mua, cao = thị trường đã nóng' : 'Theo xu hướng: cao = tiếp tục tốt');
-      return { name: I.name, a, b, lo: avg(lo), low: win(lo), hi: avg(hi), hiw: win(hi), use };
-    });
+    const f = (i, k) => (i + k < n && isNum(q[i]) && isNum(q[i + k]) ? (q[i + k] / q[i] - 1) * 100 : null);
+    const dd = (i, k) => { if (i + k >= n || !isNum(q[i])) return null; let m = 0; for (let j = i + 1; j <= i + k; j++) if (isNum(q[j])) m = Math.min(m, q[j] / q[i] - 1); return m * 100; };
+    const st = (name, I, base) => { const a = I.map((i) => f(i, 63)).filter(isNum), b = I.map((i) => f(i, 21)).filter(isNum), d = I.map((i) => dd(i, 63)).filter(isNum), av = (x) => (x.length ? x.reduce((s, v) => s + v, 0) / x.length : null);
+      return { name, n: I.length, f21: av(b), f63: av(a), win: a.length ? a.filter((v) => v > 0).length / a.length * 100 : null, dd: av(d), dates: base ? '' : I.slice(-6).map((i) => fdate(R[i].d)).join(', ') }; };
+    const rows = [st('Mua bất kỳ ngày nào (để so sánh)', R.map((_, i) => i).filter((i) => isNum(q[i])), true)];
+    for (const E of LBE) { const I = []; let prev = false; for (let i = 0; i < n; i++) { let on = false; try { on = !!E.on(R, i); } catch (e) { on = false; } if (on && !prev && (!I.length || i - I[I.length - 1] > 20)) I.push(i); prev = on; } rows.push(st(E.name, I)); }
+    const b = rows[0];
+    rows.slice(1).forEach((r) => { r.use = r.n < 6 ? 'Quá ít lần' : (r.f63 - b.f63 >= 2.5 && r.win >= b.win - 5) ? 'Tốt hơn hẳn: tín hiệu mua' : (r.f63 - b.f63 >= 2.5) ? 'Lãi cao hơn nhưng rủi ro lớn hơn: vùng bắt đáy, cần stop' : (b.f63 - r.f63 >= 4) ? 'Tín hiệu CẢNH BÁO: sau đó thường giảm' : (b.f63 - r.f63 >= 2.5) ? 'Kém hơn: nên thận trọng' : 'Như mua bất kỳ lúc nào: không có giá trị'; });
+    return rows;
   }
   function drawLong() {
     const R = longRows(); if (R.length < 200) return;
@@ -360,14 +361,16 @@
     const sel = $('#lb-sel');
     if (!sel.options.length) { sel.append(...LBI.map((I) => el('option', { value: I.id, text: I.name }))); sel.addEventListener('input', drawLong);
       $('#lb-range').replaceChildren(...[[252, '1N'], [756, '3N'], [0, 'Tất cả']].map(([d, t]) => el('button', { type: 'button', 'aria-pressed': String(lbRange === d), text: t, onclick: (ev) => { lbRange = d; $$('#lb-range button').forEach((b) => b.setAttribute('aria-pressed', String(b === ev.currentTarget))); drawLong(); } })));
-      const V = lbValidate(R), f2 = (v) => (isNum(v) ? (v > 0 ? '+' : '') + n2(v) : '—');
+      const V = lbValidate(R);
       table($('#tb-lbv'), [
-        { k: 'name', label: 'Chỉ báo', l: true },
-        { k: 'a', label: 'Tương quan với QQQ 1 tháng sau', f: (r) => f2(r.a), c: (r) => (!isNum(r.a) || Math.abs(r.a) < 0.15 ? 'muted' : r.a > 0 ? 'up' : 'dn') },
-        { k: 'b', label: '3 tháng sau', f: (r) => f2(r.b), c: (r) => (!isNum(r.b) || Math.abs(r.b) < 0.15 ? 'muted' : r.b > 0 ? 'up' : 'dn') },
-        { k: 'lo', label: 'QQQ 3 tháng sau khi chỉ báo THẤP NHẤT (20%)', f: (r) => (isNum(r.lo) ? `${spct(r.lo)} · thắng ${n0(r.low)}%` : '—'), c: (r) => cls(r.lo) },
-        { k: 'hi', label: 'Khi CAO NHẤT (20%)', f: (r) => (isNum(r.hi) ? `${spct(r.hi)} · thắng ${n0(r.hiw)}%` : '—'), c: (r) => cls(r.hi) },
-        { k: 'use', label: 'Kết luận', l: true, c: (r) => (r.use.startsWith('Không') ? 'dn' : '') },
+        { k: 'name', label: 'Tín hiệu (lần đầu chạm ngưỡng)', l: true },
+        { k: 'n', label: 'Số lần', f: (r) => n0(r.n) },
+        { k: 'f21', label: 'QQQ 1 tháng sau', f: (r) => spct(r.f21), c: (r) => cls(r.f21) },
+        { k: 'f63', label: 'QQQ 3 tháng sau', f: (r) => spct(r.f63), c: (r) => cls(r.f63) },
+        { k: 'win', label: '% lần QQQ tăng sau 3 tháng', f: (r) => pct(r.win, 0) },
+        { k: 'dd', label: 'Giảm sâu nhất TB (3 tháng)', f: (r) => spct(r.dd), c: (r) => (r.dd < -7 ? 'dn' : '') },
+        { k: 'use', label: 'Kết luận', l: true, f: (r) => r.use || '', c: (r) => ((r.use || '').startsWith('Như') || (r.use || '').startsWith('Kém') || (r.use || '').startsWith('Tín hiệu CẢNH') ? 'dn' : (r.use || '').startsWith('Tốt') ? 'up' : '') },
+        { k: 'dates', label: 'Các lần gần nhất', l: true },
       ], V, { sort: null });
     }
     const I = LBI.find((x) => x.id === sel.value) || LBI[0];
@@ -379,6 +382,11 @@
     if (I.up) {
       c.addLineSeries({ color: css('--good'), lineWidth: 2, priceLineVisible: false, title: 'Tăng' }).setData(rows.map((r) => ({ time: r.d, value: r[I.up] })));
       c.addLineSeries({ color: css('--bad'), lineWidth: 2, priceLineVisible: false, title: 'Giảm' }).setData(rows.map((r) => ({ time: r.d, value: r[I.dn] })));
+    } else if (I.ser) {
+      const all = I.ser(R), off = R.length - rows.length;
+      const s = c.addLineSeries({ color: css('--c1'), lineWidth: 2, priceLineVisible: false, title: I.name.split(' (')[0] }); s.setData(rows.map((r, k) => ({ time: r.d, value: all[off + k] })).filter((p) => isNum(p.value)));
+      (I.bands || []).forEach((b) => s.createPriceLine({ price: b, color: css(b < 0 ? (I.warnLow ? '--bad' : '--good') : (I.warnLow ? '--good' : '--bad')), lineStyle: 2, lineWidth: 1, title: b < 0 ? (I.warnLow ? 'Cảnh báo' : 'Vùng bắt đáy') : '' }));
+      s.createPriceLine({ price: 0, color: css('--muted'), lineStyle: 1, lineWidth: 1 });
     } else if (I.one) {
       const s = c.addLineSeries({ color: css('--c1'), lineWidth: 2, priceLineVisible: false, title: I.name.split(' (')[0] }); s.setData(rows.filter((r) => isNum(r[I.one])).map((r) => ({ time: r.d, value: r[I.one] })));
       (I.bands || []).forEach((b, k) => s.createPriceLine({ price: b, color: css(k ? '--bad' : '--good'), lineStyle: 2, lineWidth: 1, title: k ? 'Hưng phấn' : 'Quá bán' }));
@@ -388,6 +396,54 @@
     c.applyOptions({ leftPriceScale: { visible: true } }); c.timeScale().fitContent(); live.lbr = c;
     const L = S.q25long;
     $('#lb-src').textContent = (L.split ? `Trước ${fdate(L.split)}: tính từ ${L.src} (${n0(L.n_tickers)} mã). Từ ${fdate(L.split)}: dữ liệu của trang. ` : `Nguồn: ${L.src}. `) + (L.note || '') + ' Các phiên liền nhau chồng lên nhau nên số lần độc lập ít hơn nhiều so với số phiên; chỉ coi là tham khảo.';
+  }
+
+  // ---- tín hiệu thị trường đã kiểm chứng (từ dữ liệu độ rộng dài hạn)
+  function marketSignals() {
+    const R = longRows(); if (R.length < 300) return;
+    const n = R.length, q = R.map((r) => r.qqq);
+    const sma = (a, k) => a.map((_, i) => (i < k - 1 ? null : a.slice(i - k + 1, i + 1).reduce((s, x) => s + x, 0) / k));
+    const ema = (a, k) => { const o = []; let e = null; const al = 2 / (k + 1); for (const x of a) { e = e == null ? x : e + al * (x - e); o.push(e); } return o; };
+    const s50 = sma(q, 50), s200 = sma(q, 200), e21 = ema(q, 21);
+    const t = R.map((r) => r.t2108), ad = sma(R.map((r) => (r.adv - r.dec) / r.n * 100), 10), hl = R.map((r) => (r.nh - r.nl) / r.n * 100), u50 = R.map((r) => r.up50m / r.n * 100);
+    const any = (a, i, k, fn) => { for (let j = Math.max(0, i - k); j <= i; j++) if (isNum(a[j]) && fn(a[j])) return true; return false; };
+    const wash = (i) => any(t, i, 15, (v) => v < 20) || any(ad, i, 15, (v) => v < -20);
+    const SIG = [
+      { g: 'Đáy', name: 'Đáy xác nhận: bán tháo diện rộng (T2108 < 20% hoặc tăng−giảm TB 10 phiên < −20%) trong 15 phiên, QQQ đóng cửa lại trên EMA 21, và KHÔNG có phiên đáy mới 52 tuần vượt 10% số mã trong 15 phiên', on: (i) => wash(i) && q[i] > e21[i] && !any(hl, i, 15, (v) => v < -10), ev: true, look: 15 },
+      { g: 'Đáy', name: 'Đáy giả (để so sánh): bán tháo + lấy lại EMA 21 nhưng CÓ phiên đáy mới vượt 10% số mã', on: (i) => wash(i) && q[i] > e21[i] && any(hl, i, 15, (v) => v < -10), ev: true, look: 15 },
+      { g: 'Uptrend', name: 'Bùng nổ: số mã tăng ≥ 50% trong 1 tháng vượt 3% số mã', on: (i) => u50[i] > 3, ev: true, look: 20 },
+      { g: 'Uptrend', name: 'Uptrend ít rủi ro (trạng thái): QQQ > SMA50 > SMA200, SMA50 dốc lên, T2108 > 50%', on: (i) => q[i] > s50[i] && s50[i] > s200[i] && s50[i] > s50[i - 10] && t[i] > 50 },
+      { g: 'Tránh', name: 'Tránh xa: một phiên có đáy mới 52 tuần vượt đỉnh mới quá 10% số mã', on: (i) => hl[i] < -10, ev: true, look: 20 },
+      { g: 'Tránh', name: 'Rủi ro cao (trạng thái): QQQ dưới SMA200 đang dốc xuống', on: (i) => q[i] < s200[i] && s200[i] < s200[i - 20] },
+      { g: 'Không dùng', name: 'Mua điều chỉnh trong uptrend theo T2108 (vừa < 40% rồi quay lên > 45%) — kiểm chứng: không hơn bình thường', on: (i) => q[i] > s200[i] && s200[i] > s200[i - 20] && any(t, i, 10, (v) => v < 40) && t[i] > 45, ev: true, look: 10 },
+    ];
+    const f = (i, k) => (i + k < n ? (q[i + k] / q[i] - 1) * 100 : null);
+    const dd = (i, k) => { if (i + k >= n) return null; let m = 0; for (let j = i + 1; j <= i + k; j++) m = Math.min(m, q[j] / q[i] - 1); return m * 100; };
+    const st = (I) => { const av = (x) => (x.length ? x.reduce((s, v) => s + v, 0) / x.length : null); const a = I.map((i) => f(i, 63)).filter(isNum), c = I.map((i) => f(i, 126)).filter(isNum), d = I.map((i) => dd(i, 63)).filter(isNum);
+      return { n: I.length, f63: av(a), f126: av(c), win: a.length ? a.filter((v) => v > 0).length / a.length * 100 : null, bad: d.length ? d.filter((v) => v < -10).length / d.length * 100 : null }; };
+    const i0 = 210, idx = []; for (let i = i0; i < n; i++) idx.push(i);
+    const rows = [{ g: '', name: 'Mua bất kỳ ngày nào (để so sánh)', ...st(idx), now: '' }];
+    for (const S_ of SIG) {
+      const hit = (i) => { try { return !!S_.on(i); } catch (e) { return false; } };
+      let I = [];
+      if (S_.ev) { for (const i of idx) if (hit(i) && !hit(i - 1) && (!I.length || i - I[I.length - 1] > 20)) I.push(i); } else I = idx.filter(hit);
+      const lastHit = [...idx].reverse().find(hit); const ago = isNum(lastHit) ? n - 1 - lastHit : null;
+      const now = S_.ev ? (isNum(ago) && ago <= S_.look ? `ĐANG CÓ (${ago === 0 ? 'hôm nay' : ago + ' phiên trước'})` : (isNum(lastHit) ? `Lần gần nhất ${fdate(R[lastHit].d)}` : '—')) : (hit(n - 1) ? 'ĐANG CÓ' : 'Không');
+      rows.push({ g: S_.g, name: S_.name, ...st(I), cnt: S_.ev ? `${I.length} lần` : `${Math.round(I.length / idx.length * 100)}% số phiên`, now, on: now.startsWith('ĐANG') });
+    }
+    $('#mk-card').hidden = false;
+    table($('#tb-mk'), [
+      { k: 'g', label: 'Nhóm', l: true, c: (r) => (r.g === 'Tránh' ? 'dn' : r.g === 'Không dùng' ? 'muted' : r.g ? 'up' : '') },
+      { k: 'name', label: 'Tín hiệu', l: true },
+      { k: 'now', label: 'Hôm nay', l: true, f: (r) => (r.on ? el('b', { text: r.now }) : r.now), c: (r) => (r.on && r.g !== 'Không dùng' ? (r.g === 'Tránh' ? 'dn' : 'up') : 'muted') },
+      { k: 'cnt', label: 'Số lần', f: (r) => r.cnt || `${n0(r.n)} phiên` },
+      { k: 'f63', label: 'QQQ 3 tháng sau', f: (r) => spct(r.f63), c: (r) => cls(r.f63) },
+      { k: 'win', label: '% lần tăng (3 tháng)', f: (r) => pct(r.win, 0) },
+      { k: 'bad', label: '% lần giảm sâu > 10%', f: (r) => pct(r.bad, 0), c: (r) => (r.bad >= 30 ? 'dn' : r.bad <= 12 ? 'up' : '') },
+      { k: 'f126', label: '6 tháng sau', f: (r) => spct(r.f126), c: (r) => cls(r.f126) },
+    ], rows, { sort: null });
+    const L = S.q25long || {};
+    $('#mk-src').textContent = `Đo trên ${fdate(R[i0].d)} – ${fdate(R[n - 1].d)} (${L.src || ''}). Mẫu nhỏ (mỗi tín hiệu 8–30 lần) và chủ yếu là thị trường tăng, chỉ có một thị trường giá xuống lớn (2022); các con số tự cập nhật mỗi ngày. Không phải lời khuyên đầu tư.`;
   }
 
   function drawHistChart(key) {
@@ -487,7 +543,7 @@
   const BUILD = {
     overview() {
       const L = S.latest;
-      verdict();
+      verdict(); marketSignals();
       $('#score').textContent = L.score;
       $('#stance').textContent = L.stance;
       $('#score-delta').textContent = delta(L.score, L.score5, ' điểm');

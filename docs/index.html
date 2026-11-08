@@ -64,6 +64,12 @@
       </div>
       <p class="note">Tổng hợp tự động từ các tab Dòng tiền, Ngành và Hiệu quả setup. Mức vốn gợi ý là khung tham khảo theo cách các huyền thoại tăng giảm tỷ trọng theo thị trường, không phải khuyến nghị đầu tư.</p>
     </article>
+    <article class="card" id="mk-card" hidden>
+      <h3>Tín hiệu thị trường đã kiểm chứng (đáy · uptrend · tránh xa)</h3>
+      <p class="note">Mỗi tín hiệu được định nghĩa trước rồi đo lại trên toàn bộ lịch sử từ 2020 (cập nhật mỗi ngày): sau khi tín hiệu xuất hiện, QQQ 3 và 6 tháng sau ra sao, bao nhiêu % lần tăng, bao nhiêu % lần giảm sâu hơn 10%. So với mua bất kỳ ngày nào ở dòng đầu. Không tín hiệu nào đúng tuyệt đối; giá trị lớn nhất là biết lúc nào rủi ro cao gấp đôi bình thường.</p>
+      <div class="tbl"><table id="tb-mk"></table></div>
+      <p class="note" id="mk-src"></p>
+    </article>
     <div class="hero">
       <div class="gauge-card" id="gauge-card">
         <div class="gauge-lbl">Điểm sức khỏe thị trường</div>
@@ -158,7 +164,7 @@
       <article class="card"><h3>% cổ phiếu trên các đường trung bình</h3><p class="note">SMA 40 dưới 20% thường là vùng quá bán gần đáy; trên 70% là hưng phấn.</p><div class="range" data-chart="pct"></div><div class="chart" id="ch-pct"></div></article>
       <article class="card"><h3>Đỉnh mới và đáy mới 52 tuần</h3><p class="note">Xanh: số mã lập đỉnh 52 tuần. Đỏ: số mã lập đáy 52 tuần.</p><div class="range" data-chart="nhnl"></div><div class="chart" id="ch-nhnl"></div></article>
       <article class="card full" id="lb-card" hidden><h3>Độ rộng dài hạn (từ 2020): các chỉ báo kiểu Stockbee</h3>
-        <p class="note">Chọn một chỉ báo để xem cùng QQQ (đường đen, trục trái). Bảng bên dưới tự kiểm chứng TẤT CẢ chỉ báo trên toàn bộ lịch sử: mức chỉ báo hôm nay liên quan thế nào tới QQQ 1 tháng và 3 tháng sau. Chỉ báo nào không có giá trị dự báo sẽ ghi rõ để bỏ.</p>
+        <p class="note">Chọn một chỉ báo để xem cùng QQQ (đường đen, trục trái). Kiểm chứng thật 2020–2026: các chỉ báo kiểu này không dự báo được thị trường ở mức bình thường, chỉ có giá trị ở VÙNG CỰC. Bảng bên dưới tự đo lại mỗi ngày: sau mỗi lần chạm ngưỡng, QQQ 1 và 3 tháng sau ra sao so với mua bất kỳ lúc nào. Đã bỏ các chỉ báo không có giá trị (13%/34 phiên, 25%/tháng); đường A/D và đỉnh mới − đáy mới được đổi từ cộng dồn sang % số mã.</p>
         <div class="tools"><select id="lb-sel" aria-label="Chọn chỉ báo"></select><div class="range" id="lb-range"></div></div>
         <p class="note" id="lb-guide"></p>
         <div class="chart tall-ch" id="ch-lbr"></div>
