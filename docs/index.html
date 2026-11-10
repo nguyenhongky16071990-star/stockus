@@ -317,7 +317,7 @@
     </article>
     <article class="card" id="smi-card" hidden>
       <h3>Điểm mua trung hạn: SMI tuần quá bán cắt lên (QQQ)</h3>
-      <p class="note">SMI tuần (10-3-3) xuống dưới −40 rồi cắt lên đường tín hiệu thường trùng đáy của các nhịp điều chỉnh. Kiểm chứng trên QQQ từ 1999: tín hiệu đáng tin khi giá còn cách đỉnh 52 tuần dưới 20% và là tín hiệu thứ 1–2 trong năm (mũi tên xanh). Cách đỉnh 20–30% gần như luôn thua (đỏ). Cách đỉnh trên 30% hoặc lần thứ 3 trở lên: chờ ngày xác nhận tăng (xám). Mua thì đặt stop dưới đáy của tuần tín hiệu.</p>
+      <p class="note">SMI tuần (5-3-3) xuống dưới −40 rồi cắt lên đường tín hiệu thường trùng đáy của các nhịp điều chỉnh. Kiểm chứng trên QQQ từ 1999: tín hiệu đáng tin khi giá còn cách đỉnh 52 tuần dưới 20% và là tín hiệu thứ 1–2 trong năm (mũi tên xanh). Cách đỉnh 20–30% gần như luôn thua (đỏ). Cách đỉnh trên 30% hoặc lần thứ 3 trở lên: chờ ngày xác nhận tăng (xám). Mua thì đặt stop dưới đáy của tuần tín hiệu.</p>
       <p class="note" id="smi-now"></p>
       <div class="chart" id="ch-smi"></div>
       <div class="chart" id="ch-smi2" style="height:170px"></div>
@@ -546,6 +546,7 @@
 
   <!-- NHẬT KÝ -->
   <section id="tab-journal" class="tab" role="tabpanel" hidden>
+    <div class="banner" id="jr-alerts" hidden></div>
     <div class="tiles" id="jr-tiles"></div>
     <div class="grid2">
       <article class="card">
@@ -554,23 +555,95 @@
           <input type="hidden" id="jr-id">
           <label>Mã<input id="jr-t" required maxlength="8"></label>
           <label>Setup<input id="jr-setup" list="setup-list" maxlength="40"></label>
-          <datalist id="setup-list"><option>Nền chặt</option><option>EP</option><option>VCP</option><option>EMA crossback</option><option>EMA hội tụ</option><option>Inside day</option><option>2 inside day</option><option>Lấy lại EMA 9</option><option>Lấy lại AVWAP</option><option>Pullback</option><option>Breakout</option></datalist>
+          <datalist id="setup-list"><option>VCP</option><option>Nền phẳng</option><option>Cốc tay cầm</option><option>Breakout 20 phiên</option><option>Nền chặt</option><option>EP</option><option>Lấy lại MA50</option><option>Lấy lại EMA21</option><option>EMA hội tụ</option><option>Lấy lại AVWAP</option><option>Inside day</option><option>Lấy lại EMA 9</option><option>EMA crossback</option></datalist>
           <label>Ngày mua<input type="date" id="jr-d" required></label>
           <label>Giá mua<input type="number" id="jr-entry" step="any" min="0" required></label>
           <label>Stop ban đầu<input type="number" id="jr-stop" step="any" min="0" required></label>
           <label>Số cổ phiếu<input type="number" id="jr-shares" step="1" min="1" required></label>
-          <label>Ngày bán<input type="date" id="jr-xd"></label>
-          <label>Giá bán TB<input type="number" id="jr-exit" step="any" min="0"></label>
-          <label class="wide">Ghi chú<textarea id="jr-note" rows="2" maxlength="500" placeholder="Vì sao mua, thị trường lúc đó, có theo đúng kế hoạch không…"></textarea></label>
+          <label>Pivot / điểm mua chuẩn<input type="number" id="jr-pivot" step="any" min="0" placeholder="tùy chọn"></label>
+          <label>Lãi cao nhất đã đạt (%)<input type="number" id="jr-maxg" step="any" placeholder="tùy chọn"></label>
+          <fieldset class="wide jr-checks"><legend>Tiêu chuẩn lúc mua (đánh dấu nếu đúng)</legend>
+            <label class="chk"><input type="checkbox" data-c="pivot"> Mua trong 5% trên pivot</label>
+            <label class="chk"><input type="checkbox" data-c="vol"> KL phiên mua ≥ 1,4× TB50</label>
+            <label class="chk"><input type="checkbox" data-c="close"> Đóng cửa nửa trên biên độ</label>
+            <label class="chk"><input type="checkbox" data-c="base"> Có nền giá rõ (≥ 3 tuần)</label>
+            <label class="chk"><input type="checkbox" data-c="eps"> EPS / doanh thu tăng ≥ 20%</label>
+            <label class="chk"><input type="checkbox" data-c="plan"> Đúng kế hoạch đã viết trước</label>
+          </fieldset>
+          <label class="wide">Lý do mua / kế hoạch<textarea id="jr-note" rows="2" maxlength="600" placeholder="Vì sao mua, điểm chốt lời dự kiến, khi nào sai…"></textarea></label>
+          <div class="wide"><b class="small">Các lần mua thêm / bán</b> <span class="muted small">(bán từng phần: thêm mỗi lần một dòng)</span>
+            <div id="jr-fills"></div>
+            <button type="button" class="btn sm ghost" id="jr-addsell">+ Thêm lần bán</button> <button type="button" class="btn sm ghost" id="jr-addbuy">+ Thêm lần mua thêm</button></div>
+          <label>Lý do bán chính<select id="jr-why"><option value="">— (đang mở)</option><option>Chạm stop</option><option>Chốt lời theo kế hoạch</option><option>Thủng đường trung bình</option><option>Thị trường xấu đi</option><option>Hết thời gian, không bứt</option><option>Bán sớm vì sợ</option><option>Trước báo cáo tài chính</option><option>Khác</option></select></label>
+          <label>Cảm xúc lúc vào lệnh<select id="jr-emo"><option value="">—</option><option>Bình tĩnh, theo kế hoạch</option><option>Sợ lỡ cơ hội (FOMO)</option><option>Muốn gỡ lỗ</option><option>Tự tin quá mức</option><option>Lo lắng</option></select></label>
+          <fieldset class="wide jr-checks"><legend>Sai lầm (nếu có, đánh dấu sau khi đóng lệnh)</legend>
+            <label class="chk"><input type="checkbox" data-m="chase"> Mua đuổi, xa pivot</label>
+            <label class="chk"><input type="checkbox" data-m="mkt"> Mua khi thị trường xấu</label>
+            <label class="chk"><input type="checkbox" data-m="nostop"> Không cắt lỗ đúng stop</label>
+            <label class="chk"><input type="checkbox" data-m="early"> Bán quá sớm</label>
+            <label class="chk"><input type="checkbox" data-m="giveback"> Để lãi thành lỗ</label>
+            <label class="chk"><input type="checkbox" data-m="size"> Vị thế quá lớn</label>
+            <label class="chk"><input type="checkbox" data-m="earn"> Giữ qua báo cáo tài chính</label>
+            <label class="chk"><input type="checkbox" data-m="nosetup"> Không có setup rõ</label>
+          </fieldset>
+          <label class="wide">Bài học<textarea id="jr-lesson" rows="2" maxlength="400" placeholder="Lần sau sẽ làm gì khác?"></textarea></label>
           <div class="wide jr-btns"><button type="submit" class="btn">Lưu lệnh</button><button type="button" class="btn ghost" id="jr-cancel" hidden>Hủy sửa</button><span class="muted small" id="jr-preview"></span></div>
         </form>
       </article>
-      <article class="card"><h3>Đường vốn theo R</h3><p class="note">Cộng dồn số R của các lệnh đã đóng, theo ngày bán.</p><div class="chart" id="ch-equity"></div></article>
+      <article class="card">
+        <h3>Quy tắc chốt lời và nhắc nhở</h3>
+        <p class="note">Trang so giá đóng cửa mới nhất với từng lệnh đang mở và nhắc khi tới điểm chốt lời, chạm stop, nên dời stop, thủng EMA 21 hoặc sắp có báo cáo. Mặc định theo kiểm chứng của trang: chốt 1/3 ở +20%, 1/3 ở +40%, phần còn lại theo đường trung bình. Bạn có thể đổi.</p>
+        <form id="jr-rules" class="jr-form" autocomplete="off">
+          <label>Chốt lần 1 khi lãi (%)<input type="number" id="ru-t1" step="any" min="1"></label>
+          <label>Tỷ lệ bán lần 1<select id="ru-f1"><option value="0.333">1/3</option><option value="0.5">1/2</option><option value="0.25">1/4</option></select></label>
+          <label>Chốt lần 2 khi lãi (%)<input type="number" id="ru-t2" step="any" min="0"></label>
+          <label>Tỷ lệ bán lần 2<select id="ru-f2"><option value="0.333">1/3</option><option value="0.5">1/2</option><option value="0.25">1/4</option></select></label>
+          <label>Dời stop về hòa vốn khi lãi (%)<input type="number" id="ru-be" step="any" min="0"></label>
+          <label>Không bứt sau (phiên)<input type="number" id="ru-days" step="1" min="0"></label>
+          <label>Phần còn lại bán khi thủng<select id="ru-ma"><option value="d21">EMA 21</option><option value="d50">EMA 50</option></select></label>
+          <label>Nhắc trước báo cáo (ngày)<input type="number" id="ru-earn" step="1" min="0"></label>
+        </form>
+        <div class="tbl"><table id="tb-jr-open"></table></div>
+        <h4 class="sub-h">Đường vốn theo R</h4><div class="chart" id="ch-equity"></div>
+      </article>
     </div>
     <article class="card">
       <h3>Danh sách lệnh</h3>
-      <div class="tools"><button type="button" class="btn ghost" id="jr-export">Xuất CSV</button><label class="btn ghost file">Nhập CSV<input type="file" id="jr-import" accept=".csv,text/csv" hidden></label><span class="muted small">Nhật ký chỉ lưu trong trình duyệt này. Nhớ xuất CSV định kỳ để sao lưu.</span></div>
+      <div class="tools"><button type="button" class="btn ghost" id="jr-export">Xuất CSV</button><button type="button" class="btn ghost" id="jr-backup">Sao lưu đầy đủ (.json)</button><label class="btn ghost file">Nhập CSV / JSON<input type="file" id="jr-import" accept=".csv,.json,text/csv,application/json" hidden></label><span class="muted small">Dữ liệu chỉ lưu trên trình duyệt này. Nên sao lưu định kỳ.</span></div>
       <div class="tbl"><table id="tb-journal"></table></div>
+    </article>
+    <article class="card">
+      <h3>Tiêu chuẩn nào có tỷ lệ đúng cao? (thống kê lệnh của chính bạn)</h3>
+      <p class="note">Mỗi tiêu chuẩn chia lệnh đã đóng thành "đạt" và "không đạt", rồi so tỷ lệ thắng và R trung bình. Tiêu chuẩn tự động (RS, giai đoạn, thị trường…) được trang ghi lại lúc bạn lưu lệnh nếu mã có trong dữ liệu ngày đó. Cần ít nhất vài lệnh mỗi bên mới có ý nghĩa.</p>
+      <div class="tbl"><table id="tb-jr-crit"></table></div>
+    </article>
+    <div class="grid2">
+      <article class="card">
+        <h3>Thất bại đến từ đâu?</h3>
+        <p class="note">Tổng số R đã mất theo từng sai lầm và lý do bán. Sai lầm nào ăn mòn tài khoản nhiều nhất thì sửa trước.</p>
+        <div class="tbl"><table id="tb-jr-fail"></table></div>
+      </article>
+      <article class="card">
+        <h3>Theo setup và thời gian nắm giữ</h3>
+        <div class="tbl"><table id="tb-jr-setup"></table></div>
+        <p class="note" id="jr-hold"></p>
+      </article>
+    </div>
+    <article class="card">
+      <div class="card-top"><h3>Nhật ký thị trường từng ngày</h3><button type="button" class="btn sm" id="ml-add">Ghi hôm nay</button></div>
+      <p class="note">Bấm "Ghi hôm nay" để lưu ảnh chụp thị trường (QQQ, giai đoạn dòng tiền, xu hướng, cảnh báo, T2108) kèm nhận định của bạn. Sau vài tháng có thể so nhận định lúc đó với diễn biến thật.</p>
+      <label class="wide">Nhận định hôm nay<textarea id="ml-note" rows="2" maxlength="500" placeholder="Thị trường đang thế nào, bạn định làm gì…"></textarea></label>
+      <div class="tbl"><table id="tb-mlog"></table></div>
+    </article>
+    <article class="card">
+      <h3>Các huyền thoại ghi gì trong nhật ký?</h3>
+      <ul class="jr-legends">
+        <li><b>William O'Neil</b> — "phân tích sau giao dịch" (post-analysis): đánh dấu điểm mua và điểm bán của mọi lệnh trên biểu đồ, cuối năm xem lại cả năm để tìm lỗi lặp lại (mua đuổi quá 5% pivot, mua nền xấu, không cắt lỗ 7–8%, bán quá sớm cổ phiếu dẫn dắt). → Trang ghi pivot, giá mua, các lần bán và lý do bán; bảng "Thất bại đến từ đâu".</li>
+        <li><b>Mark Minervini</b> — theo dõi tỷ lệ thắng, lãi trung bình / lỗ trung bình (tối thiểu 2:1), số ngày giữ lệnh thắng so với lệnh thua (lệnh thắng phải giữ lâu hơn), và tăng/giảm quy mô theo phong độ ("progressive exposure"). → Ô tổng quan: tỷ lệ lãi/lỗ, ngày giữ lệnh thắng và thua.</li>
+        <li><b>Martin Luk</b> — ghi R của từng lệnh, setup, có đúng kế hoạch không; lệnh thua phải quanh −1R. → Cột R, tiêu chuẩn "Đúng kế hoạch", ô "Lệnh thua TB".</li>
+        <li><b>Qullamaggie</b> — loại setup (breakout, EP), chốt 1/3–1/2 sau 3–5 phiên, giữ phần còn lại theo MA 10/20. → Setup, các lần bán từng phần, quy tắc nhắc nhở.</li>
+        <li><b>Tâm lý giao dịch (Mark Douglas, Brett Steenbarger)</b> — ghi cảm xúc lúc vào lệnh và bài học, vì phần lớn lỗi là do cảm xúc (FOMO, muốn gỡ, tự tin quá mức). → Ô cảm xúc, bài học, thống kê theo cảm xúc.</li>
+      </ul>
     </article>
   </section>
 

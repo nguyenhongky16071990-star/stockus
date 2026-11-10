@@ -321,3 +321,11 @@ body.fs-open{overflow:hidden}
 .tbl th:first-child{z-index:2}
 #tb-mk td:nth-child(2){white-space:normal;min-width:260px;max-width:420px;line-height:1.35}
 #tb-mk td:nth-child(3){white-space:normal;min-width:110px}
+
+.jr-checks{border:1px solid var(--line);border-radius:8px;padding:6px 10px;display:flex;flex-wrap:wrap;gap:4px 14px}
+.jr-checks legend{font-size:.8rem;color:var(--muted);padding:0 4px}
+.jr-fill{display:flex;gap:6px;align-items:center;margin:4px 0;flex-wrap:wrap}
+.jr-fill input{width:auto;max-width:9rem}
+.jr-legends li{margin:6px 0;line-height:1.45}
+#tb-jr-open td:last-child{white-space:normal;min-width:240px}
+#tb-jr-open .warn{color:var(--warn)}

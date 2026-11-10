@@ -4,7 +4,7 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const LW = window.LightweightCharts;
-  const APP_VERSION = '2026.11.09-a'; // phải trùng với APP_VERSION trong pipeline/build.py
+  const APP_VERSION = '2026.11.11-a'; // phải trùng với APP_VERSION trong pipeline/build.py
   const S = { exits: null, groups: null, flow: null, lab: null, cond: null, paper: null, cycle: null, backtest: null, latest: null, history: [], stocks: [], setups: [], extended: [], themes: [], basket: [], industries: [], patterns: null, charts: null };
   const ranges = {};          // khoảng thời gian của từng biểu đồ
   const built = new Set();    // tab đã vẽ
@@ -1705,6 +1705,7 @@
       const vol = c.addHistogramSeries({ priceScaleId: 'vol', priceFormat: { type: 'volume' }, priceLineVisible: false, lastValueVisible: false });
       vol.setData(d.d.map((x, i) => ({ time: x, value: d.v[i], color: css(d.c[i] >= d.o[i] ? '--good' : '--bad') + '55' })).filter((x) => isNum(x.value)));
       c.priceScale('vol').applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
+      if (setup && setup.fills) cs.setMarkers(setup.fills.filter((f) => f.d && d.d.includes(f.d)).sort((x, y) => x.d.localeCompare(y.d)).map((f) => ({ time: f.d, position: f.k === 'S' ? 'aboveBar' : 'belowBar', shape: f.k === 'S' ? 'arrowDown' : 'arrowUp', color: css(f.k === 'S' ? '--bad' : '--good'), text: (f.k === 'S' ? 'Bán ' : 'Mua ') + n2(f.px) })));
       if (setup) {
         cs.createPriceLine({ price: setup.entry, color: css('--good'), lineWidth: 2, lineStyle: 0, title: 'Giá mua' });
         cs.createPriceLine({ price: setup.stop, color: css('--bad'), lineWidth: 2, lineStyle: 2, title: 'Stop' });
@@ -1904,106 +1905,285 @@
 
   // ------------------------------------------------------------ nhật ký
   const Journal = (() => {
-    const KEY = 'nk_journal_v1';
-    let list = store.get(KEY, []), eqChart = null, inited = false;
+    const KEY = 'nk_journal_v2', OLD = 'nk_journal_v1', RKEY = 'nk_jrules', MKEY = 'nk_mlog';
+    const RDEF = { t1: 20, f1: 0.333, t2: 40, f2: 0.333, be: 10, days: 15, ma: 'd21', earn: 5 };
+    const MIST = { chase: 'Mua đuổi, xa pivot', mkt: 'Mua khi thị trường xấu', nostop: 'Không cắt lỗ đúng stop', early: 'Bán quá sớm', giveback: 'Để lãi thành lỗ', size: 'Vị thế quá lớn', earn: 'Giữ qua báo cáo tài chính', nosetup: 'Không có setup rõ' };
+    const CHK = { pivot: 'Mua trong 5% trên pivot', vol: 'KL phiên mua ≥ 1,4× TB50', close: 'Đóng cửa nửa trên biên độ', base: 'Có nền giá rõ', eps: 'EPS / doanh thu tăng ≥ 20%', plan: 'Đúng kế hoạch đã viết trước' };
+    let list = store.get(KEY, null), eqChart = null, inited = false;
+    if (!list) { // chuyển dữ liệu nhật ký cũ (một lần mua, một lần bán) sang dạng mới
+      list = (store.get(OLD, []) || []).map((x) => ({ id: x.id, t: x.t, setup: x.setup, d: x.d, entry: x.entry, stop0: x.stop, stop: x.stop, shares: x.shares, note: x.note || '',
+        fills: x.exit ? [{ k: 'S', d: x.xd || x.d, px: x.exit, sh: x.shares }] : [], checks: {}, mistakes: {}, auto: {} }));
+      store.set(KEY, list);
+    }
+    let R = Object.assign({}, RDEF, store.get(RKEY, {}));
+    let mlog = store.get(MKEY, []);
     const save = () => store.set(KEY, list);
-    const calc = (x) => {
-      const per = x.entry - x.stop;
-      const closed = isNum(x.exit) && x.exit > 0;
-      return Object.assign({}, x, { per, closed, R: closed && per > 0 ? (x.exit - x.entry) / per : null, pl: closed ? (x.exit - x.entry) * x.shares : null, riskUsd: per * x.shares, stopPct: x.entry ? per / x.entry * 100 : null });
+    const today = () => (S.latest && S.latest.asof) || new Date().toISOString().slice(0, 10);
+    const days = (a, b) => Math.max(0, Math.round((new Date(b) - new Date(a)) / 864e5));
+    const tdays = (a, b) => Math.round(days(a, b) * 5 / 7); // xấp xỉ số phiên
+
+    // ---- tính toán một lệnh từ các lần mua / bán
+    function calc(x) {
+      const buys = [{ k: 'B', d: x.d, px: x.entry, sh: x.shares }, ...(x.fills || []).filter((f) => f.k === 'B')];
+      const sells = (x.fills || []).filter((f) => f.k === 'S');
+      const bSh = buys.reduce((s, f) => s + f.sh, 0), cost = buys.reduce((s, f) => s + f.px * f.sh, 0), avg = bSh ? cost / bSh : x.entry;
+      const sSh = sells.reduce((s, f) => s + f.sh, 0), proceeds = sells.reduce((s, f) => s + f.px * f.sh, 0);
+      const open = Math.max(0, bSh - sSh), closed = bSh > 0 && open === 0 && sells.length > 0;
+      const st = S.stocks && S.stocks.find((s) => s.t === x.t);
+      const last = open > 0 && st ? st.close : null;
+      const realized = proceeds - avg * sSh, unreal = isNum(last) ? (last - avg) * open : 0;
+      const risk0 = (x.entry - x.stop0) * x.shares;
+      const pl = realized + (closed ? 0 : unreal);
+      const lastD = sells.length ? sells.map((f) => f.d).sort().slice(-1)[0] : null;
+      const held = tdays(x.d, closed ? lastD : today());
+      const pct = cost ? pl / cost * 100 : null;
+      return Object.assign({}, x, { avg, bSh, sSh, open, closed, last, st, realized, pl, pct, R: risk0 > 0 ? pl / risk0 : null, risk0, held, lastD,
+        stopPct: x.entry ? (x.entry - x.stop0) / x.entry * 100 : null, soldFrac: bSh ? sSh / bSh : 0, gain: isNum(last) ? (last / avg - 1) * 100 : null });
+    }
+
+    // ---- nhắc nhở cho lệnh đang mở
+    function alertsOf(r) {
+      const out = []; if (r.closed) return out;
+      const g = r.gain, st = r.st || {};
+      if (!isNum(g)) { out.push({ lv: 'muted', t: 'Không có giá hiện tại (mã ngoài danh sách quét)' }); return out; }
+      if (isNum(r.last) && r.last <= (r.stop ?? r.stop0)) out.push({ lv: 'dn', t: `Đã chạm stop ${n2(r.stop ?? r.stop0)}: bán theo kế hoạch` });
+      const f1 = Number(R.f1), f2 = Number(R.f2);
+      if (R.t1 && g >= R.t1 && r.soldFrac < f1 - 0.02) out.push({ lv: 'up', t: `Lãi ${spct(g)} ≥ +${R.t1}%: chốt ${Math.round(f1 * 100)}% (≈ ${n0(Math.round(r.bSh * f1))} cổ)` });
+      if (R.t2 && g >= R.t2 && r.soldFrac < f1 + f2 - 0.02) out.push({ lv: 'up', t: `Lãi ${spct(g)} ≥ +${R.t2}%: chốt thêm ${Math.round(f2 * 100)}%` });
+      if (R.be && g >= R.be && (r.stop ?? r.stop0) < r.avg) out.push({ lv: 'warn', t: `Lãi ≥ +${R.be}%: dời stop về hòa vốn (${n2(r.avg)})` });
+      const ma = st[R.ma]; if (r.soldFrac >= f1 - 0.02 && isNum(ma) && ma < 0) out.push({ lv: 'dn', t: `Đã chốt lần 1 và giá đóng cửa dưới ${R.ma === 'd21' ? 'EMA 21' : 'EMA 50'}: bán phần còn lại` });
+      if (R.days && r.held >= R.days && g < 5) out.push({ lv: 'warn', t: `${r.held} phiên mà lãi chưa tới 5%: cân nhắc bán (không bứt)` });
+      if (st.earn && R.earn) { const d = days(today(), st.earn); if (d >= 0 && d <= R.earn) out.push({ lv: 'warn', t: `Báo cáo tài chính sau ${d} ngày (${fdate(st.earn)})` }); }
+      if (isNum(r.maxg) && r.maxg >= 15 && g < r.maxg / 2) out.push({ lv: 'warn', t: `Đã từng lãi ${spct(r.maxg)} nay còn ${spct(g)}: đừng để lãi thành lỗ` });
+      return out;
+    }
+
+    // ---- tiêu chuẩn tự động lúc mua (lấy từ dữ liệu trang nếu có)
+    function autoCrit(t) {
+      const s = (S.stocks || []).find((x) => x.t === t) || {}, L = S.latest || {}, F = S.flow || {};
+      const a = { asof: L.asof };
+      if (isNum(s.rs)) a.rs = s.rs >= 90 ? 'RS ≥ 90' : s.rs >= 80 ? 'RS 80–89' : 'RS < 80';
+      if (s.stage) a.stage = s.stage === 2 ? 'Giai đoạn 2' : 'Giai đoạn khác';
+      if ('tt' in s) a.tt = s.tt ? 'Đạt Trend Template' : 'Không đạt Trend Template';
+      if (L.qqq_regime) a.reg = 'QQQ ' + L.qqq_regime;
+      if (F.stage) a.flow = F.stage;
+      if (F.golden && F.golden.level) a.gold = F.golden.level;
+      if (isNum(s.ind_rank) && L.n_ind) a.ind = s.ind_rank <= L.n_ind * 0.2 ? 'Ngành top 20%' : s.ind_rank <= L.n_ind / 2 ? 'Ngành 20–50%' : 'Ngành nửa dưới';
+      if (s.earn) { const d = days(L.asof, s.earn); a.earn = d >= 0 && d <= 7 ? 'BCTC trong 7 ngày' : 'Không có BCTC gần'; }
+      return a;
+    }
+
+    // ---- biểu mẫu
+    const fillRow = (f = { k: 'S', d: today(), px: '', sh: '' }) => {
+      const row = el('div', { class: 'jr-fill', 'data-k': f.k },
+        el('span', { class: 'tag ' + (f.k === 'S' ? 'bad' : 'ld'), text: f.k === 'S' ? 'Bán' : 'Mua thêm' }),
+        el('input', { type: 'date', value: f.d || today(), 'aria-label': 'Ngày' }), el('input', { type: 'number', step: 'any', min: 0, placeholder: 'Giá', value: f.px ?? '', 'aria-label': 'Giá' }),
+        el('input', { type: 'number', step: 1, min: 1, placeholder: 'Số cổ', value: f.sh ?? '', 'aria-label': 'Số cổ' }),
+        el('button', { type: 'button', class: 'btn sm ghost', text: '✕', onclick: () => row.remove() }));
+      $('#jr-fills').append(row);
     };
     function preview() {
-      const e = Number($('#jr-entry').value), s = Number($('#jr-stop').value), n = Number($('#jr-shares').value);
-      $('#jr-preview').textContent = e > s && s > 0 ? `Stop ${n1((e - s) / e * 100)}% · rủi ro ${usd((e - s) * (n || 0))}` : '';
+      const e = Number($('#jr-entry').value), s = Number($('#jr-stop').value), n = Number($('#jr-shares').value), p = Number($('#jr-pivot').value);
+      const ch = p > 0 && e > 0 ? ` · cách pivot ${spct((e / p - 1) * 100)}` : '';
+      $('#jr-preview').textContent = e > s && s > 0 ? `Stop ${n1((e - s) / e * 100)}% · rủi ro ${usd((e - s) * (n || 0))}${ch}` : '';
     }
-    function reset() { $('#jr-form').reset(); $('#jr-id').value = ''; $('#jr-cancel').hidden = true; $('#jr-form-title').textContent = 'Ghi lệnh mới'; $('#jr-d').value = new Date().toISOString().slice(0, 10); preview(); }
+    function reset() { $('#jr-form').reset(); $('#jr-id').value = ''; $('#jr-fills').replaceChildren(); $('#jr-cancel').hidden = true; $('#jr-form-title').textContent = 'Ghi lệnh mới'; $('#jr-d').value = today(); preview(); }
     function fill(x) {
-      $('#jr-id').value = x.id || ''; $('#jr-t').value = x.t || ''; $('#jr-setup').value = x.setup || ''; $('#jr-d').value = x.d || new Date().toISOString().slice(0, 10);
-      $('#jr-entry').value = x.entry ?? ''; $('#jr-stop').value = x.stop ?? ''; $('#jr-shares').value = x.shares ?? ''; $('#jr-xd').value = x.xd || ''; $('#jr-exit').value = x.exit ?? ''; $('#jr-note').value = x.note || '';
+      reset();
+      $('#jr-id').value = x.id || ''; $('#jr-t').value = x.t || ''; $('#jr-setup').value = x.setup || ''; $('#jr-d').value = x.d || today();
+      $('#jr-entry').value = x.entry ?? ''; $('#jr-stop').value = x.stop0 ?? x.stop ?? ''; $('#jr-shares').value = x.shares ?? ''; $('#jr-pivot').value = x.pivot ?? ''; $('#jr-maxg').value = x.maxg ?? '';
+      $('#jr-note').value = x.note || ''; $('#jr-lesson').value = x.lesson || ''; $('#jr-why').value = x.why || ''; $('#jr-emo').value = x.emo || '';
+      $$('#jr-form [data-c]').forEach((c) => (c.checked = !!(x.checks || {})[c.dataset.c]));
+      $$('#jr-form [data-m]').forEach((c) => (c.checked = !!(x.mistakes || {})[c.dataset.m]));
+      (x.fills || []).forEach(fillRow);
       $('#jr-cancel').hidden = !x.id; $('#jr-form-title').textContent = x.id ? 'Sửa lệnh ' + x.t : 'Ghi lệnh mới'; preview();
+    }
+
+    // ---- thống kê
+    function stats(rows) {
+      const w = rows.filter((r) => r.R > 0), av = (a, k) => (a.length ? a.reduce((s, r) => s + (r[k] ?? 0), 0) / a.length : null);
+      return { n: rows.length, win: rows.length ? w.length / rows.length * 100 : null, R: av(rows, 'R'), pct: av(rows, 'pct'), sumR: rows.reduce((s, r) => s + (r.R ?? 0), 0) };
     }
     function render() {
       const rows = list.map(calc);
       const closed = rows.filter((r) => r.closed), wins = closed.filter((r) => r.R > 0), losses = closed.filter((r) => r.R <= 0);
-      const avg = (a, k) => (a.length ? a.reduce((s, r) => s + r[k], 0) / a.length : null);
+      const av = (a, k) => (a.length ? a.reduce((s, r) => s + (r[k] ?? 0), 0) / a.length : null);
       const T = $('#jr-tiles'); T.replaceChildren();
+      const aw = av(wins, 'pct'), al = av(losses, 'pct');
       tile(T, 'Lệnh đã đóng', n0(closed.length), `${rows.length - closed.length} lệnh đang mở`);
       tile(T, 'Tỷ lệ thắng', closed.length ? pct(wins.length / closed.length * 100, 0) : '—', `${wins.length} thắng / ${losses.length} thua`);
-      tile(T, 'R trung bình mỗi lệnh', isNum(avg(closed, 'R')) ? n2(avg(closed, 'R')) + 'R' : '—', 'kỳ vọng của hệ thống', cls(avg(closed, 'R')));
-      tile(T, 'Lệnh thắng TB', isNum(avg(wins, 'R')) ? '+' + n2(avg(wins, 'R')) + 'R' : '—', '', 'up');
-      tile(T, 'Lệnh thua TB', isNum(avg(losses, 'R')) ? n2(avg(losses, 'R')) + 'R' : '—', 'Martin: giữ quanh −1R', 'dn');
-      tile(T, 'Tổng lãi / lỗ', closed.length ? usd(closed.reduce((s, r) => s + r.pl, 0)) : '—', '', cls(closed.reduce((s, r) => s + r.pl, 0)));
+      tile(T, 'Lãi TB / lỗ TB', isNum(aw) && isNum(al) && al < 0 ? n2(aw / -al) + ' : 1' : '—', `${spct(aw)} / ${spct(al)} · Minervini: ≥ 2:1`, isNum(aw) && isNum(al) && al < 0 ? (aw / -al >= 2 ? 'up' : 'dn') : '');
+      tile(T, 'R trung bình mỗi lệnh', isNum(av(closed, 'R')) ? n2(av(closed, 'R')) + 'R' : '—', 'kỳ vọng của hệ thống', cls(av(closed, 'R')));
+      tile(T, 'Lệnh thua TB', isNum(av(losses, 'R')) ? n2(av(losses, 'R')) + 'R' : '—', 'nên quanh −1R', av(losses, 'R') < -1.3 ? 'dn' : '');
+      tile(T, 'Ngày giữ: thắng / thua', closed.length ? `${n0(av(wins, 'held'))} / ${n0(av(losses, 'held'))} phiên` : '—', 'lệnh thắng nên giữ lâu hơn', closed.length ? (av(wins, 'held') > av(losses, 'held') ? 'up' : 'dn') : '');
+      tile(T, 'Tổng lãi / lỗ', rows.length ? usd(rows.reduce((s, r) => s + r.pl, 0)) : '—', 'gồm cả lãi chưa chốt', cls(rows.reduce((s, r) => s + r.pl, 0)));
+      // nhắc nhở
+      const openRows = rows.filter((r) => !r.closed);
+      const allAlerts = openRows.flatMap((r) => alertsOf(r).filter((a) => a.lv !== 'muted').map((a) => `${r.t}: ${a.t}`));
+      const ab = $('#jr-alerts'); ab.hidden = !allAlerts.length; ab.replaceChildren(el('b', { text: 'Nhắc nhở hôm nay: ' }), allAlerts.join(' · '));
+      table($('#tb-jr-open'), [
+        { k: 't', label: 'Lệnh đang mở', tk: true },
+        { k: 'gain', label: 'Lãi hiện tại', f: (r) => spct(r.gain), c: (r) => cls(r.gain) },
+        { k: 'open', label: 'Còn giữ', f: (r) => `${n0(r.open)} / ${n0(r.bSh)} cổ` },
+        { k: 'held', label: 'Đã giữ', f: (r) => `${r.held} phiên` },
+        { k: '_a', label: 'Việc cần làm', l: true, f: (r) => { const f = document.createDocumentFragment(); const A = alertsOf(r); if (!A.length) f.append(el('span', { class: 'muted', text: 'Giữ theo kế hoạch' })); A.forEach((a) => f.append(el('div', { class: a.lv, text: a.t }))); return f; } },
+      ], openRows, { sort: null, empty: 'Không có lệnh đang mở.' });
+      // danh sách lệnh
       table($('#tb-journal'), [
         { k: 'd', label: 'Ngày mua', f: (r) => fdate(r.d) },
         { k: 't', label: 'Mã', tk: true },
         { k: 'setup', label: 'Setup', l: true },
-        { k: 'entry', label: 'Giá mua', f: (r) => n2(r.entry) },
-        { k: 'stop', label: 'Stop', f: (r) => n2(r.stop) },
+        { k: 'avg', label: 'Giá mua TB', f: (r) => n2(r.avg) },
         { k: 'stopPct', label: 'Stop %', f: (r) => pct(r.stopPct) },
-        { k: 'shares', label: 'Số cổ', f: (r) => n0(r.shares) },
-        { k: 'riskUsd', label: 'Rủi ro', f: (r) => usd(r.riskUsd) },
-        { k: 'xd', label: 'Ngày bán', f: (r) => (r.xd ? fdate(r.xd) : 'Đang mở') },
-        { k: 'exit', label: 'Giá bán', f: (r) => (r.closed ? n2(r.exit) : '—') },
+        { k: 'bSh', label: 'Số cổ', f: (r) => n0(r.bSh) },
+        { k: 'fills', label: 'Các lần bán', l: true, f: (r) => (r.fills || []).filter((f) => f.k === 'S').map((f) => `${fdate(f.d)} ${n2(f.px)}×${n0(f.sh)}`).join(' · ') || (r.closed ? '' : 'Đang mở') },
+        { k: 'held', label: 'Giữ', f: (r) => `${r.held} phiên` },
+        { k: 'pct', label: '%', f: (r) => spct(r.pct), c: (r) => cls(r.pct) },
         { k: 'R', label: 'R', f: (r) => (isNum(r.R) ? (r.R > 0 ? '+' : '') + n2(r.R) : '—'), c: (r) => cls(r.R) },
         { k: 'pl', label: 'Lãi/lỗ', f: (r) => usd(r.pl), c: (r) => cls(r.pl) },
-        { k: 'note', label: 'Ghi chú', l: true, f: (r) => (r.note || '').slice(0, 60) },
+        { k: 'why', label: 'Lý do bán', l: true, f: (r) => r.why || '' },
+        { k: 'mis', label: 'Sai lầm', l: true, f: (r) => Object.keys(r.mistakes || {}).filter((k) => r.mistakes[k]).map((k) => MIST[k]).join(', '), sv: (r) => Object.values(r.mistakes || {}).filter(Boolean).length },
         { k: '_a', label: '', f: (r) => {
           const box = el('span');
-          box.append(el('button', { class: 'btn sm ghost', type: 'button', text: 'Sửa', onclick: () => { fill(r); $('#jr-form').scrollIntoView({ behavior: 'smooth', block: 'center' }); } }), ' ');
+          box.append(el('button', { class: 'btn sm ghost', type: 'button', text: 'Sửa', onclick: () => { fill(list.find((y) => y.id === r.id)); $('#jr-form').scrollIntoView({ behavior: 'smooth', block: 'center' }); } }), ' ');
+          box.append(el('button', { class: 'btn sm ghost', type: 'button', text: 'Chart', onclick: () => openChart(r.t, { entry: r.avg, stop: r.stop ?? r.stop0, fills: [{ k: 'B', d: r.d, px: r.entry }, ...(r.fills || [])] }) }), ' ');
           const del = el('button', { class: 'btn sm ghost', type: 'button', text: 'Xóa' });
           del.addEventListener('click', () => { if (del.dataset.armed) { list = list.filter((x) => x.id !== r.id); save(); render(); } else { del.dataset.armed = '1'; del.textContent = 'Chắc chắn?'; setTimeout(() => { delete del.dataset.armed; del.textContent = 'Xóa'; }, 3000); } });
           box.append(del); return box;
         } },
-      ], rows, { sort: 'd', empty: 'Chưa có lệnh nào. Ghi lệnh đầu tiên ở khung bên trên, hoặc bấm "Ghi nhật ký" trong tab Setup.' });
+      ], rows, { sort: 'd', empty: 'Chưa có lệnh nào. Ghi lệnh đầu tiên ở khung bên trên, hoặc bấm "+ Nhật ký" ở tab Setup.' });
+      // tiêu chuẩn nào có tỷ lệ đúng cao
+      const crit = [];
+      const bucket = (name, getter) => { const g = {}; closed.forEach((r) => { const v = getter(r); if (v == null) return; (g[v] = g[v] || []).push(r); }); Object.entries(g).forEach(([b, rs]) => crit.push({ name, b, ...stats(rs) })); };
+      Object.entries(CHK).forEach(([k, lb]) => bucket(lb, (r) => (r.checks ? (r.checks[k] ? 'Đạt' : 'Không đạt') : null)));
+      bucket('Stop ban đầu', (r) => (isNum(r.stopPct) ? (r.stopPct <= 4 ? '≤ 4%' : r.stopPct <= 7 ? '4–7%' : '> 7%') : null));
+      bucket('Cách pivot lúc mua', (r) => (r.pivot > 0 ? ((r.entry / r.pivot - 1) * 100 <= 2 ? '≤ 2%' : (r.entry / r.pivot - 1) * 100 <= 5 ? '2–5%' : '> 5% (đuổi)') : null));
+      ['rs', 'tt', 'stage', 'ind', 'reg', 'flow', 'gold', 'earn'].forEach((k) => bucket({ rs: 'RS lúc mua', tt: 'Trend Template', stage: 'Giai đoạn', ind: 'Hạng ngành', reg: 'Xu hướng QQQ', flow: 'Giai đoạn dòng tiền', gold: 'Thời điểm mua', earn: 'Báo cáo tài chính' }[k], (r) => (r.auto || {})[k] ?? null));
+      bucket('Cảm xúc lúc vào lệnh', (r) => r.emo || null);
+      table($('#tb-jr-crit'), [
+        { k: 'name', label: 'Tiêu chuẩn', l: true },
+        { k: 'b', label: 'Nhóm', l: true },
+        { k: 'n', label: 'Số lệnh', f: (r) => n0(r.n) },
+        { k: 'win', label: 'Tỷ lệ thắng', f: (r) => pct(r.win, 0), c: (r) => (r.n >= 3 ? (r.win >= 50 ? 'up' : r.win < 35 ? 'dn' : '') : 'muted') },
+        { k: 'R', label: 'R trung bình', f: (r) => (isNum(r.R) ? (r.R > 0 ? '+' : '') + n2(r.R) : '—'), c: (r) => (r.n >= 3 ? cls(r.R) : 'muted') },
+        { k: 'pct', label: '% trung bình', f: (r) => spct(r.pct), c: (r) => (r.n >= 3 ? cls(r.pct) : 'muted') },
+      ], crit, { sort: null, empty: 'Cần có lệnh đã đóng để thống kê.' });
+      // thất bại đến từ đâu
+      const fail = [];
+      Object.entries(MIST).forEach(([k, lb]) => { const rs = closed.filter((r) => (r.mistakes || {})[k]); if (rs.length) fail.push({ what: 'Sai lầm: ' + lb, ...stats(rs) }); });
+      const byWhy = {}; closed.forEach((r) => { if (r.why) (byWhy[r.why] = byWhy[r.why] || []).push(r); });
+      Object.entries(byWhy).forEach(([k, rs]) => fail.push({ what: 'Lý do bán: ' + k, ...stats(rs) }));
+      const gb = closed.filter((r) => isNum(r.maxg) && r.maxg >= 10 && r.pct < 0); if (gb.length) fail.push({ what: 'Tự phát hiện: từng lãi ≥ 10% rồi đóng lệnh lỗ', ...stats(gb) });
+      const big = losses.filter((r) => r.R < -1.3); if (big.length) fail.push({ what: 'Tự phát hiện: lỗ quá −1,3R (không giữ kỷ luật stop)', ...stats(big) });
+      table($('#tb-jr-fail'), [
+        { k: 'what', label: 'Nguyên nhân', l: true },
+        { k: 'n', label: 'Số lệnh', f: (r) => n0(r.n) },
+        { k: 'win', label: 'Tỷ lệ thắng', f: (r) => pct(r.win, 0) },
+        { k: 'sumR', label: 'Tổng R', f: (r) => (r.sumR > 0 ? '+' : '') + n2(r.sumR), c: (r) => cls(r.sumR) },
+      ], fail, { sort: 'sumR', dir: 1, empty: 'Chưa có dữ liệu. Đánh dấu sai lầm và lý do bán cho các lệnh đã đóng.' });
+      // theo setup
+      const bs = {}; closed.forEach((r) => (bs[r.setup || '(không ghi)'] = bs[r.setup || '(không ghi)'] || []).push(r));
+      table($('#tb-jr-setup'), [
+        { k: 'b', label: 'Setup', l: true },
+        { k: 'n', label: 'Số lệnh', f: (r) => n0(r.n) },
+        { k: 'win', label: 'Tỷ lệ thắng', f: (r) => pct(r.win, 0) },
+        { k: 'R', label: 'R TB', f: (r) => (isNum(r.R) ? n2(r.R) : '—'), c: (r) => cls(r.R) },
+        { k: 'held', label: 'Giữ TB', f: (r) => `${n0(r.held)} phiên` },
+      ], Object.entries(bs).map(([b, rs]) => ({ b, ...stats(rs), held: av(rs, 'held') })), { sort: 'n', empty: 'Chưa có lệnh đã đóng.' });
+      const hb = (lo, hi) => closed.filter((r) => r.held >= lo && r.held <= hi);
+      $('#jr-hold').textContent = closed.length ? `Thời gian giữ trung bình ${n0(av(closed, 'held'))} phiên (lệnh thắng ${n0(av(wins, 'held'))}, lệnh thua ${n0(av(losses, 'held'))}). Giữ ≤ 5 phiên: ${hb(0, 5).length} lệnh, R TB ${n2(stats(hb(0, 5)).R ?? 0)}; 6–20 phiên: ${hb(6, 20).length} lệnh, R TB ${n2(stats(hb(6, 20)).R ?? 0)}; trên 20 phiên: ${hb(21, 9999).length} lệnh, R TB ${n2(stats(hb(21, 9999)).R ?? 0)}.` : '';
+      // nhật ký thị trường
+      table($('#tb-mlog'), [
+        { k: 'd', label: 'Ngày', f: (r) => fdate(r.d) },
+        { k: 'qqq', label: 'QQQ', f: (r) => n2(r.qqq) },
+        { k: 'flow', label: 'Giai đoạn dòng tiền', l: true },
+        { k: 'reg', label: 'Xu hướng QQQ', l: true },
+        { k: 'alert', label: 'Cảnh báo', l: true },
+        { k: 'gold', label: 'Thời điểm mua', l: true },
+        { k: 't2108', label: 'T2108', f: (r) => pct(r.t2108, 0) },
+        { k: 'note', label: 'Nhận định của bạn', l: true },
+        { k: 'f21', label: 'QQQ 1 tháng sau', f: (r) => { const L = longRows(); const i = L.findIndex((x) => x.d >= r.d); return i >= 0 && i + 21 < L.length && isNum(r.qqq) ? spct((L[i + 21].qqq / r.qqq - 1) * 100) : '—'; } },
+        { k: '_a', label: '', f: (r) => el('button', { class: 'btn sm ghost', type: 'button', text: 'Xóa', onclick: () => { mlog = mlog.filter((x) => x.d !== r.d); store.set(MKEY, mlog); render(); } }) },
+      ], mlog, { sort: 'd', empty: 'Chưa ghi ngày nào.' });
+      // đường vốn
       const box = $('#ch-equity');
       if (eqChart) { eqChart.remove(); eqChart = null; }
-      const pts = closed.filter((r) => r.xd).sort((a, b) => a.xd.localeCompare(b.xd));
+      const pts = closed.filter((r) => r.lastD && isNum(r.R)).sort((a, b) => a.lastD.localeCompare(b.lastD));
       if (!pts.length) { box.replaceChildren(el('p', { class: 'empty', text: 'Đường vốn sẽ hiện khi có lệnh đã đóng.' })); return; }
       if (box.closest('.tab').hidden) return;
       eqChart = baseChart(box);
       let cum = 0; const byDay = new Map();
-      for (const r of pts) { cum += r.R; byDay.set(r.xd, cum); }
-      const s = eqChart.addAreaSeries({ lineColor: css('--accent'), topColor: css('--accent') + '44', bottomColor: css('--accent') + '05', lineWidth: 2, priceLineVisible: false });
-      s.setData([...byDay].map(([time, value]) => ({ time, value })));
+      for (const r of pts) { cum += r.R; byDay.set(r.lastD, cum); }
+      eqChart.addAreaSeries({ lineColor: css('--accent'), topColor: css('--accent') + '44', bottomColor: css('--accent') + '05', lineWidth: 2, priceLineVisible: false }).setData([...byDay].map(([time, value]) => ({ time, value })));
       eqChart.timeScale().fitContent();
     }
     function init() {
       if (inited) { render(); return; } inited = true;
       reset();
-      ['#jr-entry', '#jr-stop', '#jr-shares'].forEach((s) => $(s).addEventListener('input', preview));
+      ['#jr-entry', '#jr-stop', '#jr-shares', '#jr-pivot'].forEach((s) => $(s).addEventListener('input', preview));
       $('#jr-cancel').addEventListener('click', reset);
+      $('#jr-addsell').addEventListener('click', () => fillRow({ k: 'S', d: today(), px: '', sh: '' }));
+      $('#jr-addbuy').addEventListener('click', () => fillRow({ k: 'B', d: today(), px: '', sh: '' }));
+      // quy tắc
+      const RF = { t1: '#ru-t1', f1: '#ru-f1', t2: '#ru-t2', f2: '#ru-f2', be: '#ru-be', days: '#ru-days', ma: '#ru-ma', earn: '#ru-earn' };
+      Object.entries(RF).forEach(([k, s]) => { $(s).value = R[k]; $(s).addEventListener('input', () => { R[k] = $(s).tagName === 'SELECT' && k === 'ma' ? $(s).value : Number($(s).value); store.set(RKEY, R); render(); }); });
       $('#jr-form').addEventListener('submit', (e) => {
         e.preventDefault();
-        const x = { id: $('#jr-id').value || String(Date.now()), t: $('#jr-t').value.trim().toUpperCase(), setup: $('#jr-setup').value.trim(), d: $('#jr-d').value,
-          entry: Number($('#jr-entry').value), stop: Number($('#jr-stop').value), shares: Number($('#jr-shares').value), xd: $('#jr-xd').value || '', exit: $('#jr-exit').value ? Number($('#jr-exit').value) : null, note: $('#jr-note').value.trim() };
-        if (!(x.entry > x.stop)) { $('#jr-preview').textContent = 'Stop phải thấp hơn giá mua.'; return; }
+        const id = $('#jr-id').value, old = list.find((y) => y.id === id) || {};
+        const fills = $$('#jr-fills .jr-fill').map((row) => { const [d, px, sh] = $$('input', row).map((i) => i.value); return { k: row.dataset.k, d, px: Number(px), sh: Number(sh) }; }).filter((f) => f.px > 0 && f.sh > 0);
+        const t = $('#jr-t').value.trim().toUpperCase();
+        const x = { id: id || String(Date.now()), t, setup: $('#jr-setup').value.trim(), d: $('#jr-d').value,
+          entry: Number($('#jr-entry').value), stop0: Number($('#jr-stop').value), stop: old.stop && old.stop !== old.stop0 ? old.stop : Number($('#jr-stop').value), shares: Number($('#jr-shares').value),
+          pivot: $('#jr-pivot').value ? Number($('#jr-pivot').value) : null, maxg: $('#jr-maxg').value ? Number($('#jr-maxg').value) : null,
+          fills, why: $('#jr-why').value, emo: $('#jr-emo').value, note: $('#jr-note').value.trim(), lesson: $('#jr-lesson').value.trim(),
+          checks: Object.fromEntries($$('#jr-form [data-c]').map((c) => [c.dataset.c, c.checked])), mistakes: Object.fromEntries($$('#jr-form [data-m]').map((c) => [c.dataset.m, c.checked])),
+          auto: old.auto && Object.keys(old.auto).length ? old.auto : autoCrit(t) };
+        if (!(x.entry > x.stop0)) { $('#jr-preview').textContent = 'Stop phải thấp hơn giá mua.'; return; }
+        const sold = fills.filter((f) => f.k === 'S').reduce((s, f) => s + f.sh, 0), bought = x.shares + fills.filter((f) => f.k === 'B').reduce((s, f) => s + f.sh, 0);
+        if (sold > bought) { $('#jr-preview').textContent = 'Số cổ đã bán nhiều hơn số cổ đã mua.'; return; }
         const i = list.findIndex((y) => y.id === x.id); if (i >= 0) list[i] = x; else list.push(x);
         save(); reset(); render();
       });
+      $('#ml-add').addEventListener('click', () => {
+        const L = S.latest || {}, F = S.flow || {}, LR = longRows(), last = LR[LR.length - 1] || {};
+        const r = { d: L.asof || today(), qqq: last.d === L.asof ? last.qqq : ((S.history || []).slice(-1)[0] || {}).qqq, flow: F.stage || '', reg: L.qqq_regime || '', alert: L.alert || '', gold: (F.golden || {}).level || '', t2108: last.t2108, note: $('#ml-note').value.trim() };
+        mlog = mlog.filter((x) => x.d !== r.d).concat([r]); store.set(MKEY, mlog); $('#ml-note').value = ''; render();
+      });
       $('#jr-export').addEventListener('click', () => {
-        const head = ['id', 't', 'setup', 'd', 'entry', 'stop', 'shares', 'xd', 'exit', 'note'];
+        const head = ['id', 't', 'setup', 'd', 'entry', 'stop0', 'shares', 'pivot', 'avg', 'sold', 'last_sell', 'pct', 'R', 'held', 'why', 'emo', 'mistakes', 'note', 'lesson'];
         const q = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
-        const csv = '﻿' + [head.join(','), ...list.map((x) => head.map((h) => q(x[h])).join(','))].join('\n');
-        const a = el('a', { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })), download: `nhat-ky-${new Date().toISOString().slice(0, 10)}.csv` });
+        const rows = list.map(calc).map((r) => ({ ...r, sold: r.sSh, last_sell: r.lastD, avg: r.avg && r.avg.toFixed(2), pct: isNum(r.pct) ? r.pct.toFixed(2) : '', R: isNum(r.R) ? r.R.toFixed(2) : '', mistakes: Object.keys(r.mistakes || {}).filter((k) => r.mistakes[k]).map((k) => MIST[k]).join('; ') }));
+        const csv = '﻿' + [head.join(','), ...rows.map((x) => head.map((h) => q(x[h])).join(','))].join('\n');
+        const a = el('a', { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })), download: `nhat-ky-${today()}.csv` });
+        document.body.append(a); a.click(); a.remove();
+      });
+      $('#jr-backup').addEventListener('click', () => {
+        const a = el('a', { href: URL.createObjectURL(new Blob([JSON.stringify({ v: 2, trades: list, rules: R, mlog }, null, 1)], { type: 'application/json' })), download: `nhat-ky-day-du-${today()}.json` });
         document.body.append(a); a.click(); a.remove();
       });
       $('#jr-import').addEventListener('change', async (e) => {
         const f = e.target.files[0]; if (!f) return;
         const text = (await f.text()).replace(/^﻿/, '');
+        if (f.name.endsWith('.json')) {
+          try { const j = JSON.parse(text); (j.trades || []).forEach((x) => { const i = list.findIndex((y) => y.id === x.id); if (i >= 0) list[i] = x; else list.push(x); }); if (j.rules) { R = Object.assign({}, RDEF, j.rules); store.set(RKEY, R); } if (j.mlog) { mlog = j.mlog; store.set(MKEY, mlog); } save(); render(); } catch (err) { alertBox('File JSON không hợp lệ.'); }
+          e.target.value = ''; return;
+        }
         const lines = text.split(/\r?\n/).filter(Boolean);
         const parse = (line) => { const out = []; let cur = '', inq = false; for (let i = 0; i < line.length; i++) { const ch = line[i]; if (inq) { if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') inq = false; else cur += ch; } else if (ch === '"') inq = true; else if (ch === ',') { out.push(cur); cur = ''; } else cur += ch; } out.push(cur); return out; };
         const head = parse(lines[0]);
-        const rows = lines.slice(1).map((l) => Object.fromEntries(parse(l).map((v, i) => [head[i], v])));
-        let added = 0;
-        for (const r of rows) {
-          const x = { id: r.id || String(Date.now() + added), t: (r.t || '').toUpperCase(), setup: r.setup || '', d: r.d || '', entry: Number(r.entry), stop: Number(r.stop), shares: Number(r.shares), xd: r.xd || '', exit: r.exit ? Number(r.exit) : null, note: r.note || '' };
-          if (!x.t || !(x.entry > x.stop)) continue;
-          const i = list.findIndex((y) => y.id === x.id); if (i >= 0) list[i] = x; else list.push(x); added++;
+        for (const l of lines.slice(1)) {
+          const r = Object.fromEntries(parse(l).map((v, i) => [head[i], v]));
+          const x = { id: r.id || String(Date.now() + Math.random()), t: (r.t || '').toUpperCase(), setup: r.setup || '', d: r.d || '', entry: Number(r.entry), stop0: Number(r.stop0 || r.stop), shares: Number(r.shares), note: r.note || '', checks: {}, mistakes: {}, auto: {},
+            fills: (r.exit || r.xd) && Number(r.exit) > 0 ? [{ k: 'S', d: r.xd || r.d, px: Number(r.exit), sh: Number(r.shares) }] : [] };
+          x.stop = x.stop0;
+          if (!x.t || !(x.entry > x.stop0)) continue;
+          const i = list.findIndex((y) => y.id === x.id); if (i >= 0) list[i] = Object.assign({}, list[i], x); else list.push(x);
         }
         save(); render(); e.target.value = '';
       });
       render();
     }
+    const alertBox = (t) => { const ab = $('#jr-alerts'); ab.hidden = false; ab.textContent = t; };
     return { init, fill, render };
   })();
   function prefillJournal(s) {
