@@ -1,4 +1,4 @@
-"""Điểm mua trung hạn: SMI tuần (Stochastic Momentum Index 10-3-3) quá bán rồi cắt lên.
+"""Điểm mua trung hạn: SMI tuần (Stochastic Momentum Index 5-3-3) quá bán rồi cắt lên.
 
 Kiểm chứng trên QQQ tuần từ 1999 (Yahoo): tín hiệu một mình không hơn mua bất kỳ lúc nào, nhưng khi giá còn cách đỉnh
 52 tuần dưới 20% và là tín hiệu thứ 1–2 trong năm (nhịp điều chỉnh trong xu hướng tăng) thì 3 tháng sau thắng ~72%,
@@ -13,7 +13,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-K, D, E = 10, 3, 3
+K, D, E = 5, 3, 3   # theo cài đặt của người dùng (trước đây 10-3-3)
 OS = -40   # ngưỡng quá bán
 
 
