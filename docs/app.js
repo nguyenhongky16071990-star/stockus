@@ -4,7 +4,7 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const LW = window.LightweightCharts;
-  const APP_VERSION = '2026.11.11-a'; // phải trùng với APP_VERSION trong pipeline/build.py
+  const APP_VERSION = '2026.11.12-b'; // phải trùng với APP_VERSION trong pipeline/build.py
   const S = { exits: null, groups: null, flow: null, lab: null, cond: null, paper: null, cycle: null, backtest: null, latest: null, history: [], stocks: [], setups: [], extended: [], themes: [], basket: [], industries: [], patterns: null, charts: null };
   const ranges = {};          // khoảng thời gian của từng biểu đồ
   const built = new Set();    // tab đã vẽ
@@ -271,6 +271,48 @@
     live.surv = c;
   }
   function drawFlow() { drawHistChart('flow'); }
+  function drawGates() {
+    const B = (S.backtest || {}).gates || {}, M = S.smi || {}, AC = M.alert_cmp || {}, GL = M.gates || {};
+    if (!(B.rows || []).length && !(AC.rows || []).length && !GL.long) return;
+    $('#gate-card').hidden = false;
+    const rr = (x) => (isNum(x) ? (x > 0 ? '+' : '') + x.toFixed(2) + 'R' : '—');
+    const brows = (B.rows || []).map((r) => ({ ...r, now: (B.now || {})[r.name] }));
+    table($('#tb-gate-bt'), [
+      { k: 'name', label: 'Bộ lọc', l: true, f: (r) => (/^SMI/.test(r.name) ? el('b', { text: r.name }) : r.name) },
+      { k: 'now', label: 'Hôm nay', l: true, f: (r) => (r.now == null ? '—' : r.now ? 'Được mua' : 'Không mua'), c: (r) => (r.now ? 'up' : 'dn') },
+      { k: 'share', label: '% số ngày được mua', f: (r) => pct(r.share, 0) },
+      { k: 'n', label: 'Số lệnh', f: (r) => n0(r.n) },
+      { k: 'win', label: '% lệnh thắng', f: (r) => pct(r.win, 0) },
+      { k: 'exp', label: 'Kỳ vọng / lệnh', f: (r) => rr(r.exp), c: (r) => cls(r.exp) },
+      { k: 'total', label: 'Tổng R', f: (r) => (isNum(r.total) ? (r.total > 0 ? '+' : '') + n0(r.total) + 'R' : '—'), c: (r) => cls(r.total) },
+      { k: 'pf', label: 'Lãi/lỗ (PF)', f: (r) => (isNum(r.pf) ? r.pf.toFixed(2) : '—') },
+      { k: 'mdd', label: 'Sụt giảm lớn nhất', f: (r) => (isNum(r.mdd) ? r.mdd.toFixed(1) + 'R' : '—'), c: () => 'dn', title: 'Mức tụt sâu nhất của đường R cộng dồn (gộp mọi phương pháp)' },
+    ], brows, { sort: null });
+    const qcols = [
+      { k: 'name', label: 'Điều kiện', l: true, f: (r) => (/SMI/.test(r.name) ? el('b', { text: r.name }) : r.name) },
+      { k: 'share', label: '% số ngày', f: (r) => pct(r.share, 0) },
+      { k: 'f21', label: 'QQQ 1 tháng sau', f: (r) => spct(r.f21), c: (r) => cls(r.f21) },
+      { k: 'f63', label: 'QQQ 3 tháng sau', f: (r) => spct(r.f63), c: (r) => cls(r.f63) },
+      { k: 'win', label: '% lần tăng (3 tháng)', f: (r) => pct(r.win, 0) },
+      { k: 'bad', label: '% lần giảm sâu > 10%', f: (r) => pct(r.bad, 0), c: (r) => (r.bad >= 30 ? 'dn' : r.bad <= 12 ? 'up' : '') },
+    ];
+    table($('#tb-gate-al'), qcols, AC.rows || [], { sort: null });
+    const lrows = [];
+    [['long', 'Từ ' + fdate(GL.long && GL.long.from)], ['since2020', 'Từ 2020']].forEach(([k, lab]) => { const g = GL[k]; if (g && !(k === 'since2020' && GL.long && GL.long.from === g.from)) g.rows.forEach((r) => lrows.push({ ...r, name: `${lab}: ${r.name}` })); });
+    table($('#tb-gate-long'), qcols, lrows, { sort: null });
+    // kết luận tự động từ bảng 1 (cổ phiếu riêng lẻ)
+    const by = Object.fromEntries(brows.map((r) => [r.name, r]));
+    const sm = by['SMI tuần (5-3-3) trên đường tín hiệu'], cur = by['Đang dùng: xu hướng QQQ không Xấu'], al = by['Đèn không Đỏ (Xanh hoặc Vàng)'];
+    const parts = [];
+    const cmp = (a, b, nb) => { if (!a || !b || !isNum(a.exp) || !isNum(b.exp)) return; const d = a.exp - b.exp;
+      parts.push(`So với "${nb}": SMI ${Math.abs(d) < 0.05 ? 'NGANG' : d > 0 ? 'TỐT HƠN' : 'KÉM HƠN'} (kỳ vọng ${rr(a.exp)} so với ${rr(b.exp)}, thắng ${a.win}% so với ${b.win}%, tổng ${n0(a.total)}R so với ${n0(b.total)}R, sụt giảm ${a.mdd}R so với ${b.mdd}R).`); };
+    cmp(sm, al, 'đèn không Đỏ'); cmp(sm, cur, 'bộ lọc đang dùng');
+    const SMIr = (GL.long || {}).rows || [];
+    if (SMIr.length >= 3) parts.push(`QQQ lịch sử dài: ngày SMI trên tín hiệu 3 tháng sau ${spct(SMIr[1].f63)} (tăng ${SMIr[1].win}%), ngày SMI dưới ${spct(SMIr[2].f63)} (tăng ${SMIr[2].win}%); SMI đổi chiều khoảng ${GL.long.flips_per_year} lần/năm.`);
+    $('#gate-verdict').replaceChildren(el('b', { text: 'Kết luận từ dữ liệu: ' }), parts.join(' ') || 'Chưa đủ dữ liệu.');
+    $('#gate-src').textContent = `Bảng 1 đo từ ${fdate((S.backtest || {}).from)} đến ${fdate((S.backtest || {}).to)}; bảng 2 từ ${fdate(AC.from)}. Số R là lãi/lỗ tính theo mức rủi ro mỗi lệnh. Giai đoạn ngắn, kết quả có thể thay đổi; không phải lời khuyên đầu tư.`;
+  }
+
   function drawSmi() {
     const M = S.smi; if (!M || !M.series || !M.series.length) return;
     $('#smi-card').hidden = false;
@@ -415,6 +457,15 @@
       { g: 'Uptrend', name: 'Uptrend ít rủi ro (trạng thái): QQQ > SMA50 > SMA200, SMA50 dốc lên, T2108 > 50%', on: (i) => q[i] > s50[i] && s50[i] > s200[i] && s50[i] > s50[i - 10] && t[i] > 50 },
       { g: 'Tránh', name: 'Tránh xa: một phiên có đáy mới 52 tuần vượt đỉnh mới quá 10% số mã', on: (i) => hl[i] < -10, ev: true, look: 20 },
       { g: 'Tránh', name: 'Rủi ro cao (trạng thái): QQQ dưới SMA200 đang dốc xuống', on: (i) => q[i] < s200[i] && s200[i] < s200[i - 20] },
+      // ---- các phiên bản "chart cắt lên" (do người dùng đề xuất) để so trực tiếp với các tín hiệu trên
+      { g: 'Cắt lên', name: 'T2108 cắt lên trên 20% (từ vùng quá bán)', on: (i) => t[i] >= 20 && t[i - 1] < 20, ev: true, look: 10 },
+      { g: 'Cắt lên', name: 'T2108 cắt lên trên 20% + không có phiên đáy mới vượt 10% số mã trong 15 phiên', on: (i) => t[i] >= 20 && t[i - 1] < 20 && !any(hl, i, 15, (v) => v < -10), ev: true, look: 10 },
+      { g: 'Cắt lên', name: 'Tăng − giảm (TB 10 phiên) cắt lên 0 sau bán tháo (< −20% trong 20 phiên)', on: (i) => ad[i] > 0 && ad[i - 1] <= 0 && any(ad, i, 20, (v) => v < -20), ev: true, look: 10 },
+      { g: 'Cắt lên', name: 'Đường xanh cắt lên đường đỏ: mã tăng ≥ 25%/quý vượt mã giảm ≥ 25%/quý', on: (i) => R[i].up25q > R[i].dn25q && R[i - 1].up25q <= R[i - 1].dn25q, ev: true, look: 10 },
+      { g: 'Cắt lên', name: 'Đỉnh mới − đáy mới 52 tuần (TB 10 phiên) cắt lên trên 0', on: (i) => { const h10 = (k) => hl.slice(Math.max(0, k - 9), k + 1).reduce((s, v) => s + v, 0) / 10; return h10(i) > 0 && h10(i - 1) <= 0; }, ev: true, look: 10 },
+      { g: 'Cắt lên', name: 'T2108 cắt lên trên 50%', on: (i) => t[i] >= 50 && t[i - 1] < 50, ev: true, look: 10 },
+      { g: 'Cắt lên', name: 'QQQ cắt lên trên SMA 50', on: (i) => q[i] > s50[i] && q[i - 1] <= s50[i - 1], ev: true, look: 10 },
+      { g: 'Cắt lên', name: 'SMA 50 cắt lên trên SMA 200 (golden cross)', on: (i) => s50[i] > s200[i] && s50[i - 1] <= s200[i - 1], ev: true, look: 20 },
       { g: 'Không dùng', name: 'Mua điều chỉnh trong uptrend theo T2108 (vừa < 40% rồi quay lên > 45%) — kiểm chứng: không hơn bình thường', on: (i) => q[i] > s200[i] && s200[i] > s200[i - 20] && any(t, i, 10, (v) => v < 40) && t[i] > 45, ev: true, look: 10 },
     ];
     const f = (i, k) => (i + k < n ? (q[i + k] / q[i] - 1) * 100 : null);
@@ -433,7 +484,7 @@
     }
     $('#mk-card').hidden = false;
     table($('#tb-mk'), [
-      { k: 'g', label: 'Nhóm', l: true, c: (r) => (r.g === 'Tránh' ? 'dn' : r.g === 'Không dùng' ? 'muted' : r.g ? 'up' : '') },
+      { k: 'g', label: 'Nhóm', l: true, c: (r) => (r.g === 'Tránh' ? 'dn' : r.g === 'Không dùng' ? 'muted' : r.g === 'Cắt lên' ? 'warn' : r.g ? 'up' : '') },
       { k: 'name', label: 'Tín hiệu', l: true },
       { k: 'now', label: 'Hôm nay', l: true, f: (r) => (r.on ? el('b', { text: r.now }) : r.now), c: (r) => (r.on && r.g !== 'Không dùng' ? (r.g === 'Tránh' ? 'dn' : 'up') : 'muted') },
       { k: 'cnt', label: 'Số lần', f: (r) => r.cnt || `${n0(r.n)} phiên` },
@@ -978,7 +1029,7 @@
         const q = G.q25 || {};
         $('#gd-q25').textContent = isNum(q.up) ? `Hôm nay: ${n0(q.up)} mã tăng ≥25% / ${n0(q.dn)} mã giảm ≥25% trong một quý (chênh lệch ${spct(q.net)} số mã, 10 phiên trước ${spct(q.net10)}). ${q.net <= 10 && q.net > q.net10 ? 'Chênh lệch còn thấp và đang cải thiện: pha đầu, đã kiểm chứng là thuận lợi nhất.' : q.net > 10 && q.net > q.net10 ? 'Bên tăng đã áp đảo và còn tăng thêm: thị trường đã nóng, giữ lệnh, đừng mua đuổi.' : q.up > q.dn ? 'Bên tăng còn nhiều hơn nhưng đang yếu đi.' : 'Bên giảm nhiều hơn và chưa cải thiện: chờ.'}` : '';
         { const LQ = S.q25long || {}; if ((LQ.rows || []).length) $('#q25-long-note').textContent = `Nút "Từ 2020": phần nét đứt là lịch sử dài tính từ ${LQ.src} (${n0(LQ.n_tickers)} mã), từ ${fdate(LQ.rows[0][0])}; phần nét liền là dữ liệu của trang. ${LQ.note || ''}`; }
-        drawHistChart('gold'); drawHistChart('q25f'); drawSmi();
+        drawHistChart('gold'); drawHistChart('q25f'); drawSmi(); drawGates();
       }
       table($('#tb-fl-val'), [
         { k: 'stage', label: 'Giai đoạn', l: true, f: (r) => el('span', { class: 'ph-badge sm', style: `--ph:var(${STC[r.stage] || '--muted'})`, text: r.stage }) },
