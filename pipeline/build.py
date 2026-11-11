@@ -27,7 +27,7 @@ DATA = ROOT / "docs" / "data"
 CONFIG = json.loads((ROOT / "pipeline" / "config.json").read_text(encoding="utf-8"))
 INDEXES = ["QQQ", "SPY", "IWM", "SMH", "IGV"]
 FIELDS = ["Open", "High", "Low", "Close", "Volume"]
-APP_VERSION = "2026.11.11-a"  # phải trùng với APP_VERSION trong docs/app.js
+APP_VERSION = "2026.11.12-b"  # phải trùng với APP_VERSION trong docs/app.js
 
 
 # ---------------------------------------------------------------- tải dữ liệu
@@ -585,7 +585,8 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
                                           liquid=liquid, rs=rs, rs_pos=rs_pos, tt=tt, ret=ret, hi20=hi20, hiprev=hiprev, dd_hi=dd_hi,
                                           udv=udv, stage=stage, ind_rank=ind_rank_p, n_ind=n_ind0,
                                           qqq_regime=idx_reg.get("QQQ", pd.Series("Giằng co", index=dates)),
-                                          dd_qqq=dd.get("QQQ", pd.Series(0, index=dates)), qqq_close=qc), cfg)
+                                          dd_qqq=dd.get("QQQ", pd.Series(0, index=dates)), qqq_close=qc,
+                                          alert=hist["alert"] if "alert" in hist else None, qqq_ohlc=qqq), cfg)
         bt["notes"] = backtest.notes(bt, {"ml": "Martin Luk", "qm": "Qullamaggie", "mm": "Mark Minervini", "wo": "William O'Neil",
                                           "sw": "Stan Weinstein", "pb": "Pradeep Bonde", "ok": "Oliver Kell", "vs": "VSA"})
     except _Light as lt:
@@ -646,6 +647,35 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
             import traceback
             traceback.print_exc()
             print("SMI tuần lỗi:", e, file=sys.stderr)
+        # so với đèn Đỏ/Vàng/Xanh trên cùng giai đoạn dữ liệu của trang: QQQ 1 và 3 tháng sau
+        try:
+            dl = _smi.live_daily(raw["QQQ"]).reindex(dates)
+            sup = (dl["smi"] > dl["sig"]).values
+            al = hist["alert"].reindex(dates).values
+            cv = qc.values.astype(float)
+            nn = len(cv)
+            vld = [i for i in range(nn) if al[i] in ("Xanh", "Vàng", "Đỏ") and np.isfinite(dl["smi"].values[i])]
+            def _crow(name, I):
+                f = [(cv[i + 63] / cv[i] - 1) * 100 for i in I if i + 63 < nn]
+                f21 = [(cv[i + 21] / cv[i] - 1) * 100 for i in I if i + 21 < nn]
+                d_ = [(np.nanmin(cv[i + 1:i + 64]) / cv[i] - 1) * 100 for i in I if i + 63 < nn]
+                return {"name": name, "n": len(I), "share": r1(len(I) / len(vld) * 100, 0) if vld else None, "f21": r1(np.mean(f21)) if f21 else None,
+                        "f63": r1(np.mean(f)) if f else None, "win": r1(np.mean([x > 0 for x in f]) * 100, 0) if f else None,
+                        "bad": r1(np.mean([x < -10 for x in d_]) * 100, 0) if d_ else None, "n63": len(f)}
+            rows = [_crow("Mọi ngày", vld)]
+            for c_ in ("Xanh", "Vàng", "Đỏ"):
+                rows.append(_crow(f"Đèn {c_}", [i for i in vld if al[i] == c_]))
+            rows.append(_crow("Đèn không Đỏ (Xanh hoặc Vàng)", [i for i in vld if al[i] != "Đỏ"]))
+            rows.append(_crow("SMI tuần trên đường tín hiệu", [i for i in vld if sup[i]]))
+            rows.append(_crow("SMI tuần dưới đường tín hiệu", [i for i in vld if not sup[i]]))
+            rows.append(_crow("SMI trên + đèn không Đỏ", [i for i in vld if sup[i] and al[i] != "Đỏ"]))
+            if smi_out is not None:
+                smi_out["alert_cmp"] = {"from": dates[vld[0]].strftime("%Y-%m-%d") if vld else None, "rows": rows,
+                                        "now_up": bool(sup[-1]) if nn else None}
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print("So sánh SMI với đèn lỗi:", e, file=sys.stderr)
 
     # ---- điểm ngành dẫn
     groups_out = {"rows": []}

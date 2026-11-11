@@ -452,6 +452,50 @@ def run(ctx: dict, cfg: dict) -> dict:
         out[k]["nodef"]["recent"] = s0.get("recent")
         out[k]["nodef"]["curve"] = s0.get("curve")
         raw[k] = tr
+    # ---- so sánh BỘ LỌC THỊ TRƯỜNG khi mua cổ phiếu riêng lẻ: cùng điểm mua, cùng quy tắc bán và phòng thủ của từng người,
+    # chỉ khác điều kiện được phép mở lệnh mới. Câu hỏi của người dùng: SMI tuần (5-3-3) của QQQ có lọc tốt hơn đèn đỏ/vàng/xanh?
+    gates_cmp = {}
+    import time as _time
+    _t0 = _time.time()
+    try:
+        G = {"Không lọc (mọi ngày)": pd.Series(True, index=dates), "Đang dùng: xu hướng QQQ không Xấu": gate}
+        al = ctx.get("alert")
+        if al is not None:
+            al = al.reindex(dates)
+            G["Đèn không Đỏ (Xanh hoặc Vàng)"] = al.isin(["Xanh", "Vàng"])
+            G["Chỉ đèn Xanh"] = al.eq("Xanh")
+        qo = ctx.get("qqq_ohlc")
+        if qo is not None:
+            import smi as _smi
+            dl = _smi.live_daily(qo).reindex(dates)
+            sup = (dl["smi"] > dl["sig"]).fillna(False)
+            G["SMI tuần (5-3-3) trên đường tín hiệu"] = sup
+            G["SMI tuần trên tín hiệu + xu hướng không Xấu"] = sup & gate
+            if al is not None:
+                G["SMI tuần trên tín hiệu + đèn không Đỏ"] = sup & al.isin(["Xanh", "Vàng"])
+        cnt = {}
+        for gname, g in G.items():
+            g = g.fillna(False).astype(bool)
+            allt = []
+            for k, (sig, spec) in S.items():
+                bad = BAD[k].fillna(False)
+                bad2 = (bad & bad.shift(1, fill_value=False)).values
+                tr = simulate_rules(k, (sig & bc(g & ~bad)).fillna(False).astype(bool), spec, A, dates, qreg, start, mexit=bad2)
+                allt += [t for t in tr if not t["open"]]
+            r = np.array([t["r"] for t in allt]) if allt else np.array([])
+            # sụt giảm lớn nhất của đường R cộng dồn (theo ngày đóng lệnh)
+            cum = pd.Series([t["r"] for t in sorted(allt, key=lambda t: t["x"])]).cumsum() if allt else pd.Series([0.0])
+            mdd = float((cum - cum.cummax()).min()) if len(cum) else 0.0
+            share = float(g.iloc[start:].mean() * 100)
+            cnt[gname] = {"name": gname, "share": _r(share, 0), "n": len(allt), "win": _r((r > 0).mean() * 100, 0) if len(r) else None,
+                          "exp": _r(r.mean(), 2) if len(r) else None, "total": _r(r.sum(), 1) if len(r) else None,
+                          "pf": _r(r[r > 0].sum() / -r[r <= 0].sum(), 2) if len(r) and r[r <= 0].sum() < 0 else None, "mdd": _r(mdd, 1)}
+        print(f"So sánh bộ lọc thị trường: {len(G)} bộ lọc, {_time.time() - _t0:.0f} giây")
+        gates_cmp = {"rows": list(cnt.values()), "now": {k: bool(v.fillna(False).iloc[-1]) for k, v in G.items()}}
+    except Exception as e:
+        import sys, traceback
+        traceback.print_exc()
+        print("So sánh bộ lọc thị trường lỗi:", e, file=sys.stderr)
     vtypes = []
     for name, sg in vsa.items():
         tr = simulate_rules(name, (sg & (rs >= 50)).fillna(False).astype(bool), vspec, A, dates, qreg, start)
@@ -460,7 +504,7 @@ def run(ctx: dict, cfg: dict) -> dict:
     today_vsa = {t: [n for n, sg in vsa.items() if bool(sg[t].iloc[-1])] for t in C.columns}
     return {"from": dates[start].strftime("%Y-%m-%d"), "to": dates[-1].strftime("%Y-%m-%d"),
             "recent_from": dates[recent_from].strftime("%Y-%m-%d"), "regime_now": qreg[-1],
-            "strategies": out, "vsa_types": vtypes, "_raw": raw, "_start": start,
+            "strategies": out, "vsa_types": vtypes, "gates": gates_cmp, "_raw": raw, "_start": start,
             "_vsa": {n: (sg & (rs >= 50)) for n, sg in vsa.items()}}, today_vsa
 
 

@@ -54,6 +54,81 @@ def smi(w: pd.DataFrame):
     return s, ema(s, E)
 
 
+def live_daily(df: pd.DataFrame) -> pd.DataFrame:
+    """SMI tuần như người dùng nhìn trên TradingView TRONG tuần: nến tuần đang chạy (chưa đóng) được tính đến phiên hôm đó.
+    Không nhìn trước tương lai: giá trị của mỗi ngày chỉ dùng dữ liệu đến hết ngày đó. Ngày cuối tuần = đúng giá trị tuần đã đóng."""
+    df = df[["High", "Low", "Close"]].dropna()
+    wk = df.index.to_period("W-FRI")
+    g = df.groupby(wk)
+    Hw, Lw = g["High"].max().values, g["Low"].min().values
+    keys = list(g.groups.keys())
+    pos = {k: j for j, k in enumerate(sorted(keys))}
+    Hw, Lw = g["High"].max().sort_index().values, g["Low"].min().sort_index().values
+    Cw = g["Close"].last().sort_index().values
+    nW = len(Cw)
+    a, aE = 2 / (D + 1), 2 / (E + 1)
+    E1r, E2r, E1d, E2d, SG = (np.full(nW, np.nan) for _ in range(5))
+    for j in range(nW):
+        if j < K - 1:
+            continue
+        hh, ll = Hw[j - K + 1:j + 1].max(), Lw[j - K + 1:j + 1].min()
+        rd, dd = Cw[j] - (hh + ll) / 2, hh - ll
+        if np.isnan(E1r[j - 1]) if j > 0 else True:
+            E1r[j], E2r[j], E1d[j], E2d[j] = rd, rd, dd, dd
+        else:
+            E1r[j] = a * rd + (1 - a) * E1r[j - 1]; E2r[j] = a * E1r[j] + (1 - a) * E2r[j - 1]
+            E1d[j] = a * dd + (1 - a) * E1d[j - 1]; E2d[j] = a * E1d[j] + (1 - a) * E2d[j - 1]
+        sm = 200 * E2r[j] / E2d[j] if E2d[j] else np.nan
+        SG[j] = sm if (j == 0 or np.isnan(SG[j - 1])) else aE * sm + (1 - aE) * SG[j - 1]
+    H, L, C = df["High"].values, df["Low"].values, df["Close"].values
+    ph, pl, last = -np.inf, np.inf, None
+    out_s, out_g = np.full(len(df), np.nan), np.full(len(df), np.nan)
+    for i in range(len(df)):
+        j = pos[wk[i]]
+        if j != last:
+            ph, pl, last = -np.inf, np.inf, j
+        ph, pl = max(ph, H[i]), min(pl, L[i])
+        if j < K or np.isnan(E1r[j - 1]) or np.isnan(SG[j - 1]):
+            continue
+        hh, ll = max(ph, Hw[j - K + 1:j].max()), min(pl, Lw[j - K + 1:j].min())
+        rd, dd = C[i] - (hh + ll) / 2, hh - ll
+        e1r = a * rd + (1 - a) * E1r[j - 1]; e2r = a * e1r + (1 - a) * E2r[j - 1]
+        e1d = a * dd + (1 - a) * E1d[j - 1]; e2d = a * e1d + (1 - a) * E2d[j - 1]
+        if not e2d:
+            continue
+        sm = 200 * e2r / e2d
+        out_s[i], out_g[i] = sm, aE * sm + (1 - aE) * SG[j - 1]
+    return pd.DataFrame({"smi": out_s, "sig": out_g}, index=df.index)
+
+
+def gate_test(df: pd.DataFrame, since: str | None = None) -> dict:
+    """Kiểm chứng quy tắc của người dùng trên QQQ ngày: chỉ mua khi SMI tuần (đang chạy) nằm TRÊN đường tín hiệu."""
+    dl = live_daily(df)
+    c = df["Close"].reindex(dl.index)
+    n = len(c)
+    up = (dl["smi"] > dl["sig"]).values
+    ok = dl["smi"].notna().values
+    cv = c.values
+    i0 = 0 if since is None else int(np.searchsorted(dl.index.values, np.datetime64(since)))
+    def row(name, I):
+        f = [(cv[i + 63] / cv[i] - 1) * 100 for i in I if i + 63 < n]
+        f21 = [(cv[i + 21] / cv[i] - 1) * 100 for i in I if i + 21 < n]
+        dd = [(cv[i + 1:i + 64].min() / cv[i] - 1) * 100 for i in I if i + 63 < n]
+        return {"name": name, "n": len(I), "share": None, "f21": _r(np.mean(f21)) if f21 else None, "f63": _r(np.mean(f)) if f else None,
+                "win": _r(np.mean([x > 0 for x in f]) * 100, 0) if f else None, "bad": _r(np.mean([x < -10 for x in dd]) * 100, 0) if dd else None}
+    allI = [i for i in range(max(i0, 30), n) if ok[i]]
+    onI = [i for i in allI if up[i]]
+    offI = [i for i in allI if not up[i]]
+    crossI = [i for i in allI if up[i] and i > 0 and not up[i - 1]]
+    rows = [row("Mua bất kỳ ngày nào", allI), row("SMI tuần TRÊN đường tín hiệu (được mua)", onI),
+            row("SMI tuần DƯỚI đường tín hiệu (không mua)", offI), row("Ngày SMI vừa cắt lên", crossI)]
+    for r, I in zip(rows, (allI, onI, offI, crossI)):
+        r["share"] = _r(len(I) / len(allI) * 100, 0) if allI else None
+    flips = int(sum(1 for i in allI[1:] if up[i] != up[i - 1]))
+    yrs = len(allI) / 252 if allI else 1
+    return {"from": dl.index[allI[0]].strftime("%Y-%m-%d") if allI else None, "rows": rows, "flips_per_year": _r(flips / yrs, 1)}
+
+
 def compute(fallback: pd.DataFrame | None = None, long: pd.DataFrame | None = None) -> dict:
     src = "Yahoo (từ 1999)"
     df = long if long is not None else _load_long()
@@ -101,9 +176,14 @@ def compute(fallback: pd.DataFrame | None = None, long: pd.DataFrame | None = No
            "oversold": bool(s.iloc[i] < OS), "nth_next": nth_now,
            "grp_if": "Tốt" if dd_now > -0.20 and nth_now <= 2 else ("Tránh" if dd_now > -0.30 else "Chờ xác nhận"),
            "last": sig[-1] if sig else None, "weeks_since": int(i - idx[-1]) if idx else None}
+    gates = {}
+    try:
+        gates = {"long": gate_test(df), "since2020": gate_test(df, "2020-01-01")}
+    except Exception as e:
+        print("SMI: lỗi kiểm chứng quy tắc mua:", e, file=sys.stderr)
     tail = w.iloc[-400:]
     st_, sg_ = s.iloc[-400:], sg.iloc[-400:]
     series = [[d.strftime("%Y-%m-%d"), _r(o, 2), _r(hh, 2), _r(lw, 2), _r(cl, 2), _r(a, 1), _r(b, 1)]
               for d, o, hh, lw, cl, a, b in zip(tail.index, tail["Open"], tail["High"], tail["Low"], tail["Close"], st_, sg_)]
     return {"src": src, "from": w.index[30].strftime("%Y-%m-%d"), "to": w.index[-1].strftime("%Y-%m-%d"), "base": base,
-            "groups": groups, "signals": sig, "now": now, "series": series}
+            "groups": groups, "signals": sig, "now": now, "series": series, "gates": gates}
