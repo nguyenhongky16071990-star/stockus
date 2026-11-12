@@ -21,8 +21,8 @@ def _r(x, d=1):
     return None if not np.isfinite(x) else round(x, d)
 
 
-def phase_series(c: pd.Series) -> pd.Series:
-    """Phân loại từng ngày theo giá đóng cửa."""
+def phase_series(c: pd.Series, smooth: bool = True) -> pd.Series:
+    """Phân loại từng ngày theo giá đóng cửa. smooth=False: không gộp pha ngắn (không dùng dữ liệu tương lai, dùng cho kiểm chứng)."""
     e21 = c.ewm(span=21, adjust=False, min_periods=21).mean()
     e50 = c.ewm(span=50, adjust=False, min_periods=50).mean()
     sl21 = e21 / e21.shift(5) - 1
@@ -34,6 +34,8 @@ def phase_series(c: pd.Series) -> pd.Series:
     pull = (sl50 > 0) & (dd20 < -0.02)
     ph = np.select([down, up, pull], ["Giảm", "Tăng", "Điều chỉnh"], default="Giằng co")
     ph = pd.Series(ph, index=c.index).where(e50.notna())
+    if not smooth:
+        return ph
     # làm mượt: pha kéo dài dưới 3 phiên được gộp vào pha trước
     v = ph.values.copy()
     i, n = 0, len(v)

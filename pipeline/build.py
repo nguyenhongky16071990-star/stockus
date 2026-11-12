@@ -27,7 +27,7 @@ DATA = ROOT / "docs" / "data"
 CONFIG = json.loads((ROOT / "pipeline" / "config.json").read_text(encoding="utf-8"))
 INDEXES = ["QQQ", "SPY", "IWM", "SMH", "IGV"]
 FIELDS = ["Open", "High", "Low", "Close", "Volume"]
-APP_VERSION = "2026.11.12-b"  # phải trùng với APP_VERSION trong docs/app.js
+APP_VERSION = "2026.11.13-b"  # phải trùng với APP_VERSION trong docs/app.js
 
 
 # ---------------------------------------------------------------- tải dữ liệu
@@ -211,8 +211,9 @@ class _Light(Exception):
     pass
 
 
-def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = False) -> dict:
-    """light=True: bỏ qua kiểm chứng và chu kỳ (dùng khi chạy lại nhiều ngày cho danh mục mô phỏng)."""
+def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = False, bt_only: bool = False) -> dict:
+    """light=True: bỏ qua kiểm chứng và chu kỳ (dùng khi chạy lại nhiều ngày cho danh mục mô phỏng).
+    bt_only=True: chỉ chạy tới phần kiểm chứng rồi trả về lệnh thô (dùng cho kiểm chứng dài hạn nhiều năm, longbt.py)."""
     cfg = CONFIG
     if "QQQ" not in raw:
         raise SystemExit("Không tải được QQQ — dừng.")
@@ -303,6 +304,9 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
     bo_ok = ((C > C.shift(5)) & bo5).sum(axis=1) / bo_n.replace(0, np.nan)
     bo_ret = ret[5].where(bo5).mean(axis=1) * 100
     b_down2_5d = (b_ret1 <= -2).rolling(5, min_periods=1).sum()
+    # độ ra/vào top N: số mã có trong top hôm nay mà 5 phiên trước chưa có (nhóm dẫn đầu thay người nhanh hay chậm)
+    b_in5 = (top & ~top.shift(5, fill_value=False).astype(bool)).sum(axis=1).astype(float)
+    b_in5.iloc[:5] = np.nan
 
     # ---- chỉ số
     idx_reg = {k: regime(raw[k]["Close"].reindex(dates)) for k in INDEXES if k in raw}
@@ -331,7 +335,7 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
         "leaders": leaders_n,
         "leader_health": cnt(top & (C > e9)) / top.sum(axis=1).replace(0, np.nan) * 100,  # % top 100 còn trên EMA 9
         "pct_tt": cnt(tt) / n * 100,
-        "b_ret1": b_ret1, "b_up": b_up * 100, "b_gain": b_gain, "b_loss": b_loss,
+        "b_ret1": b_ret1, "b_in5": b_in5, "b_up": b_up * 100, "b_gain": b_gain, "b_loss": b_loss,
         "b_bigdown": b_bigdown, "b_ret5": b_ret5, "b_above21": b_above21 * 100,
         "b_offhigh": b_offhigh, "b_down2_5d": b_down2_5d,
         "b_ret3": b_ret3, "b_ret21": b_ret21, "b_nh52": b_nh52, "b_nh20": b_nh20,
@@ -566,9 +570,11 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
 
     # ---- chu kỳ thị trường: tăng / điều chỉnh / giằng co / giảm
     import cycle
+    top_phase = None
     try:
         top_idx = (1 + (hist["b_ret1"].fillna(0) / 100)).cumprod() * 100
-        cyc = {"notes": []} if light else cycle.analyze(qc, top_idx, C, e21, top, adr, cfg["history_days"])
+        top_phase = cycle.phase_series(top_idx, smooth=False)
+        cyc = {"notes": []} if (light or bt_only) else cycle.analyze(qc, top_idx, C, e21, top, adr, cfg["history_days"])
     except Exception as e:
         print("Chu kỳ lỗi:", e, file=sys.stderr)
         cyc = {"notes": ["Chưa tính được chu kỳ thị trường."]}
@@ -586,9 +592,9 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
                                           udv=udv, stage=stage, ind_rank=ind_rank_p, n_ind=n_ind0,
                                           qqq_regime=idx_reg.get("QQQ", pd.Series("Giằng co", index=dates)),
                                           dd_qqq=dd.get("QQQ", pd.Series(0, index=dates)), qqq_close=qc,
-                                          alert=hist["alert"] if "alert" in hist else None, qqq_ohlc=qqq), cfg)
+                                          alert=hist["alert"] if "alert" in hist else None, top_phase=top_phase), cfg)
         bt["notes"] = backtest.notes(bt, {"ml": "Martin Luk", "qm": "Qullamaggie", "mm": "Mark Minervini", "wo": "William O'Neil",
-                                          "sw": "Stan Weinstein", "pb": "Pradeep Bonde", "ok": "Oliver Kell", "vs": "VSA"})
+                                          "sw": "Stan Weinstein", "pb": "Pradeep Bonde", "ok": "Oliver Kell"})
     except _Light as lt:
         bt, vsa_today = {"strategies": {}, "vsa_types": [], "notes": []}, lt.args[0]
     except Exception as e:  # kiểm chứng lỗi không làm hỏng cả lần chạy
@@ -596,6 +602,21 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
         bt, vsa_today = {"strategies": {}, "vsa_types": [], "notes": ["Chưa chạy được phần kiểm chứng."]}, {}
 
     bt_raw, bt_vsa, bt_start = bt.pop("_raw", {}), bt.pop("_vsa", None), bt.pop("_start", 260)
+    if bt_only:
+        # kiểm chứng dài hạn: thêm lệnh của các setup (không có giai đoạn dòng tiền, chỉ xu hướng QQQ)
+        lab_tr = []
+        try:
+            import setuplab
+            cS = dict(O=O, H=H, L=L, C=C, V=V, e21=e21, e50=e50, s50=s50, s200=s200, v50=v50, rs=rs, liquid=liquid, tt=tt)
+            nd_ = len(dates)
+            ctxm = {"stage": np.array([None] * nd_, dtype=object), "reg": idx_reg.get("QQQ", pd.Series("Giằng co", index=dates)).values,
+                    "btr": np.full(nd_, np.nan), "ind_rank": ind_rank_p, "n_ind": np.full(nd_, float(n_ind0)), "gold": np.array([None] * nd_, dtype=object)}
+            lab_tr, _ = setuplab.simulate(cS, setuplab.signals(cS), ctxm, bt_start)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print("Kiểm chứng dài hạn setup lỗi:", e, file=sys.stderr)
+        return {"bt": bt, "bt_raw": bt_raw, "lab_trades": lab_tr, "dates": dates, "start": bt_start, "hist": hist, "n_stocks": len(stocks)}
     upv = V.where(C > C.shift(1), 0).rolling(50, min_periods=30).sum()
     dnv = V.where(C < C.shift(1), 0).rolling(50, min_periods=30).sum()
     udv = upv / dnv.replace(0, np.nan)
@@ -647,14 +668,13 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
             import traceback
             traceback.print_exc()
             print("SMI tuần lỗi:", e, file=sys.stderr)
-        # so với đèn Đỏ/Vàng/Xanh trên cùng giai đoạn dữ liệu của trang: QQQ 1 và 3 tháng sau
+        # đèn Đỏ/Vàng/Xanh và pha top 100 trên cùng giai đoạn dữ liệu của trang: QQQ 1 và 3 tháng sau
         try:
-            dl = _smi.live_daily(raw["QQQ"]).reindex(dates)
-            sup = (dl["smi"] > dl["sig"]).values
+            tpv = top_phase.reindex(dates).values if top_phase is not None else None
             al = hist["alert"].reindex(dates).values
             cv = qc.values.astype(float)
             nn = len(cv)
-            vld = [i for i in range(nn) if al[i] in ("Xanh", "Vàng", "Đỏ") and np.isfinite(dl["smi"].values[i])]
+            vld = [i for i in range(nn) if al[i] in ("Xanh", "Vàng", "Đỏ")]
             def _crow(name, I):
                 f = [(cv[i + 63] / cv[i] - 1) * 100 for i in I if i + 63 < nn]
                 f21 = [(cv[i + 21] / cv[i] - 1) * 100 for i in I if i + 21 < nn]
@@ -666,12 +686,13 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
             for c_ in ("Xanh", "Vàng", "Đỏ"):
                 rows.append(_crow(f"Đèn {c_}", [i for i in vld if al[i] == c_]))
             rows.append(_crow("Đèn không Đỏ (Xanh hoặc Vàng)", [i for i in vld if al[i] != "Đỏ"]))
-            rows.append(_crow("SMI tuần trên đường tín hiệu", [i for i in vld if sup[i]]))
-            rows.append(_crow("SMI tuần dưới đường tín hiệu", [i for i in vld if not sup[i]]))
-            rows.append(_crow("SMI trên + đèn không Đỏ", [i for i in vld if sup[i] and al[i] != "Đỏ"]))
+            if tpv is not None:
+                rows.append(_crow("Pha top 100 xanh lá hoặc vàng", [i for i in vld if tpv[i] in ("Tăng", "Điều chỉnh")]))
+                rows.append(_crow("Pha top 100 chỉ xanh lá", [i for i in vld if tpv[i] == "Tăng"]))
+                rows.append(_crow("Pha top 100 đỏ hoặc xanh dương", [i for i in vld if tpv[i] in ("Giảm", "Giằng co")]))
             if smi_out is not None:
                 smi_out["alert_cmp"] = {"from": dates[vld[0]].strftime("%Y-%m-%d") if vld else None, "rows": rows,
-                                        "now_up": bool(sup[-1]) if nn else None}
+                                        "phase_now": tpv[-1] if tpv is not None and isinstance(tpv[-1], str) else None}
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -1157,7 +1178,7 @@ def _jd(o):
 
 def write(out: dict) -> None:
     DATA.mkdir(parents=True, exist_ok=True)
-    for k in ("latest", "history", "stocks", "setups", "extended", "themes", "basket", "charts", "industries", "patterns", "backtest", "cycle", "flow", "lab", "groups", "exits", "smi", "paper", "q25long"):
+    for k in ("latest", "history", "stocks", "setups", "extended", "themes", "basket", "charts", "industries", "patterns", "backtest", "cycle", "flow", "lab", "groups", "exits", "smi", "paper", "q25long", "longbt"):
         (DATA / f"{k}.json").write_text(json.dumps(out.get(k, {}), ensure_ascii=False, separators=(",", ":"), default=_jd), encoding="utf-8")
     # lưu lại ảnh chụp setup + tổng quan mỗi ngày để thống kê về sau
     snap = DATA / "archive"
@@ -1291,6 +1312,17 @@ def main():
     except Exception as e:
         print("Lịch sử dài q25 lỗi:", e, file=sys.stderr)
         out["q25long"] = {}
+    # kiểm chứng dài hạn từ 2019 theo từng năm (lưu đệm 30 ngày)
+    try:
+        import longbt
+        t0 = time.time()
+        out["longbt"] = longbt.compute(raw, uni, demo=a.demo)
+        print(f"Kiểm chứng dài hạn: {time.time() - t0:.0f} giây")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print("Kiểm chứng dài hạn lỗi:", e, file=sys.stderr)
+        out["longbt"] = {}
     write(out)
     L = out["latest"]
     print(f"{L['asof']}: điểm {L['score']} ({L['stance']}), cảnh báo {L['alert']}, dẫn đầu {L['leaders']}, setup đạt chuẩn {L['n_setups']}")

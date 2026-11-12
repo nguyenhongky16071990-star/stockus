@@ -1,0 +1,171 @@
+"""Kiểm chứng DÀI HẠN (từ 2019) theo từng năm: các phương pháp huyền thoại và các setup, cùng quy tắc như kiểm chứng
+hằng ngày, nhưng chạy trên giá Yahoo nhiều năm để biết phương pháp nào dương qua nhiều kiểu thị trường (2020, 2021 tăng
+mạnh; 2022 giảm; 2023–2024 tăng; 2025–2026), không chỉ một năm gần nhất.
+
+Thêm: kiểm chứng dài hạn các chỉ báo của nhóm top 100 (pha, tốc độ tăng so với QQQ, độ ra/vào top 100).
+
+Giới hạn: Yahoo chỉ có các mã CÒN niêm yết hôm nay, nên kết quả đẹp hơn thực tế một chút (mã đã hủy niêm yết,
+thường là mã giảm mạnh, không có). Chỉ dùng ~1.200 mã thanh khoản nhất hiện nay để chạy đủ nhanh.
+Kết quả được lưu đệm 30 ngày (pipeline/cache/longbt.json) vì tải và tính mất nhiều phút.
+"""
+from __future__ import annotations
+
+import json
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+ROOT = Path(__file__).resolve().parents[1]
+CACHE = ROOT / "pipeline" / "cache" / "longbt.json"
+VER = 1
+START = "2019-01-01"
+N_TICK = 1200
+NAMES = {"ml": "Martin Luk", "qm": "Qullamaggie", "mm": "Mark Minervini", "wo": "William O'Neil", "sw": "Stan Weinstein",
+         "pb": "Pradeep Bonde", "ok": "Oliver Kell"}
+
+
+def _r(x, d=2):
+    try:
+        x = float(x)
+    except (TypeError, ValueError):
+        return None
+    return round(x, d) if np.isfinite(x) else None
+
+
+def _download(tickers: list[str], minutes: float = 25) -> dict:
+    import yfinance as yf
+    out, t_end = {}, time.time() + minutes * 60
+    for k in range(0, len(tickers), 100):
+        if time.time() > t_end:
+            print("Kiểm chứng dài hạn: hết thời gian tải, dùng phần đã có", file=sys.stderr)
+            break
+        chunk = tickers[k:k + 100]
+        ymap = {t.replace(".", "-"): t for t in chunk}
+        try:
+            df = yf.download(list(ymap), start=START, interval="1d", auto_adjust=True, progress=False, threads=True, group_by="ticker")
+        except Exception as e:
+            print("Kiểm chứng dài hạn: lỗi tải", e, file=sys.stderr)
+            continue
+        if df is None or df.empty:
+            continue
+        for yt, t in ymap.items():
+            try:
+                d = df[yt] if isinstance(df.columns, pd.MultiIndex) else df
+                d = d[["Open", "High", "Low", "Close", "Volume"]].dropna(subset=["Close"])
+                if len(d) >= 260:
+                    out[t] = d.astype(float)
+            except Exception:
+                continue
+    return out
+
+
+def _stats(rs: list[float]) -> dict:
+    if not rs:
+        return {"n": 0}
+    a = np.array(rs, dtype=float)
+    return {"n": int(len(a)), "win": _r((a > 0).mean() * 100, 0), "exp": _r(a.mean()), "total": _r(a.sum(), 1)}
+
+
+def _by_year(trades, dates, key_i, min_n=20):
+    years = sorted({dates[t[key_i]].year for t in trades})
+    yrs = {y: _stats([t["r"] for t in trades if dates[t[key_i]].year == y]) for y in years}
+    allst = _stats([t["r"] for t in trades])
+    ok_years = [y for y, s in yrs.items() if s["n"] >= min_n]
+    pos = sum(1 for y in ok_years if (yrs[y]["exp"] or 0) > 0)
+    keep = (allst.get("exp") or 0) > 0 and pos >= max(1, len(ok_years) / 2)
+    return {"years": {str(y): s for y, s in yrs.items()}, "all": allst, "pos_years": pos, "n_years": len(ok_years),
+            "verdict": "Quá ít lệnh để kết luận" if not ok_years else "Giữ: dương qua phần lớn các năm" if keep else ("Chỉ dương vài năm: chưa ổn định" if pos else "Bỏ: âm hầu hết các năm")}
+
+
+def _fwd_table(rows, t_idx, q, n):
+    """rows: [(tên, danh sách chỉ số ngày)] → lợi nhuận nhóm top 100 / QQQ 1 tháng sau."""
+    out = []
+    for name, I in rows:
+        f = [(t_idx[i + 21] / t_idx[i] - 1) * 100 for i in I if i + 21 < n]
+        g = [(q[i + 21] / q[i] - 1) * 100 for i in I if i + 21 < n and np.isfinite(q[i]) and np.isfinite(q[i + 21])]
+        dd = [(np.nanmin(t_idx[i + 1:i + 22]) / t_idx[i] - 1) * 100 for i in I if i + 21 < n]
+        out.append({"name": name, "days": len(I), "top21": _r(np.mean(f), 1) if f else None, "win": _r(np.mean([x > 0 for x in f]) * 100, 0) if f else None,
+                    "q21": _r(np.mean(g), 1) if g else None, "dd8": _r(np.mean([x < -8 for x in dd]) * 100, 0) if dd else None})
+    return out
+
+
+def top_tests(hist: pd.DataFrame, start: int = 260) -> dict:
+    """Kiểm chứng các chỉ báo của nhóm top 100 trên lịch sử dài."""
+    import cycle
+    b = hist["b_ret1"].fillna(0).values / 100
+    t_idx = np.cumprod(1 + b) * 100
+    q = hist["qqq"].astype(float).values
+    n = len(t_idx)
+    ph = cycle.phase_series(pd.Series(t_idx, index=hist.index), smooth=False).values
+    rs = t_idx / q
+    m21 = np.full(n, np.nan)
+    m21[21:] = (rs[21:] / rs[:-21] - 1) * 100
+    tin = hist["b_in5"].astype(float).values if "b_in5" in hist else np.full(n, np.nan)
+    I = [i for i in range(start, n) if isinstance(ph[i], str)]
+    tq = np.nanpercentile([tin[i] for i in I if np.isfinite(tin[i])], [25, 75]) if I else [np.nan, np.nan]
+    phase = _fwd_table([("Mọi ngày", I), ("Pha xanh lá + vàng (Tăng, Điều chỉnh)", [i for i in I if ph[i] in ("Tăng", "Điều chỉnh")]),
+                        ("Pha xanh lá (Tăng)", [i for i in I if ph[i] == "Tăng"]), ("Pha đỏ + xanh dương (Giảm, Giằng co)", [i for i in I if ph[i] in ("Giảm", "Giằng co")])], t_idx, q, n)
+    speed = _fwd_table([("Mọi ngày", I), ("Top 100 mạnh hơn QQQ (21 phiên)", [i for i in I if m21[i] > 0]),
+                        ("Top 100 yếu hơn QQQ (21 phiên)", [i for i in I if m21[i] < 0]),
+                        ("Top 100 yếu hơn QQQ trên 5%", [i for i in I if m21[i] < -5]),
+                        ("Top 100 mạnh hơn QQQ trên 5%", [i for i in I if m21[i] > 5])], t_idx, q, n)
+    turn = _fwd_table([("Mọi ngày", I), (f"Ít mã mới vào (≤ {tq[0]:.0f} mã/5 phiên, 1/4 số ngày thấp nhất)", [i for i in I if tin[i] <= tq[0]]),
+                       ("Mức bình thường", [i for i in I if tq[0] < tin[i] < tq[1]]),
+                       (f"Nhiều mã mới vào (≥ {tq[1]:.0f} mã/5 phiên, 1/4 số ngày cao nhất)", [i for i in I if tin[i] >= tq[1]])], t_idx, q, n)
+    return {"phase": phase, "speed": speed, "turnover": turn, "turn_q": [_r(tq[0], 0), _r(tq[1], 0)]}
+
+
+def compute(raw_recent: dict, universe: pd.DataFrame, demo: bool = False) -> dict:
+    now = datetime.now(timezone.utc)
+    if not demo and CACHE.exists():
+        try:
+            c = json.loads(CACHE.read_text())
+            if c.get("ver") == VER and (now - datetime.fromisoformat(c["built"])).days < 30:
+                return c
+        except Exception:
+            pass
+    import build
+    stocks = [t for t in universe.ticker if t in raw_recent]
+    if demo:
+        raw_long, src = raw_recent, "dữ liệu giả lập (demo)"
+    else:
+        dvs = {t: float((raw_recent[t]["Close"] * raw_recent[t]["Volume"]).tail(20).mean()) for t in stocks}
+        pick = sorted((t for t in dvs if np.isfinite(dvs[t])), key=lambda t: -dvs[t])[:N_TICK]
+        idx = [k for k in build.INDEXES]
+        raw_long = _download(pick + idx)
+        src = f"Yahoo, {len([t for t in raw_long if t not in idx])} mã thanh khoản nhất hiện nay"
+        if "QQQ" not in raw_long or len(raw_long) < 300:
+            print("Kiểm chứng dài hạn: không tải đủ dữ liệu Yahoo, bỏ qua", file=sys.stderr)
+            return {}
+    uni = universe[universe.ticker.isin(raw_long)]
+    old = dict(build.CONFIG)
+    build.CONFIG.update({"bt_days": 100000, "bt_gates": False})
+    try:
+        res = build.compute(raw_long, uni, bt_only=True)
+    finally:
+        build.CONFIG.clear()
+        build.CONFIG.update(old)
+    dates = res["dates"]
+    legends = []
+    for k, tr in (res["bt_raw"] or {}).items():
+        closed = [t for t in tr if not t["open"]]
+        legends.append({"id": k, "name": NAMES.get(k, k), **_by_year(closed, dates, "d")})
+    lab_tr = [t for t in res["lab_trades"] if not t["open"]]
+    setups = []
+    for name in sorted({t["s"] for t in lab_tr}):
+        ts = [t for t in lab_tr if t["s"] == name]
+        ok = [t for t in ts if t["d"].get("reg") != "Xấu"]
+        setups.append({"name": name, **_by_year(ts, dates, "e"), "ok": _by_year(ok, dates, "e")})
+    q = res["hist"]["qqq"].astype(float)
+    qy = {str(y): _r((g.iloc[-1] / g.iloc[0] - 1) * 100, 1) for y, g in q.groupby(q.index.year) if len(g) > 20}
+    out = {"ver": VER, "built": now.isoformat(), "src": src, "from": dates[res["start"]].strftime("%Y-%m-%d"), "to": dates[-1].strftime("%Y-%m-%d"),
+           "n_stocks": res["n_stocks"], "qqq_years": qy, "legends": legends, "setups": setups, "top": top_tests(res["hist"]),
+           "note": "Chỉ gồm các mã còn niêm yết hôm nay nên kết quả đẹp hơn thực tế một chút. Có áp dụng quy tắc phòng thủ như kiểm chứng hằng ngày. Setup: cột 'Khi QQQ không Xấu' là chỉ tính lệnh mở khi xu hướng QQQ không Xấu."}
+    if not demo:
+        CACHE.parent.mkdir(parents=True, exist_ok=True)
+        CACHE.write_text(json.dumps(out))
+    return out

@@ -422,7 +422,7 @@ def run(ctx: dict, cfg: dict) -> dict:
     vsa = vsa_signals(O, H, L, C, V, e21, e50, ctx["s150"], v50, liquid)
     any_vsa = vsa["Không có cung"] | vsa["Kiểm định cung"] | vsa["Rũ bỏ (spring)"] | vsa["Khối lượng chặn"]
     vspec = dict(entry="stop", lvl=H * 1.001, pending=3, stop=L * 0.995, max_stop=10, be_r=2, vsa=True, max_hold=60)
-    S["vs"] = (any_vsa & (rs >= 50) & M["vs"], vspec)
+    # VSA đã bỏ khỏi kiểm chứng (11/2026): 3.769 lệnh, kỳ vọng −0,23R, cả 4 loại tín hiệu đều âm
     wk = pd.Series(dates.to_period("W"), index=dates)
     A = {"O": O.values, "H": H.values, "L": L.values, "C": C.values, "V": V.values, "e9": e9.values, "e21": e21.values,
          "e10": C.ewm(span=10, adjust=False).mean().values, "s10": C.rolling(10).mean().values, "s20": C.rolling(20).mean().values,
@@ -453,26 +453,30 @@ def run(ctx: dict, cfg: dict) -> dict:
         out[k]["nodef"]["curve"] = s0.get("curve")
         raw[k] = tr
     # ---- so sánh BỘ LỌC THỊ TRƯỜNG khi mua cổ phiếu riêng lẻ: cùng điểm mua, cùng quy tắc bán và phòng thủ của từng người,
-    # chỉ khác điều kiện được phép mở lệnh mới. Câu hỏi của người dùng: SMI tuần (5-3-3) của QQQ có lọc tốt hơn đèn đỏ/vàng/xanh?
+    # chỉ khác điều kiện được phép mở lệnh mới. (SMI tuần đã thử 11/2026: không hơn không lọc, đã bỏ.)
     gates_cmp = {}
     import time as _time
+    if not cfg.get("bt_gates", True):
+        G_SKIP = True
+    else:
+        G_SKIP = False
     _t0 = _time.time()
     try:
+        if G_SKIP:
+            raise StopIteration
         G = {"Không lọc (mọi ngày)": pd.Series(True, index=dates), "Đang dùng: xu hướng QQQ không Xấu": gate}
         al = ctx.get("alert")
         if al is not None:
             al = al.reindex(dates)
             G["Đèn không Đỏ (Xanh hoặc Vàng)"] = al.isin(["Xanh", "Vàng"])
             G["Chỉ đèn Xanh"] = al.eq("Xanh")
-        qo = ctx.get("qqq_ohlc")
-        if qo is not None:
-            import smi as _smi
-            dl = _smi.live_daily(qo).reindex(dates)
-            sup = (dl["smi"] > dl["sig"]).fillna(False)
-            G["SMI tuần (5-3-3) trên đường tín hiệu"] = sup
-            G["SMI tuần trên tín hiệu + xu hướng không Xấu"] = sup & gate
+        tp = ctx.get("top_phase")
+        if tp is not None:
+            tp = tp.reindex(dates)
+            G["Pha top 100: Tăng (xanh lá) hoặc Điều chỉnh (vàng)"] = tp.isin(["Tăng", "Điều chỉnh"])
+            G["Pha top 100: chỉ Tăng (xanh lá)"] = tp.eq("Tăng")
             if al is not None:
-                G["SMI tuần trên tín hiệu + đèn không Đỏ"] = sup & al.isin(["Xanh", "Vàng"])
+                G["Pha top 100 xanh lá/vàng + đèn không Đỏ"] = tp.isin(["Tăng", "Điều chỉnh"]) & al.isin(["Xanh", "Vàng"])
         cnt = {}
         for gname, g in G.items():
             g = g.fillna(False).astype(bool)
@@ -492,20 +496,18 @@ def run(ctx: dict, cfg: dict) -> dict:
                           "pf": _r(r[r > 0].sum() / -r[r <= 0].sum(), 2) if len(r) and r[r <= 0].sum() < 0 else None, "mdd": _r(mdd, 1)}
         print(f"So sánh bộ lọc thị trường: {len(G)} bộ lọc, {_time.time() - _t0:.0f} giây")
         gates_cmp = {"rows": list(cnt.values()), "now": {k: bool(v.fillna(False).iloc[-1]) for k, v in G.items()}}
+    except StopIteration:
+        pass
     except Exception as e:
         import sys, traceback
         traceback.print_exc()
         print("So sánh bộ lọc thị trường lỗi:", e, file=sys.stderr)
     vtypes = []
-    for name, sg in vsa.items():
-        tr = simulate_rules(name, (sg & (rs >= 50)).fillna(False).astype(bool), vspec, A, dates, qreg, start)
-        s_ = summarize(tr, dates, tickers, recent_from)
-        vtypes.append({"type": name, **{k: s_.get(k) for k in ("n", "win", "exp", "pf", "hold")}, "recent": s_["recent"]})
-    today_vsa = {t: [n for n, sg in vsa.items() if bool(sg[t].iloc[-1])] for t in C.columns}
+    today_vsa = {}
     return {"from": dates[start].strftime("%Y-%m-%d"), "to": dates[-1].strftime("%Y-%m-%d"),
             "recent_from": dates[recent_from].strftime("%Y-%m-%d"), "regime_now": qreg[-1],
             "strategies": out, "vsa_types": vtypes, "gates": gates_cmp, "_raw": raw, "_start": start,
-            "_vsa": {n: (sg & (rs >= 50)) for n, sg in vsa.items()}}, today_vsa
+            "_vsa": {}}, today_vsa
 
 
 def notes(bt: dict, names: dict) -> list[str]:
