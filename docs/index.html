@@ -50,15 +50,20 @@
   <!-- TỔNG QUAN -->
   <section id="tab-overview" class="tab" role="tabpanel">
     <button type="button" class="banner fl-banner" id="flow-banner" hidden></button>
+    <article class="card dc-card" id="dc-card" hidden>
+      <div class="card-top"><h3>Hôm nay nên làm gì?</h3><span class="dc-badge" id="dc-badge"></span></div>
+      <p class="dc-main" id="dc-main"></p>
+      <details class="dc-more"><summary>Vì sao chọn điều kiện này (kiểm chứng 2020–2026)</summary>
+        <p class="note">Mỗi dòng: chỉ mở lệnh các setup (tab Hiệu quả setup) khi điều kiện đúng. Ô quyết định dùng điều kiện có tổng R cao nhất. Sụt giảm lớn nhất là mức tụt sâu nhất của đường R cộng dồn.</p>
+        <div class="tbl"><table id="tb-dc"></table></div>
+      </details>
+    </article>
     <article class="card verdict" id="verdict" hidden>
-      <div class="card-top"><h3>Kết luận hôm nay</h3><span class="gd-badge" id="vd-badge"></span></div>
-      <p class="vd-main" id="vd-main"></p>
+      <h3>Bối cảnh hôm nay</h3>
       <div class="vd-grid">
         <div><h4 class="sub-h">Thị trường</h4><ul class="small-list" id="vd-mkt"></ul></div>
         <div><h4 class="sub-h">Tiền đang vào đâu</h4><ul class="small-list" id="vd-grp"></ul></div>
-        <div><h4 class="sub-h">Mã hôm nay</h4><ul class="small-list" id="vd-pick"></ul></div>
       </div>
-      <p class="note">Tổng hợp tự động từ các tab Dòng tiền, Ngành và Hiệu quả setup. Mức vốn gợi ý là khung tham khảo theo cách các huyền thoại tăng giảm tỷ trọng theo thị trường, không phải khuyến nghị đầu tư.</p>
     </article>
     <article class="card" id="mk-card" hidden>
       <h3>Tín hiệu thị trường đã kiểm chứng (đáy · uptrend · tránh xa)</h3>
@@ -119,6 +124,16 @@
       <article class="card"><h3>Stockbee: mã tăng/giảm ≥ 4% kèm khối lượng</h3><p class="note">Xanh: số mã tăng ≥ 4%. Đỏ: số mã giảm ≥ 4%. Đường: tỷ lệ 10 ngày (trên 1 là bên mua mạnh hơn).</p><p class="note" id="sbn-note"></p><div class="range" data-chart="sb"></div><div class="chart" id="ch-sb"></div></article>
       <article class="card"><h3>% cổ phiếu trên các đường trung bình</h3><p class="note">SMA 40 dưới 20% thường là vùng quá bán gần đáy; trên 70% là hưng phấn.</p><div class="range" data-chart="pct"></div><div class="chart" id="ch-pct"></div></article>
       <article class="card"><h3>Đỉnh mới và đáy mới 52 tuần</h3><p class="note">Xanh: số mã lập đỉnh 52 tuần. Đỏ: số mã lập đáy 52 tuần.</p><div class="range" data-chart="nhnl"></div><div class="chart" id="ch-nhnl"></div></article>
+      <article class="card full" id="ants-card">
+        <h3>Số mã có "Ants" mỗi ngày (David Ryan)</h3>
+        <p class="note">Một mã có Ants khi trong 15 phiên có ít nhất 12 phiên tăng, giá tăng ≥ 20% và khối lượng trung bình tăng ≥ 20%: dấu vết quỹ lớn gom hàng liên tục. Cột: số mã có Ants mỗi ngày; đường kẻ: 30 mã. Ý "thị trường uptrend khi có từ 30 mã dẫn dắt tăng liên tục" được kiểm chứng ở bảng dưới; chưa tìm được nguồn ghi lại con số 30 từ chính David Ryan.</p>
+        <p class="note" id="ants-now"></p>
+        <div class="range" data-chart="ants"></div><div class="chart" id="ch-ants"></div>
+        <h4 class="sub-h">Kiểm chứng trên dữ liệu của trang (toàn thị trường, khoảng 2 năm)</h4>
+        <div class="tbl"><table id="tb-ants"></table></div>
+        <h4 class="sub-h">Kiểm chứng dài hạn 2020–2026 (theo % số mã thanh khoản, vì danh sách mã dài hạn nhỏ hơn)</h4>
+        <div class="tbl"><table id="tb-ants-long"></table></div>
+      </article>
       <article class="card full" id="lb-card" hidden><h3>Độ rộng dài hạn (từ 2020): các chỉ báo kiểu Stockbee</h3>
         <p class="note">Chọn một chỉ báo để xem cùng QQQ (đường đen, trục trái). Kiểm chứng thật 2020–2026: các chỉ báo kiểu này không dự báo được thị trường ở mức bình thường, chỉ có giá trị ở VÙNG CỰC. Bảng bên dưới tự đo lại mỗi ngày: sau mỗi lần chạm ngưỡng, QQQ 1 và 3 tháng sau ra sao so với mua bất kỳ lúc nào. Đã bỏ các chỉ báo không có giá trị (13%/34 phiên, 25%/tháng); đường A/D và đỉnh mới − đáy mới được đổi từ cộng dồn sang % số mã.</p>
         <div class="tools"><select id="lb-sel" aria-label="Chọn chỉ báo"></select><div class="range" id="lb-range"></div></div>
@@ -184,6 +199,7 @@
       <button type="button" data-mv="buy" aria-pressed="true">Setup mua (A+)</button>
       <button type="button" data-mv="edge" aria-pressed="false">Theo lợi thế setup</button>
       <button type="button" data-mv="pat" aria-pressed="false">Theo mẫu hình</button>
+      <button type="button" data-mv="hold" aria-pressed="false">Giữ sức mạnh</button>
       <button type="button" data-mv="scr" aria-pressed="false">Lọc &amp; tìm mã</button>
     </div>
     <article class="card calc">
@@ -229,6 +245,17 @@
       <h3>Mã vừa có tín hiệu mẫu hình hôm nay</h3><p class="note">Kết quả gần đây của từng mẫu hình nằm ở tab Hiệu quả setup.</p>
       <div class="tools"><select id="sel-sig" aria-label="Lọc theo mẫu hình"><option value="">Mọi mẫu hình</option></select><span class="muted small" id="sig-count"></span></div>
       <div class="tbl"><table id="tb-sig"></table></div>
+    </article>
+    </div>
+    <div class="mv" data-mv="hold" hidden>
+    <article class="card">
+      <h3>Mã giữ sức mạnh khi thị trường điều chỉnh</h3>
+      <p class="note">Mã đủ thanh khoản, giá cách đỉnh 1 năm không quá 10%, đường RS (giá chia QQQ) lập đỉnh 52 tuần trong 5 phiên gần nhất, RS ≥ 80. Theo O'Neil và Minervini, khi thị trường điều chỉnh, đây thường là nhóm bứt lên đầu tiên lúc thị trường hồi. Danh sách để chuẩn bị, chưa phải điểm mua: chỉ mua khi có setup và ô "Hôm nay nên làm gì?" cho phép.</p>
+      <p class="note" id="hold-now"></p>
+      <div class="tbl"><table id="tb-hold"></table></div>
+      <h4 class="sub-h">Kiểm chứng 2020–2026: những lần QQQ điều chỉnh từ 8% trở lên, nhóm này sau đó ra sao?</h4>
+      <div class="tbl"><table id="tb-hold-val"></table></div>
+      <p class="note" id="hold-val-note"></p>
     </article>
     </div>
     <div class="mv" data-mv="scr" hidden>
@@ -379,18 +406,13 @@
     <div class="tiles" id="bk-period"></div>
     <article class="card notes"><h3>Nhận xét về nhóm top 100</h3><ul id="bk-notes"></ul></article>
     <article class="card">
-      <h3>Tốc độ tăng của top 100 so với QQQ</h3>
-      <p class="note">Đường: chỉ số nhóm top 100 chia cho QQQ (đặt bằng 100 ở đầu biểu đồ). Đi lên là nhóm dẫn đầu tăng nhanh hơn thị trường chung; đi xuống là nhóm dẫn đầu đang chậm lại hoặc bị bán mạnh hơn. Cột: chênh lệch 21 phiên (%).</p>
+      <h3>Top 100 và QQQ chồng lên nhau</h3>
+      <p class="note">Hai đường đặt bằng 100 ở đầu khoảng đang xem: <b>nhóm top 100</b> (đường đậm) và <b>QQQ</b> (đường xám). Cột: top 100 hơn (xanh) hay kém (đỏ) QQQ bao nhiêu % trong 21 phiên.</p>
+      <p class="note" id="tspd-now"></p>
       <div class="range" data-chart="tspd"></div><div class="chart" id="ch-tspd"></div>
-      <h4 class="sub-h">Kiểm chứng dài hạn: nhóm top 100 sau 1 tháng</h4>
+      <h4 class="sub-h">Kiểm chứng dài hạn: sau đó 1 tháng</h4>
       <div class="tbl"><table id="tb-tspd"></table></div>
-    </article>
-    <article class="card">
-      <h3>Độ ra/vào top 100</h3>
-      <p class="note">Cột: số mã mới vào top 100 so với 5 phiên trước (cũng là số mã vừa rời). Nhiều là nhóm dẫn đầu thay người nhanh (dòng tiền xoay vòng, xu hướng kém bền); ít là nhóm dẫn đầu ổn định. Đường: trung bình 20 phiên.</p>
-      <div class="range" data-chart="turn"></div><div class="chart" id="ch-turn"></div>
-      <h4 class="sub-h">Kiểm chứng dài hạn: nhóm top 100 sau 1 tháng</h4>
-      <div class="tbl"><table id="tb-turn"></table></div>
+      <p class="note">Kiểm chứng 2020–2026 (chỉ gồm mã còn niêm yết): top 100 mạnh hay yếu hơn QQQ <b>không báo trước được hướng của QQQ</b>. Dữ liệu 2 năm gần đây (toàn thị trường) thì cho thấy khi top 100 yếu hơn QQQ trên 5%, chính nhóm top 100 tháng sau kém hẳn. Dùng biểu đồ để nhìn nhóm dẫn đầu, đừng dùng để đoán chỉ số.</p>
     </article>
     <div class="grid2">
       <article class="card"><h3>Mới vào top 100 (5 phiên)</h3><div class="chips" id="new-leaders"></div></article>
@@ -583,7 +605,7 @@
       <h3>Mới xem lần đầu? Bắt đầu ở đây (10 phút)</h3>
       <p><b>Ý tưởng chính:</b> trang này không chỉ tìm cổ phiếu có mẫu hình đẹp. Nó trả lời 3 câu hỏi trước khi mua, và tự kiểm chứng xem các câu trả lời đó trước đây có đúng không:</p>
       <ol>
-        <li><b>Thị trường có ủng hộ mua không?</b> Xem nhóm Thị trường: Tổng quan → Kết luận hôm nay và bảng Tín hiệu thị trường đã kiểm chứng; Chu kỳ → Lịch sử các pha (Nhóm top 100).</li>
+        <li><b>Thị trường có ủng hộ mua không?</b> Xem nhóm Thị trường: Tổng quan → ô "Hôm nay nên làm gì?" (Mua mới / Chỉ theo dõi / Đứng ngoài, chọn theo kiểm chứng 2020–2026) và bảng Tín hiệu thị trường đã kiểm chứng.</li>
         <li><b>Tiền đang vào ngành nào, mã nào?</b> Xem tab Ngành → Điểm ngành dẫn, và Radar dòng tiền ở tab Dòng tiền.</li>
         <li><b>Mua ở đâu, sai khi nào, và kiểu mua này có lợi thế không?</b> Xem tab Hiệu quả setup → Tín hiệu hôm nay, bấm vào mã để mở "Ba câu hỏi trước khi mua".</li>
       </ol>
@@ -591,7 +613,7 @@
       <ol>
         <li><b>Nhìn vào bên trong chỉ số.</b> Theo dõi riêng 100 mã mạnh nhất (tab Chu kỳ &amp; Top 100). Các mã dẫn dắt thường gãy trước chỉ số, nên đây là hệ thống báo động sớm.</li>
         <li><b>Hỏi xem thị trường có đang thưởng cho breakout không.</b> Bảng mẫu hình ở tab Hiệu quả setup và điểm Follow-through. Breakout thất bại hàng loạt là lúc đứng ngoài, dù chỉ số còn đẹp.</li>
-        <li><b>Không tin một chỉ báo.</b> Kết luận hôm nay cần 5/6 bằng chứng độc lập để là "Thời điểm vàng"; ngành dẫn cần 7 bằng chứng; mỗi cổ phiếu có 9 bằng chứng dòng tiền. Luôn có danh sách "bằng chứng còn thiếu".</li>
+        <li><b>Không tin một chỉ báo.</b> Ô quyết định chỉ dùng điều kiện đã kiểm chứng qua nhiều năm; ngành dẫn cần 7 bằng chứng; mỗi cổ phiếu có 9 bằng chứng dòng tiền. Luôn có danh sách "bằng chứng còn thiếu".</li>
         <li><b>Mọi tín hiệu đều được chấm điểm bằng lịch sử,</b> tính theo R (bội số rủi ro) sau trượt giá, có khoảng tin cậy và kết quả ngoài mẫu. Nếu một setup không có lợi thế trong điều kiện hiện tại, trang sẽ nói thẳng.</li>
         <li><b>Kết quả thay đổi theo điều kiện thị trường.</b> Cùng một mẫu hình VCP có thể rất tốt khi thị trường khỏe và rất tệ khi thị trường yếu. Tab Hiệu quả setup chia rõ điều này.</li>
         <li><b>Các huyền thoại giao dịch song song bằng tiền ảo</b> (tab Kiểm chứng huyền thoại, phần Tài khoản ảo), mỗi người đúng quy tắc của mình, để thấy phong cách nào hợp thị trường hiện tại.</li>
@@ -612,7 +634,7 @@
     <article class="card">
       <h3>Đọc trang này mỗi sáng trong 5 bước</h3>
       <ol>
-        <li><b>Tổng quan → Kết luận hôm nay:</b> thị trường đang ở mức nào (Thời điểm vàng / Thuận lợi / Trung tính / Bất lợi) và mức vốn nên dùng.</li>
+        <li><b>Tổng quan → Hôm nay nên làm gì?:</b> Mua mới, Chỉ theo dõi hay Đứng ngoài, kèm điều kiện được chọn và kết quả kiểm chứng của nó.</li>
         <li><b>Dòng tiền:</b> giai đoạn dòng tiền, 16 bằng chứng và bằng chứng nào còn thiếu. Một ngày tăng mạnh chưa đủ, cần nhiều bằng chứng độc lập.</li>
         <li><b>Ngành:</b> chọn ngành Dẫn dắt hoặc Mới nổi; tránh ngành Suy yếu và Tụt hậu.</li>
         <li><b>Hiệu quả setup → Tín hiệu hôm nay:</b> chỉ chọn setup có kỳ vọng dương trong điều kiện hiện tại, nhiều bằng chứng dòng tiền, stop trong mức cho phép. Bấm vào mã để xem 3 câu hỏi trước khi mua.</li>
@@ -637,7 +659,7 @@
         <dt>Dòng tiền (Money Flow Radar)</dt><dd>Bốn điểm 0–100: Độ rộng (% mã trên EMA21/MA50/MA200, đường A/D, đỉnh − đáy mới), Tích lũy (tỷ trọng khối lượng ở mã tăng, phiên tăng mạnh có khối lượng, ngày tích lũy − phân phối của QQQ), Dẫn dắt (đường RS lập đỉnh, mã mạnh gần đỉnh, sức bền top 100), Follow-through (breakout giữ pivot, thất bại 3 phiên). Giai đoạn: Xu hướng giảm, Hồi phục ban đầu, Dòng tiền lan rộng, Uptrend xác nhận, Phân phối / suy yếu.</dd>
         <dt>Hiệu quả setup</dt><dd>6 setup định lượng (VCP, nền phẳng, cốc tay cầm, breakout 20 phiên, lấy lại EMA21, lấy lại MA50; đã bỏ inside day, pullback EMA21, EP, cờ cán cao vì kiểm chứng thật đều lỗ) được mô phỏng thành lệnh thật và đo theo R sau trượt giá, chia theo điều kiện lúc vào lệnh, trong mẫu / ngoài mẫu.</dd>
 <dt>Danh mục mô phỏng</dt><dd>Mỗi huyền thoại một tài khoản ảo 60.000 USD, giao dịch theo đúng quy tắc của người đó: chỉ mua khi thị trường đạt điều kiện của họ, cỡ vị thế và stop riêng (O'Neil cắt lỗ 7,5%, Minervini rủi ro 1,25%, Martin/Qullamaggie dời stop lên đáy phiên mua…), chốt từng phần và chốt hết theo cách của họ. Mã đạt bộ lọc MẶC ĐỊNH của huyền thoại được đặt lệnh, tối đa 5 lệnh mới mỗi ngày, ưu tiên mã mạnh nhất. Có tính trượt giá 0,1%. Lần chạy đầu tiên chạy lại 6 tháng gần nhất (đánh dấu ↺), sau đó cộng dồn mỗi ngày.</dd>
-        <dt>Ký hiệu huyền thoại</dt><dd><b>ML</b> Martin Luk · <b>QM</b> Qullamaggie · <b>MM</b> Mark Minervini · <b>WO</b> William O'Neil (CAN SLIM) · <b>SW</b> Stan Weinstein · <b>PB</b> Pradeep Bonde (Stockbee) · <b>OK</b> Oliver Kell · <b>TÔI</b> bộ lọc riêng của bạn. Mã có ký hiệu nào là đạt đủ các điều kiện đang bật của huyền thoại đó (chỉnh trong tab Mã hôm nay → Lọc &amp; tìm mã). Điểm mua, stop và cách bán của từng người nằm trong cửa sổ biểu đồ khi bấm vào mã. Các mức giá là gợi ý theo quy tắc của từng huyền thoại, tính từ giá đóng cửa gần nhất.</dd>
+        <dt>Ký hiệu huyền thoại</dt><dd><b>MM</b> Mark Minervini · <b>WO</b> William O'Neil (CAN SLIM) · <b>SW</b> Stan Weinstein · <b>PB</b> Pradeep Bonde (Stockbee) · <b>OK</b> Oliver Kell · <b>TÔI</b> bộ lọc riêng của bạn. Mã có ký hiệu nào là đạt đủ các điều kiện đang bật của huyền thoại đó (chỉnh trong tab Mã hôm nay → Lọc &amp; tìm mã). Điểm mua, stop và cách bán của từng người nằm trong cửa sổ biểu đồ khi bấm vào mã. Các mức giá là gợi ý theo quy tắc của từng huyền thoại, tính từ giá đóng cửa gần nhất.</dd>
         <dt>Bảng kiểm các huyền thoại</dt><dd>8 điều kiện thị trường: ngày phân phối và nhịp tạo đáy (O'Neil), xu hướng QQQ và số mã có đà tăng mạnh (Martin Luk), đỉnh mới so với đáy mới (Minervini), giai đoạn của QQQ (Weinstein), tỷ lệ bứt phá/sập 4% (Stockbee), nhóm mạnh và breakout (Qullamaggie). Từ 6 chấm xanh: thị trường thuận lợi; dưới 4: nên giảm tỷ trọng.</dd>
         <dt>Mã mới niêm yết (IPO)</dt><dd>Được xếp hạng từ 1 tháng sau phiên đầu tiên. Dưới 6 tháng, sức mạnh giá tính bằng mức tăng kể từ phiên đầu tiên. Có nhãn "IPO x tháng" trong năm đầu.</dd>
         <dt>Giai đoạn của từng mã (Weinstein)</dt><dd>So giá với SMA 150 phiên (≈ 30 tuần) và độ dốc 1 tháng của đường này. 2: giá trên đường đang dốc lên, giai đoạn duy nhất nên mua. 4: giá dưới đường đang dốc xuống. 1: tạo nền. 3: tạo đỉnh.</dd>

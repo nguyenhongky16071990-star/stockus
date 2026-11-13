@@ -332,3 +332,8 @@ body.fs-open{overflow:hidden}
 
 .mv-seg{display:flex;flex-wrap:wrap;margin:0 0 12px}
 .mv-seg button{padding:7px 14px;font-size:.88rem}
+
+.dc-card{border-left:6px solid var(--dc,var(--muted))}
+.dc-badge{font-weight:700;padding:4px 12px;border-radius:999px;color:var(--panel);background:var(--dc,var(--muted))}
+.dc-main{font-size:1rem;margin:.4rem 0}
+.dc-more summary{cursor:pointer;color:var(--accent);font-size:.88rem}
