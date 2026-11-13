@@ -26,7 +26,7 @@ VERSION = 4   # 4: điều kiện nền giá chặt cho Minervini/O'Neil/Qullama
 
 MARTIN = ["Lấy lại EMA 9", "Lấy lại AVWAP", "EMA hội tụ", "Inside day", "2 inside day"]
 TIGHT = ["Nền chặt", "VCP", "Inside day", "2 inside day", "EMA hội tụ"]
-NAMES = {"ml": "Martin Luk", "qm": "Qullamaggie", "mm": "Mark Minervini", "wo": "William O'Neil", "sw": "Stan Weinstein",
+NAMES = {"mm": "Mark Minervini", "wo": "William O'Neil", "sw": "Stan Weinstein",
          "pb": "Pradeep Bonde", "ok": "Oliver Kell"}   # VSA đã bỏ (11/2026): cả 4 loại tín hiệu kiểm chứng đều âm
 
 # ---------------------------------------------------------------- quy tắc của từng người (hiển thị trên web)

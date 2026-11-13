@@ -21,10 +21,10 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 CACHE = ROOT / "pipeline" / "cache" / "longbt.json"
-VER = 1
+VER = 2
 START = "2019-01-01"
 N_TICK = 1200
-NAMES = {"ml": "Martin Luk", "qm": "Qullamaggie", "mm": "Mark Minervini", "wo": "William O'Neil", "sw": "Stan Weinstein",
+NAMES = {"mm": "Mark Minervini", "wo": "William O'Neil", "sw": "Stan Weinstein",
          "pb": "Pradeep Bonde", "ok": "Oliver Kell"}
 
 
@@ -104,19 +104,87 @@ def top_tests(hist: pd.DataFrame, start: int = 260) -> dict:
     rs = t_idx / q
     m21 = np.full(n, np.nan)
     m21[21:] = (rs[21:] / rs[:-21] - 1) * 100
-    tin = hist["b_in5"].astype(float).values if "b_in5" in hist else np.full(n, np.nan)
     I = [i for i in range(start, n) if isinstance(ph[i], str)]
-    tq = np.nanpercentile([tin[i] for i in I if np.isfinite(tin[i])], [25, 75]) if I else [np.nan, np.nan]
     phase = _fwd_table([("Mọi ngày", I), ("Pha xanh lá + vàng (Tăng, Điều chỉnh)", [i for i in I if ph[i] in ("Tăng", "Điều chỉnh")]),
                         ("Pha xanh lá (Tăng)", [i for i in I if ph[i] == "Tăng"]), ("Pha đỏ + xanh dương (Giảm, Giằng co)", [i for i in I if ph[i] in ("Giảm", "Giằng co")])], t_idx, q, n)
     speed = _fwd_table([("Mọi ngày", I), ("Top 100 mạnh hơn QQQ (21 phiên)", [i for i in I if m21[i] > 0]),
                         ("Top 100 yếu hơn QQQ (21 phiên)", [i for i in I if m21[i] < 0]),
                         ("Top 100 yếu hơn QQQ trên 5%", [i for i in I if m21[i] < -5]),
                         ("Top 100 mạnh hơn QQQ trên 5%", [i for i in I if m21[i] > 5])], t_idx, q, n)
-    turn = _fwd_table([("Mọi ngày", I), (f"Ít mã mới vào (≤ {tq[0]:.0f} mã/5 phiên, 1/4 số ngày thấp nhất)", [i for i in I if tin[i] <= tq[0]]),
-                       ("Mức bình thường", [i for i in I if tq[0] < tin[i] < tq[1]]),
-                       (f"Nhiều mã mới vào (≥ {tq[1]:.0f} mã/5 phiên, 1/4 số ngày cao nhất)", [i for i in I if tin[i] >= tq[1]])], t_idx, q, n)
-    return {"phase": phase, "speed": speed, "turnover": turn, "turn_q": [_r(tq[0], 0), _r(tq[1], 0)]}
+    # Ants (David Ryan): số mã có Ants mỗi ngày, theo % số mã thanh khoản (vì số mã trong danh sách khác nhau giữa các nguồn)
+    ap = hist["ants_pct"].astype(float).values if "ants_pct" in hist else np.full(n, np.nan)
+    lo40 = pd.Series(ap).rolling(40, min_periods=20).min().shift(1).values
+    ants = _fwd_table([("Mọi ngày", I)] + [(f"Mã có Ants ≥ {th}% số mã thanh khoản", [i for i in I if np.isfinite(ap[i]) and ap[i] >= th]) for th in (0.5, 1, 1.5, 3)]
+                      + [("Mã có Ants < 0,5% (rất ít mã tăng đều)", [i for i in I if np.isfinite(ap[i]) and ap[i] < 0.5]),
+                         ("Ants vượt lên 1,5% sau khi đã dưới 0,5% trong 40 phiên (bùng lên sau giai đoạn trầm lắng)",
+                          [i for i in I if np.isfinite(ap[i]) and ap[i] >= 1.5 and np.isfinite(lo40[i]) and lo40[i] < 0.5 and not (np.isfinite(ap[i - 1]) and ap[i - 1] >= 1.5)])], t_idx, q, n)
+    return {"phase": phase, "speed": speed, "ants": ants}
+
+
+
+def market_filters(hist: pd.DataFrame) -> dict:
+    """Các điều kiện 'được mở lệnh mới' cần so sánh. Mỗi cái là chuỗi True/False theo ngày, chỉ dùng dữ liệu tới ngày đó."""
+    q = hist["qqq"].astype(float)
+    s50, s200 = q.rolling(50, min_periods=40).mean(), q.rolling(200, min_periods=150).mean()
+    reg = hist["qqq_regime"] if "qqq_regime" in hist else pd.Series("Giằng co", index=hist.index)
+    hl = (hist["nh52"] - hist["nl52"]) / hist["n"].replace(0, np.nan) * 100
+    no_wash = ~(hl < -10).rolling(20, min_periods=1).max().fillna(0).astype(bool)
+    f1 = reg != "Xấu"
+    f2 = ~((q < s200) & (s200 < s200.shift(20)))
+    return {
+        "Mọi ngày (không lọc)": pd.Series(True, index=hist.index),
+        "Xu hướng QQQ không Xấu (đang dùng)": f1,
+        "Không phải: QQQ dưới SMA 200 đang dốc xuống": f2,
+        "Không có phiên đáy mới 52 tuần vượt đỉnh mới >10% số mã trong 20 phiên": no_wash,
+        "QQQ trên SMA 50": q > s50,
+        "Xu hướng QQQ không Xấu + không dưới SMA 200 dốc xuống": f1 & f2,
+        "Xu hướng QQQ không Xấu + không có phiên đáy mới diện rộng 20 phiên": f1 & no_wash,
+    }
+
+
+def filter_test(trades, dates, hist, start_key="i") -> list:
+    F = market_filters(hist)
+    out = []
+    for name, f in F.items():
+        fv = f.reindex(dates).fillna(False).values
+        kept = [t for t in trades if fv[t[start_key]]]
+        a = np.array([t["r"] for t in kept]) if kept else np.array([])
+        order = sorted(kept, key=lambda t: t["x"])
+        cum = np.cumsum([t["r"] for t in order]) if order else np.array([0.0])
+        mdd = float((cum - np.maximum.accumulate(cum)).min()) if len(cum) else 0.0
+        y22 = [t["r"] for t in kept if dates[t[start_key]].year == 2022]
+        yrs = _by_year(kept, dates, start_key)
+        out.append({"name": name, "share": _r(float(f.iloc[260:].mean()) * 100, 0), "n": len(kept), "exp": _r(a.mean()) if len(a) else None,
+                    "total": _r(a.sum(), 0) if len(a) else None, "mdd": _r(mdd, 0), "y2022": _r(np.mean(y22)) if y22 else None,
+                    "pos_years": yrs["pos_years"], "n_years": yrs["n_years"]})
+    return out
+
+
+def holders_test(res, step: int = 5) -> list:
+    """Khi QQQ đang điều chỉnh (cách đỉnh 60 phiên ≥ 8%): mã giữ sức mạnh có tăng hơn sau 1 và 3 tháng không?"""
+    C, A, liq, rs, qc = res["C"], res["holders"], res["liquid"], res["rs"], res["qc"]
+    n = len(C)
+    dd60 = (qc / qc.rolling(60, min_periods=20).max() - 1).values
+    days = [i for i in range(res["start"], n - 1, step) if dd60[i] <= -0.08]
+    groups = {"Mã giữ sức mạnh (sát đỉnh 1 năm ≤ 10%, đường RS lập đỉnh, RS ≥ 80)": A & liq,
+              "Mã RS ≥ 80 còn lại": liq & (rs >= 80) & ~A, "Mọi mã thanh khoản": liq}
+    out = []
+    for h in (21, 63):
+        f = (C.shift(-h) / C - 1).values * 100
+        qf = (qc.shift(-h) / qc - 1).values * 100
+        for name, m in groups.items():
+            mv = m.values
+            vals, beat = [], []
+            for i in days:
+                if i + h >= n:
+                    continue
+                x = f[i][mv[i] & np.isfinite(f[i])]
+                vals.extend(x.tolist())
+                beat.extend((x > qf[i]).tolist())
+            out.append({"h": h, "name": name, "n": len(vals), "days": len([i for i in days if i + h < n]),
+                        "avg": _r(np.mean(vals), 1) if vals else None, "med": _r(np.median(vals), 1) if vals else None,
+                        "win": _r(np.mean(np.array(vals) > 0) * 100, 0) if vals else None, "beat": _r(np.mean(beat) * 100, 0) if beat else None})
+    return out
 
 
 def compute(raw_recent: dict, universe: pd.DataFrame, demo: bool = False) -> dict:
@@ -162,7 +230,18 @@ def compute(raw_recent: dict, universe: pd.DataFrame, demo: bool = False) -> dic
         setups.append({"name": name, **_by_year(ts, dates, "e"), "ok": _by_year(ok, dates, "e")})
     q = res["hist"]["qqq"].astype(float)
     qy = {str(y): _r((g.iloc[-1] / g.iloc[0] - 1) * 100, 1) for y, g in q.groupby(q.index.year) if len(g) > 20}
-    out = {"ver": VER, "built": now.isoformat(), "src": src, "from": dates[res["start"]].strftime("%Y-%m-%d"), "to": dates[-1].strftime("%Y-%m-%d"),
+    lab_all = [t for t in lab_tr]
+    try:
+        flt = filter_test(lab_all, dates, res["hist"], "i")
+    except Exception as e:
+        print("Kiểm chứng dài hạn: lỗi bộ lọc", e, file=sys.stderr)
+        flt = []
+    try:
+        hold = holders_test(res)
+    except Exception as e:
+        print("Kiểm chứng dài hạn: lỗi mã giữ sức mạnh", e, file=sys.stderr)
+        hold = []
+    out = {"ver": VER, "built": now.isoformat(), "filters": flt, "holders": hold, "src": src, "from": dates[res["start"]].strftime("%Y-%m-%d"), "to": dates[-1].strftime("%Y-%m-%d"),
            "n_stocks": res["n_stocks"], "qqq_years": qy, "legends": legends, "setups": setups, "top": top_tests(res["hist"]),
            "note": "Chỉ gồm các mã còn niêm yết hôm nay nên kết quả đẹp hơn thực tế một chút. Có áp dụng quy tắc phòng thủ như kiểm chứng hằng ngày. Setup: cột 'Khi QQQ không Xấu' là chỉ tính lệnh mở khi xu hướng QQQ không Xấu."}
     if not demo:

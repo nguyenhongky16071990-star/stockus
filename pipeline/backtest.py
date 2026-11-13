@@ -390,15 +390,10 @@ def run(ctx: dict, cfg: dict) -> dict:
     BF = _bases.frames(H, L, C, V, v50)
     bpv = BF["bpiv"] * 1.001
     S = {}
-    S["ml"] = (liquid & top & (adr >= 4) & e21up & (d9.abs() <= 5) & (reclaim9 | inside | conv) & M["ml"],
-               dict(entry="stop", lvl=H * 1.001, stop=L * 0.999, pending=1, chase=1.03, max_stop=cfg.get("max_stop_pct", 6), lod=True,
-                    partials=[["R", 2, 0.25, True], ["R", 4, 0.25, False]], trail_list=[["e21", "pre"], ["e9", "post"]], max_hold=60))
     adrv = adr.values
+    # (Martin Luk, Qullamaggie đã bỏ 11/2026: kiểm chứng 2020–2026 âm ở 5/7 năm)
     # Qullamaggie: sau nhịp tăng mạnh, tích lũy 2–8 tuần sát đỉnh vùng tích lũy, giá bám EMA 10/20 (không quá 15% trên EMA 21), nến co hẹp; hoặc EP
     qbase = BF["qb"] & (C / e21 - 1 <= 0.15) & (rng5 < 0.7 * adr)
-    S["qm"] = (liquid & ((ret[21] >= 0.3) | (ret[63] >= 0.3)) & (adr >= 4) & (dv >= 20e6) & (C > e21) & (qbase | gap_ep) & M["qm"],
-               dict(entry="stop", lvl=H * 1.001, stop=np.maximum(L * 0.999, H * 1.001 * (1 - adr / 100)), pending=1, chase=1.05, max_stop=12, lod=True,
-                    partials=[["day_profit", 3, 0.5, True]], trail=lambda d, j: "s10" if adrv[d, j] >= 6 else "s20", trail_after=0, max_hold=150))
     # Minervini: chỉ mua VCP thật (nền ≥ 3 tuần, co hẹp, khối lượng cạn), giá trong 5% dưới pivot của nền
     vcp = BF["vcp"] & (C >= 0.95 * BF["bpiv"])
     S["mm"] = (liquid & tt & (rs >= 80) & (dd_hi >= -25) & vcp & M["mm"],

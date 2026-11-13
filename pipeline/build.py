@@ -27,7 +27,7 @@ DATA = ROOT / "docs" / "data"
 CONFIG = json.loads((ROOT / "pipeline" / "config.json").read_text(encoding="utf-8"))
 INDEXES = ["QQQ", "SPY", "IWM", "SMH", "IGV"]
 FIELDS = ["Open", "High", "Low", "Close", "Volume"]
-APP_VERSION = "2026.11.13-b"  # phải trùng với APP_VERSION trong docs/app.js
+APP_VERSION = "2026.11.14-a"  # phải trùng với APP_VERSION trong docs/app.js
 
 
 # ---------------------------------------------------------------- tải dữ liệu
@@ -211,6 +211,31 @@ class _Light(Exception):
     pass
 
 
+def _filters_now(hist: pd.DataFrame, t0: int) -> dict:
+    try:
+        import longbt
+        return {k: bool(v.iloc[t0]) for k, v in longbt.market_filters(hist).items()}
+    except Exception as e:
+        print("Bộ lọc hôm nay lỗi:", e, file=sys.stderr)
+        return {}
+
+
+def decision(latest: dict, lb: dict) -> dict:
+    """Ô quyết định mỗi ngày: chọn bộ lọc 'được mở lệnh mới' có tổng R cao nhất trên kiểm chứng 2020–2026 (setup)."""
+    F = [f for f in (lb or {}).get("filters", []) if f.get("n")]
+    now = latest.get("filters_now") or {}
+    if not F or not now:
+        name = "Xu hướng QQQ không Xấu (đang dùng)"
+        best = None
+    else:
+        best = max(F, key=lambda f: f.get("total") or -1e9)
+        name = best["name"]
+    ok = now.get(name, latest.get("qqq_regime") != "Xấu")
+    n_ok = latest.get("n_setups", 0)
+    state = "Đứng ngoài" if not ok else ("Mua mới" if n_ok else "Chỉ theo dõi")
+    return {"state": state, "filter": name, "ok": ok, "best": best, "all": F, "n_setups": n_ok}
+
+
 def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = False, bt_only: bool = False) -> dict:
     """light=True: bỏ qua kiểm chứng và chu kỳ (dùng khi chạy lại nhiều ngày cho danh mục mô phỏng).
     bt_only=True: chỉ chạy tới phần kiểm chứng rồi trả về lệnh thô (dùng cho kiểm chứng dài hạn nhiều năm, longbt.py)."""
@@ -307,6 +332,14 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
     # độ ra/vào top N: số mã có trong top hôm nay mà 5 phiên trước chưa có (nhóm dẫn đầu thay người nhanh hay chậm)
     b_in5 = (top & ~top.shift(5, fill_value=False).astype(bool)).sum(axis=1).astype(float)
     b_in5.iloc[:5] = np.nan
+    # "Ants" của David Ryan: trong 15 phiên có ít nhất 12 phiên tăng, giá tăng ≥ 20%, khối lượng TB 15 phiên ≥ 1,2× TB 50 phiên trước đó
+    ants = (liquid & ((C > C.shift(1)).rolling(15, min_periods=15).sum() >= 12) & (C / C.shift(15) - 1 >= 0.20)
+            & (V.rolling(15, min_periods=12).mean() >= 1.2 * V.shift(15).rolling(50, min_periods=30).mean()))
+    n_liq = liquid.sum(axis=1).astype(float)
+    ants_n = ants.sum(axis=1).astype(float)
+    # mã giữ sức mạnh: sát đỉnh 1 năm (≤ 10%), đường RS lập đỉnh 52 tuần trong 5 phiên, RS ≥ 80
+    rs_nh5 = rs_nh.rolling(5, min_periods=1).max().fillna(0).astype(bool)
+    holders = liquid & (dd_hi >= -10) & rs_nh5 & (rs >= 80)
 
     # ---- chỉ số
     idx_reg = {k: regime(raw[k]["Close"].reindex(dates)) for k in INDEXES if k in raw}
@@ -335,7 +368,7 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
         "leaders": leaders_n,
         "leader_health": cnt(top & (C > e9)) / top.sum(axis=1).replace(0, np.nan) * 100,  # % top 100 còn trên EMA 9
         "pct_tt": cnt(tt) / n * 100,
-        "b_ret1": b_ret1, "b_in5": b_in5, "b_up": b_up * 100, "b_gain": b_gain, "b_loss": b_loss,
+        "b_ret1": b_ret1, "ants": ants_n, "ants_pct": ants_n / n_liq.replace(0, np.nan) * 100, "n_liq": n_liq, "b_up": b_up * 100, "b_gain": b_gain, "b_loss": b_loss,
         "b_bigdown": b_bigdown, "b_ret5": b_ret5, "b_above21": b_above21 * 100,
         "b_offhigh": b_offhigh, "b_down2_5d": b_down2_5d,
         "b_ret3": b_ret3, "b_ret21": b_ret21, "b_nh52": b_nh52, "b_nh20": b_nh20,
@@ -456,7 +489,7 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
                 row["win5_base"] = r1((w120 / c120.replace(0, np.nan)).shift(5).iloc[-1] * 100, 0)
         pat_stats.append(row)
         pat_series[name] = {k: [r1(x, 1) for x in v.iloc[-keep_n:]] for k, v in ser_out.items()}
-    sig_today = {t: [n for n, (_, sg) in PATTERNS.items() if bool(sg[t].iloc[-1]) is True] for t in stocks}
+    sig_today = {t: [n for n, (_, sg) in PATTERNS.items() if bool(sg[t].iloc[-1]) is True] + (["Ants (Ryan)"] if bool(ants[t].iloc[-1]) else []) for t in stocks}
 
     # ---- TOP 100: breakout giữ giá bao lâu, điều chỉnh bao lâu thì lên đỉnh mới
     hiprev = C.shift(1).rolling(20, min_periods=15).max()
@@ -616,7 +649,8 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
             import traceback
             traceback.print_exc()
             print("Kiểm chứng dài hạn setup lỗi:", e, file=sys.stderr)
-        return {"bt": bt, "bt_raw": bt_raw, "lab_trades": lab_tr, "dates": dates, "start": bt_start, "hist": hist, "n_stocks": len(stocks)}
+        return {"bt": bt, "bt_raw": bt_raw, "lab_trades": lab_tr, "dates": dates, "start": bt_start, "hist": hist, "n_stocks": len(stocks),
+                "C": C, "holders": holders, "liquid": liquid, "rs": rs, "qc": qc}
     upv = V.where(C > C.shift(1), 0).rolling(50, min_periods=30).sum()
     dnv = V.where(C < C.shift(1), 0).rolling(50, min_periods=30).sum()
     udv = upv / dnv.replace(0, np.nan)
@@ -987,6 +1021,10 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
         "q_up25": int(h0.q_up25), "q_dn25": int(h0.q_dn25), "mcclellan": r1(h0.mcclellan, 1),
         "basket": {k: r1(h0[k], 1) for k in ("b_ret1", "b_up", "b_gain", "b_loss", "b_bigdown", "b_ret5", "b_above21", "b_offhigh", "bo_n", "bo_ok", "bo_ret")},
         "n_setups": sum(1 for x in setups if x["ok"]),
+        "holders": sorted([t for t in stocks if bool(holders[t].iloc[t0])], key=lambda t: -(rs[t].iloc[t0] if np.isfinite(rs[t].iloc[t0]) else 0)),
+        "qqq_dd60": r1((qc.iloc[-1] / qc.iloc[-60:].max() - 1) * 100, 1),
+        "ants_n": int(ants_n.iloc[t0]), "n_liq": int(n_liq.iloc[t0]),
+        "filters_now": _filters_now(hist, t0),
         "n_ind": n_ind, "basket_size": cfg["basket_size"],
         "basket2": {k: r1(hist[k].iloc[t0], 1) for k in ("b_ret1", "b_ret3", "b_ret5", "b_ret21", "b_nh52", "b_nh20", "b_w10", "b_w20", "b_ddmed")} | {k + "_5": r1(hist[k].iloc[t0 - 5], 1) for k in ("b_ret5", "b_nh52", "b_w20", "b_ddmed")}
                     | {k + "_21": r1(hist[k].iloc[t0 - 21], 1) for k in ("b_nh52", "b_w20")},
@@ -1323,6 +1361,10 @@ def main():
         traceback.print_exc()
         print("Kiểm chứng dài hạn lỗi:", e, file=sys.stderr)
         out["longbt"] = {}
+    try:
+        out["latest"]["decision"] = decision(out["latest"], out.get("longbt"))
+    except Exception as e:
+        print("Ô quyết định lỗi:", e, file=sys.stderr)
     write(out)
     L = out["latest"]
     print(f"{L['asof']}: điểm {L['score']} ({L['stance']}), cảnh báo {L['alert']}, dẫn đầu {L['leaders']}, setup đạt chuẩn {L['n_setups']}")
