@@ -4,7 +4,7 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const LW = window.LightweightCharts;
-  const APP_VERSION = '2026.11.14-a'; // phải trùng với APP_VERSION trong pipeline/build.py
+  const APP_VERSION = '2026.11.14-b'; // phải trùng với APP_VERSION trong pipeline/build.py
   const S = { exits: null, groups: null, flow: null, lab: null, cond: null, paper: null, cycle: null, backtest: null, latest: null, history: [], stocks: [], setups: [], extended: [], themes: [], basket: [], industries: [], patterns: null, charts: null };
   const ranges = {};          // khoảng thời gian của từng biểu đồ
   const built = new Set();    // tab đã vẽ
@@ -146,6 +146,24 @@
     },
     cyc(c, rows) {
       const Y = S.cycle, X = Y[cyKey]; if (!X) return;
+      const LS = (((S.longbt || {}).top || {}).series) || null;
+      if (ranges.cyc === -1 && LS && LS.d.length) {
+        // phần trước khi trang có dữ liệu riêng: chuỗi dài (Yahoo, mã còn niêm yết), vẽ nét đứt; phần sau: dữ liệu của trang
+        const first = Y.dates.find((d, i) => isNum(X.close[i]));
+        const vals = LS[cyKey], phs = LS['ph_' + cyKey];
+        const k0 = LS.d.findIndex((d) => d >= first);
+        const j0 = Y.dates.indexOf(first);
+        const scale = cyKey === 'top' && k0 >= 0 && isNum(vals[k0]) && vals[k0] ? X.close[j0] / vals[k0] : 1;
+        const old = LS.d.map((d, i) => [d, isNum(vals[i]) ? vals[i] * scale : null, phs[i]]).filter(([d, v]) => d < first && isNum(v));
+        const now = Y.dates.map((d, i) => [d, X.close[i], X.phase[i]]).filter(([d, v]) => d >= first && isNum(v));
+        c.addLineSeries({ lineWidth: 2, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, title: '' }).setData(old.map(([d, v, p]) => ({ time: d, value: v, color: css(PHC[p] || '--muted') })));
+        c.addLineSeries({ lineWidth: 2, priceLineVisible: false, title: cyKey === 'qqq' ? 'QQQ' : 'Top 100' }).setData(now.map(([d, v, p]) => ({ time: d, value: v, color: css(PHC[p] || '--muted') })));
+        const band = c.addHistogramSeries({ priceScaleId: 'band', priceLineVisible: false, lastValueVisible: false });
+        band.setData(old.concat(now).map(([d, , p]) => ({ time: d, value: 1, color: css(PHC[p] || '--muted') })));
+        c.priceScale('band').applyOptions({ scaleMargins: { top: 0.93, bottom: 0 }, visible: false });
+        if (cyKey === 'top') c.priceScale('right').applyOptions({ mode: 1 });
+        return;
+      }
       const from = rows.length ? rows[0].d : '';
       const pts = Y.dates.map((d, i) => [d, X.close[i], X.phase[i]]).filter(([d, v]) => d >= from && isNum(v));
       c.addLineSeries({ lineWidth: 2, priceLineVisible: false, title: cyKey === 'qqq' ? 'QQQ' : 'Top 100' })
@@ -539,7 +557,7 @@
     $$('.range').forEach((r) => {
       const key = r.dataset.chart;
       ranges[key] = ranges[key] ?? 126;
-      r.replaceChildren(...[[63, '3T'], [126, '6T'], [252, '1N'], [0, 'Tất cả']].concat(key === 'q25f' && ((S.q25long || {}).rows || []).length ? [[-1, 'Từ 2020']] : []).map(([d, t]) =>
+      r.replaceChildren(...[[63, '3T'], [126, '6T'], [252, '1N'], [0, 'Tất cả']].concat((key === 'q25f' && ((S.q25long || {}).rows || []).length) || (key === 'cyc' && ((((S.longbt || {}).top || {}).series) || {}).d) ? [[-1, 'Từ 2020']] : []).map(([d, t]) =>
         el('button', { type: 'button', 'aria-pressed': String(ranges[key] === d), text: t, onclick: (ev) => {
           ranges[key] = d; $$('button', r).forEach((b) => b.setAttribute('aria-pressed', String(b === ev.currentTarget))); drawHistChart(key);
         } })));
@@ -956,6 +974,18 @@
           { k: 'longest', label: 'Dài nhất', f: (r) => (isNum(r.longest) ? `${r.longest} phiên` : '—') },
           { k: 'next', label: 'Sau đó chuyển sang', l: true, f: (r) => Object.entries(r.next || {}).filter(([, v]) => v).sort((a, b) => b[1] - a[1]).map(([q, v]) => `${q} ${v}%`).join(' · ') || '—', sv: (r) => r.n },
         ], ['Tăng', 'Điều chỉnh', 'Giằng co', 'Giảm'].map((p) => Object.assign({ p }, st[p] || {})), {});
+        const LST = ((((S.longbt || {}).top || {}).phase_stats) || {})[cyKey];
+        const lw = $('#tb-phase-long');
+        if (lw) { lw.closest('.lt-wrap').hidden = !LST; if (LST) table(lw, [
+          { k: 'p', label: 'Pha', l: true, f: (r) => el('span', { class: 'ph-badge sm', style: `--ph:var(${PHC[r.p]})`, text: r.p }) },
+          { k: 'n', label: 'Số lần', f: (r) => n0(r.n) },
+          { k: 'days', label: 'Thời gian (trung vị)', f: (r) => (isNum(r.days) ? `${r.days} phiên` : '—') },
+          { k: 'days_q3', label: '3/4 kết thúc trong', f: (r) => (isNum(r.days_q3) ? `${r.days_q3} phiên` : '—') },
+          { k: 'chg', label: 'Thay đổi (trung vị)', f: (r) => spct(r.chg), c: (r) => cls(r.chg) },
+          { k: 'worst', label: 'Thấp nhất trong pha', f: (r) => spct(r.worst) },
+          { k: 'longest', label: 'Dài nhất', f: (r) => (isNum(r.longest) ? `${r.longest} phiên` : '—') },
+          { k: 'next', label: 'Sau đó chuyển sang', l: true, f: (r) => Object.entries(r.next || {}).filter(([, v]) => v).sort((a, b) => b[1] - a[1]).map(([q, v]) => `${q} ${v}%`).join(' · ') || '—', sv: (r) => r.n },
+        ], ['Tăng', 'Điều chỉnh', 'Giằng co', 'Giảm'].map((p) => Object.assign({ p }, LST[p] || {})), {}); }
       };
       const setKey = (k) => { cyKey = k; $('#cy-qqq').setAttribute('aria-pressed', String(k === 'qqq')); $('#cy-top').setAttribute('aria-pressed', String(k === 'top')); drawHistChart('cyc'); drawPh(); };
       $('#cy-qqq').addEventListener('click', () => setKey('qqq')); $('#cy-top').addEventListener('click', () => setKey('top'));
@@ -996,13 +1026,14 @@
         { k: 'q21', label: 'QQQ 1 tháng sau', f: (r) => spct(r.q21), c: (r) => cls(r.q21) },
       ];
       const emp = 'Chưa có: kết quả kiểm chứng dài hạn sẽ có sau lần chạy tới (tính lại mỗi tháng).';
-      table($('#tb-cy-long'), tcols, LT.phase || [], { sort: null, empty: emp });
+      const lab2 = (rows, pre) => (rows || []).filter((r, i) => i > 0).map((r) => Object.assign({}, r, { name: pre + r.name }));
+      table($('#tb-cy-long'), tcols, (LT.phase || []).slice(0, 1).concat(lab2(LT.phase, 'Lên chậm, xuống nhanh (đang dùng) · '), lab2(LT.phase_raw, 'Đổi màu ngay trong ngày · ')), { sort: null, empty: emp });
       table($('#tb-tspd'), tcols, LT.speed || [], { sort: null, empty: emp });
       { const H = S.history, n = H.length; let t = 100; const ti = H.map((r) => (t *= 1 + (isNum(r.b_ret1) ? r.b_ret1 : 0) / 100));
         const j = n - 22; if (j >= 0 && isNum(H[n - 1].qqq) && isNum(H[j].qqq)) { const x = ((ti[n - 1] / ti[j]) / (H[n - 1].qqq / H[j].qqq) - 1) * 100;
           $('#tspd-now').replaceChildren(el('b', { text: 'Hôm nay: ' }), `nhóm top 100 ${x >= 0 ? 'mạnh hơn' : 'yếu hơn'} QQQ ${n1(Math.abs(x))}% trong 21 phiên${x < -5 ? ' (yếu hơn trên 5%: theo dữ liệu 2 năm gần đây, nhóm dẫn đầu tháng sau thường kém)' : ''}.`); } }
       const LB = S.longbt || {};
-      $('#cy-long-note').textContent = LB.from ? `Đo trên ${fdate(LB.from)} – ${fdate(LB.to)} (${LB.src}). ${LB.note || ''}` : '';
+      $('#cy-long-note').textContent = LB.from ? `Đo trên ${fdate(LB.from)} – ${fdate(LB.to)} (${LB.src}). Số lần đổi màu mỗi năm: lên chậm xuống nhanh ${LT.chg_asym ?? '—'}, đổi ngay ${LT.chg_raw ?? '—'}. ${LB.note || ''}` : '';
     },
     flow() {
       const F = S.flow;

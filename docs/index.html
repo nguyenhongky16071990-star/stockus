@@ -395,10 +395,11 @@
     <article class="card">
       <div class="card-top"><h3>Lịch sử các pha</h3>
         <div class="seg" role="group" aria-label="Chỉ số"><button type="button" id="cy-qqq" aria-pressed="true">QQQ</button><button type="button" id="cy-top" aria-pressed="false">Nhóm top 100</button></div></div>
-      <p class="note">Đường giá tô màu theo pha; dải màu ở chân biểu đồ cho thấy từng pha kéo dài bao lâu. "Nhóm top 100" là chỉ số tự tính từ lợi nhuận bình quân hằng ngày của 100 mã mạnh nhất.</p>
+      <p class="note">Đường giá tô màu theo pha; dải màu ở chân biểu đồ cho thấy từng pha kéo dài bao lâu. <b>Màu đúng như ngày hôm đó, không vẽ lại:</b> xấu đi thì đổi màu ngay trong ngày, tốt lên thì phải giữ 3 phiên liên tiếp mới đổi ("lên chậm, xuống nhanh"). Nút "Từ 2020": phần nét đứt là lịch sử dài tính từ giá Yahoo của các mã còn niêm yết (năm xấu như 2022 trông nhẹ hơn thực tế); phần nét liền là dữ liệu của trang. "Nhóm top 100" là chỉ số tự tính từ lợi nhuận bình quân hằng ngày của 100 mã mạnh nhất.</p>
       <div class="ph-key"><span><i class="ph-t"></i>Tăng</span><span><i class="ph-d"></i>Điều chỉnh</span><span><i class="ph-g"></i>Giằng co</span><span><i class="ph-x"></i>Giảm</span></div>
       <div class="range" data-chart="cyc"></div><div class="chart tall-ch" id="ch-cyc"></div>
       <div class="tbl"><table id="tb-phase"></table></div>
+      <div class="lt-wrap" hidden><h4 class="sub-h">Thống kê pha 2020–2026 (dài hạn, nhiều mẫu hơn)</h4><div class="tbl"><table id="tb-phase-long"></table></div></div>
       <h4 class="sub-h">Kiểm chứng dài hạn: nhóm top 100 sau 1 tháng, theo pha hôm đó</h4>
       <div class="tbl"><table id="tb-cy-long"></table></div>
       <p class="note" id="cy-long-note"></p>
