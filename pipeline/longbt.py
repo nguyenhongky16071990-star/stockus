@@ -21,7 +21,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 CACHE = ROOT / "pipeline" / "cache" / "longbt.json"
-VER = 2
+VER = 3
 START = "2019-01-01"
 N_TICK = 1200
 NAMES = {"mm": "Mark Minervini", "wo": "William O'Neil", "sw": "Stan Weinstein",
@@ -100,13 +100,29 @@ def top_tests(hist: pd.DataFrame, start: int = 260) -> dict:
     t_idx = np.cumprod(1 + b) * 100
     q = hist["qqq"].astype(float).values
     n = len(t_idx)
-    ph = cycle.phase_series(pd.Series(t_idx, index=hist.index), smooth=False).values
+    ph = cycle.phase_series(pd.Series(t_idx, index=hist.index)).values          # lên chậm, xuống nhanh (cách trang đang dùng)
+    phr = cycle.phase_series(pd.Series(t_idx, index=hist.index), mode="raw").values  # đổi màu ngay trong ngày
     rs = t_idx / q
     m21 = np.full(n, np.nan)
     m21[21:] = (rs[21:] / rs[:-21] - 1) * 100
     I = [i for i in range(start, n) if isinstance(ph[i], str)]
     phase = _fwd_table([("Mọi ngày", I), ("Pha xanh lá + vàng (Tăng, Điều chỉnh)", [i for i in I if ph[i] in ("Tăng", "Điều chỉnh")]),
                         ("Pha xanh lá (Tăng)", [i for i in I if ph[i] == "Tăng"]), ("Pha đỏ + xanh dương (Giảm, Giằng co)", [i for i in I if ph[i] in ("Giảm", "Giằng co")])], t_idx, q, n)
+    def chg_per_year(p):
+        v = [x for x in p[start:] if isinstance(x, str)]
+        return _r(sum(1 for a, b2 in zip(v, v[1:]) if a != b2) / max(1, len(v) / 252), 0)
+    Ir = [i for i in range(start, n) if isinstance(phr[i], str)]
+    phase_raw = _fwd_table([("Mọi ngày", Ir), ("Pha xanh lá + vàng (Tăng, Điều chỉnh)", [i for i in Ir if phr[i] in ("Tăng", "Điều chỉnh")]),
+                            ("Pha xanh lá (Tăng)", [i for i in Ir if phr[i] == "Tăng"]), ("Pha đỏ + xanh dương (Giảm, Giằng co)", [i for i in Ir if phr[i] in ("Giảm", "Giằng co")])], t_idx, q, n)
+    # chuỗi dài để vẽ biểu đồ pha từ 2020 (cả nhóm top 100 lẫn QQQ, cùng cách tô màu)
+    phq = cycle.phase_series(pd.Series(q, index=hist.index)).values
+    series = {"d": [x.strftime("%Y-%m-%d") for x in hist.index[start:]], "top": [_r(x, 2) for x in t_idx[start:]], "qqq": [_r(x, 2) for x in q[start:]],
+              "ph_top": [x if isinstance(x, str) else None for x in ph[start:]], "ph_qqq": [x if isinstance(x, str) else None for x in phq[start:]]}
+    stats = {}
+    for key, ser_, p_ in (("top", t_idx, ph), ("qqq", q, phq)):
+        s_ = pd.Series(ser_[start:], index=hist.index[start:])
+        segs = cycle.segments(pd.Series(p_[start:], index=hist.index[start:]), s_)
+        stats[key] = cycle.phase_stats(segs)
     speed = _fwd_table([("Mọi ngày", I), ("Top 100 mạnh hơn QQQ (21 phiên)", [i for i in I if m21[i] > 0]),
                         ("Top 100 yếu hơn QQQ (21 phiên)", [i for i in I if m21[i] < 0]),
                         ("Top 100 yếu hơn QQQ trên 5%", [i for i in I if m21[i] < -5]),
@@ -118,7 +134,8 @@ def top_tests(hist: pd.DataFrame, start: int = 260) -> dict:
                       + [("Mã có Ants < 0,5% (rất ít mã tăng đều)", [i for i in I if np.isfinite(ap[i]) and ap[i] < 0.5]),
                          ("Ants vượt lên 1,5% sau khi đã dưới 0,5% trong 40 phiên (bùng lên sau giai đoạn trầm lắng)",
                           [i for i in I if np.isfinite(ap[i]) and ap[i] >= 1.5 and np.isfinite(lo40[i]) and lo40[i] < 0.5 and not (np.isfinite(ap[i - 1]) and ap[i - 1] >= 1.5)])], t_idx, q, n)
-    return {"phase": phase, "speed": speed, "ants": ants}
+    return {"phase": phase, "phase_raw": phase_raw, "chg_asym": chg_per_year(ph), "chg_raw": chg_per_year(phr),
+            "speed": speed, "ants": ants, "series": series, "phase_stats": stats}
 
 
 

@@ -21,8 +21,18 @@ def _r(x, d=1):
     return None if not np.isfinite(x) else round(x, d)
 
 
-def phase_series(c: pd.Series, smooth: bool = True) -> pd.Series:
-    """Phân loại từng ngày theo giá đóng cửa. smooth=False: không gộp pha ngắn (không dùng dữ liệu tương lai, dùng cho kiểm chứng)."""
+RANK = {"Tăng": 3, "Điều chỉnh": 2, "Giằng co": 1, "Giảm": 0}
+CONFIRM_UP = 3   # số phiên liên tiếp cần có để chuyển sang pha TỐT HƠN
+
+
+def phase_series(c: pd.Series, mode: str = "asym", smooth=None) -> pd.Series:
+    """Phân loại từng ngày theo giá đóng cửa, chỉ dùng dữ liệu tới hết ngày đó: màu của một ngày không bao giờ đổi về sau.
+    mode="raw": pha thô của từng ngày (đổi ngay khi điều kiện đổi, lốm đốm).
+    mode="asym" (mặc định): "lên chậm, xuống nhanh" — chuyển sang pha XẤU hơn ngay trong ngày; chuyển sang pha TỐT hơn
+    chỉ khi pha đó giữ được CONFIRM_UP phiên liên tiếp. (Bản cũ gộp pha ngắn dưới 3 phiên bằng dữ liệu của các phiên sau,
+    nên màu quá khứ đẹp hơn lúc theo dõi thật; đã bỏ 11/2026.)"""
+    if smooth is False:
+        mode = "raw"
     e21 = c.ewm(span=21, adjust=False, min_periods=21).mean()
     e50 = c.ewm(span=50, adjust=False, min_periods=50).mean()
     sl21 = e21 / e21.shift(5) - 1
@@ -34,19 +44,24 @@ def phase_series(c: pd.Series, smooth: bool = True) -> pd.Series:
     pull = (sl50 > 0) & (dd20 < -0.02)
     ph = np.select([down, up, pull], ["Giảm", "Tăng", "Điều chỉnh"], default="Giằng co")
     ph = pd.Series(ph, index=c.index).where(e50.notna())
-    if not smooth:
+    if mode == "raw":
         return ph
-    # làm mượt: pha kéo dài dưới 3 phiên được gộp vào pha trước
-    v = ph.values.copy()
-    i, n = 0, len(v)
-    while i < n:
-        j = i
-        while j + 1 < n and v[j + 1] == v[i]:
-            j += 1
-        if j - i + 1 < 3 and i > 0 and isinstance(v[i - 1], str):
-            v[i:j + 1] = v[i - 1]
-        i = j + 1
-    return pd.Series(v, index=c.index)
+    out, cur, cand, cnt = [], None, None, 0
+    for p in ph.values:
+        if not isinstance(p, str):
+            out.append(None)
+            continue
+        if cur is None or p == cur:
+            cur, cand, cnt = p, None, 0
+        elif RANK[p] < RANK[cur]:          # xấu đi: đổi ngay
+            cur, cand, cnt = p, None, 0
+        else:                              # tốt lên: cần giữ đủ CONFIRM_UP phiên liên tiếp
+            cnt = cnt + 1 if p == cand else 1
+            cand = p
+            if cnt >= CONFIRM_UP:
+                cur, cand, cnt = p, None, 0
+        out.append(cur)
+    return pd.Series(out, index=c.index, dtype=object)
 
 
 def segments(ph: pd.Series, c: pd.Series) -> list[dict]:

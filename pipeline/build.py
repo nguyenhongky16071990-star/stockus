@@ -27,7 +27,7 @@ DATA = ROOT / "docs" / "data"
 CONFIG = json.loads((ROOT / "pipeline" / "config.json").read_text(encoding="utf-8"))
 INDEXES = ["QQQ", "SPY", "IWM", "SMH", "IGV"]
 FIELDS = ["Open", "High", "Low", "Close", "Volume"]
-APP_VERSION = "2026.11.14-a"  # phải trùng với APP_VERSION trong docs/app.js
+APP_VERSION = "2026.11.14-b"  # phải trùng với APP_VERSION trong docs/app.js
 
 
 # ---------------------------------------------------------------- tải dữ liệu
@@ -606,7 +606,7 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
     top_phase = None
     try:
         top_idx = (1 + (hist["b_ret1"].fillna(0) / 100)).cumprod() * 100
-        top_phase = cycle.phase_series(top_idx, smooth=False)
+        top_phase = cycle.phase_series(top_idx)   # cùng cách tô màu với biểu đồ (lên chậm, xuống nhanh; không vẽ lại)
         cyc = {"notes": []} if (light or bt_only) else cycle.analyze(qc, top_idx, C, e21, top, adr, cfg["history_days"])
     except Exception as e:
         print("Chu kỳ lỗi:", e, file=sys.stderr)
