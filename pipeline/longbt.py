@@ -21,7 +21,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 CACHE = ROOT / "pipeline" / "cache" / "longbt.json"
-VER = 5
+VER = 6
 START = "2019-01-01"
 N_TICK = 1200
 NAMES = {"mm": "Mark Minervini", "wo": "William O'Neil", "sw": "Stan Weinstein",
@@ -225,6 +225,7 @@ def lead_tests(hist: pd.DataFrame, start: int = 260) -> dict:
     n = len(q)
     lows = [i for i in range(max(start, 60), n - 30) if np.isfinite(q[i]) and q[i] == np.nanmin(q[i - 30:i + 31]) and np.nanmax(q[i - 60:i]) / q[i] > 1.10]
     rows = []
+    idx = hist.index
     for (K, name), sig in lead_signals(hist).items():
         v = sig.values
         E, last = [], -99
@@ -244,11 +245,16 @@ def lead_tests(hist: pd.DataFrame, start: int = 260) -> dict:
         rows.append({"k": K, "name": name, "n": len(E), "caught": len(lag), "of": len(lows), "lag": _r(np.median(lag), 0) if lag else None,
                      "q21": _r(np.mean(f), 1) if f else None, "win": _r(np.mean([x > 0 for x in f]) * 100, 0) if f else None,
                      "g21": _r(np.mean(fg), 1) if fg else None, "dd5": _r(np.mean([x < -5 for x in dd]) * 100, 0) if dd else None,
-                     "per_year": _r(len(E) / max(1, (n - start) / 252), 1)})
+                     "per_year": _r(len(E) / max(1, (n - start) / 252), 1), "dates": [idx[i].strftime("%Y-%m-%d") for i in E]})
     base = [(q[i + 21] / q[i] - 1) * 100 for i in range(start, n - 21)]
     ok = [r for r in rows if r["n"] >= 6 and r["caught"] >= max(1, r["of"] / 2) and r["win"] is not None]
     best = max(ok, key=lambda r: (r["win"], -(r["lag"] or 99))) if ok else None
-    return {"rows": rows, "best": best, "lows": len(lows), "base": {"q21": _r(np.mean(base), 1), "win": _r(np.mean([x > 0 for x in base]) * 100, 0)}}
+    ser = {"d": [x.strftime("%Y-%m-%d") for x in idx[start:]], "qqq": [_r(x, 2) for x in q[start:]],
+           "tt": [_r(x, 1) for x in hist["pct_tt"].astype(float).values[start:]] if "pct_tt" in hist else [],
+           **{f"sp{K}": [_r(x, 2) for x in hist[f"k{K}_sp5"].astype(float).values[start:]] for K in (30, 50, 100, 200) if f"k{K}_sp5" in hist},
+           **{f"g{K}": [_r(x, 3) for x in hist[f"k{K}_r1"].astype(float).values[start:]] for K in (30, 50, 100, 200) if f"k{K}_r1" in hist},
+           "lows": [idx[i].strftime("%Y-%m-%d") for i in lows]}
+    return {"rows": rows, "best": best, "lows": len(lows), "series": ser, "base": {"q21": _r(np.mean(base), 1), "win": _r(np.mean([x > 0 for x in base]) * 100, 0)}}
 
 
 def up6_test(hist: pd.DataFrame, start: int = 260) -> list:
