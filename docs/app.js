@@ -4,12 +4,12 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const LW = window.LightweightCharts;
-  const APP_VERSION = '2026.11.15-a'; // phải trùng với APP_VERSION trong pipeline/build.py
+  const APP_VERSION = '2026.11.15-b'; // phải trùng với APP_VERSION trong pipeline/build.py
   const S = { exits: null, groups: null, flow: null, lab: null, cond: null, paper: null, cycle: null, backtest: null, latest: null, history: [], stocks: [], setups: [], extended: [], themes: [], basket: [], industries: [], patterns: null, charts: null };
   const ranges = {};          // khoảng thời gian của từng biểu đồ
   const built = new Set();    // tab đã vẽ
   const live = {};            // biểu đồ đang hiển thị
-  let hlScope = 'top', patDone = false, tsWin = 21, swWin = '5';
+  let hlScope = 'top', patDone = false, tsWin = 21, swWin = '5', leadSel = null;
   let cyKey = 'qqq';
   const PHC = { 'Tăng': '--good', 'Điều chỉnh': '--warn', 'Giằng co': '--c1', 'Giảm': '--bad' };
   const GDC = { 'Vàng + đầu chu kỳ': '--good', 'Thời điểm vàng': '--good', 'Thuận lợi': '--c4', 'Trung tính': '--warn', 'Bất lợi': '--bad' };
@@ -310,6 +310,15 @@
     const V = LN.vals || {};
     $('#lead-vals').textContent = 'Hôm nay — ' + [30, 50, 100, 200].map((k) => { const v = V['k' + k] || {}; return `top ${k}: tốc độ ${isNum(v.sp5) ? n2(v.sp5) : '—'}%/ngày, giai đoạn 2 ${pct(v.st2, 0)}, nhanh hơn QQQ ${pct(v.beat5, 0)}, 10 mã mạnh nhất chiếm ${pct(v.c10, 0)} phần tăng`; }).join(' · ') + `. Toàn thị trường đạt Trend Template: ${pct(LN.pct_tt, 1)}.`;
     const rows = (LT.rows || []).filter((r) => r.n >= 3).map((r) => Object.assign({}, r, { now: rec[key(r)] }));
+    // biểu đồ + thống kê từng lần
+    const opts = rows.slice().sort((a, b) => (b.win ?? 0) - (a.win ?? 0)).slice(0, 15);
+    if (!leadSel) leadSel = B ? key(B) : (opts[0] ? key(opts[0]) : null);
+    const sel = $('#lead-sel');
+    if (sel && !sel.children.length) {
+      sel.replaceChildren(...opts.map((r) => el('option', { value: key(r), text: `top ${r.k} · ${r.name} — đúng ${r.win}%, bắt ${r.caught}/${r.of} đáy, ${r.per_year} lần/năm` })));
+      sel.value = leadSel || ''; sel.addEventListener('input', () => { leadSel = sel.value; drawLeadChart(); });
+    }
+    drawLeadChart();
     table($('#tb-lead'), [
       { k: 'k', label: 'Nhóm', f: (r) => `top ${r.k}` },
       { k: 'name', label: 'Tín hiệu', l: true, f: (r) => (B && key(r) === key(B) ? el('b', { text: '★ ' + r.name }) : r.name) },
@@ -321,9 +330,49 @@
       { k: 'q21', label: 'QQQ 1 tháng sau', f: (r) => spct(r.q21), c: (r) => cls(r.q21) },
       { k: 'g21', label: 'Nhóm 1 tháng sau', f: (r) => spct(r.g21), c: (r) => cls(r.g21) },
       { k: 'dd5', label: '% lần QQQ giảm > 5%', f: (r) => pct(r.dd5, 0) },
-    ], rows, { sort: 'win', empty: 'Chưa có: kết quả kiểm chứng dài hạn sẽ có sau lần chạy tới.' });
+    ], rows, { sort: 'win', onRow: (r) => { leadSel = key(r); const sl = $('#lead-sel'); if (sl) sl.value = leadSel; drawLeadChart(); $('#ch-lead').scrollIntoView({ behavior: 'smooth', block: 'center' }); }, empty: 'Chưa có: kết quả kiểm chứng dài hạn sẽ có sau lần chạy tới.' });
     const LB = S.longbt || {};
     $('#lead-note').textContent = LT.rows ? `Đo trên ${fdate(LB.from)} – ${fdate(LB.to)} (${LB.src}), ${LT.lows} đáy QQQ (giảm ≥ 10%). "Bật lên" = vượt mức cao (70% số ngày thấp hơn, tính tới hôm đó) sau khi vừa ở mức thấp trong 20 phiên. Mốc so sánh: mọi ngày QQQ 1 tháng sau tăng ${(LT.base || {}).win}% số lần. Tín hiệu tốt nhất được chọn tự động: bắt ít nhất một nửa số đáy, ít nhất 6 lần, tỉ lệ đúng cao nhất. ${LB.note || ''}` : '';
+  }
+  function drawLeadChart() {
+    const LT = (S.longbt || {}).lead || {}, SR = LT.series, row = (LT.rows || []).find((r) => `${r.k}|${r.name}` === leadSel);
+    ['lead', 'lead2'].forEach((k) => { if (live[k]) { live[k].remove(); delete live[k]; } });
+    if (!SR || !row || !$('#ch-lead')) return;
+    const D = SR.d, q = SR.qqq, ix = Object.fromEntries(D.map((d, i) => [d, i])), K = row.k;
+    let g = 1; const gi = (SR['g' + K] || []).map((x) => (g *= 1 + (isNum(x) ? x : 0) / 100));
+    const fw = (a, i, h) => (i + h < a.length && isNum(a[i]) && isNum(a[i + h]) ? (a[i + h] / a[i] - 1) * 100 : null);
+    const ev = (row.dates || []).filter((d) => d in ix).map((d) => { const i = ix[d]; let m = 0; for (let j = i + 1; j <= Math.min(q.length - 1, i + 21); j++) m = Math.min(m, q[j] / q[i] - 1);
+      const lo = (SR.lows || []).map((x) => ix[x]).filter((x) => x != null && Math.abs(x - i) <= 40).sort((a, b) => Math.abs(a - i) - Math.abs(b - i))[0];
+      return { d, q21: fw(q, i, 21), q63: fw(q, i, 63), dd: i + 21 < q.length ? m * 100 : null, g21: fw(gi, i, 21), low: lo != null ? i - lo : null }; });
+    const c1 = baseChart($('#ch-lead'));
+    c1.timeScale().applyOptions({ minBarSpacing: 0.05 }); c1.priceScale('right').applyOptions({ mode: 1 });
+    const ln = c1.addLineSeries({ color: css('--ink'), lineWidth: 2, priceLineVisible: false, title: 'QQQ' });
+    ln.setData(D.map((d, i) => (isNum(q[i]) ? { time: d, value: q[i] } : null)).filter(Boolean));
+    const mk = ev.map((e) => ({ time: e.d, position: 'belowBar', shape: 'arrowUp', color: css(e.q21 == null ? '--muted' : e.q21 > 0 ? '--good' : '--bad'), text: '' }))
+      .concat((SR.lows || []).map((d) => ({ time: d, position: 'belowBar', shape: 'circle', color: css('--muted'), text: '' })))
+      .sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
+    ln.setMarkers(mk);
+    c1.timeScale().fitContent(); live.lead = c1;
+    const c2 = baseChart($('#ch-lead2'));
+    c2.timeScale().applyOptions({ minBarSpacing: 0.05 });
+    const sp = c2.addLineSeries({ color: css('--c1'), lineWidth: 1, priceLineVisible: false, title: `Tốc độ top ${K} %/ngày` });
+    sp.setData(D.map((d, i) => (isNum((SR['sp' + K] || [])[i]) ? { time: d, value: SR['sp' + K][i] } : null)).filter(Boolean));
+    sp.createPriceLine({ price: 0, color: css('--muted'), lineStyle: 2, lineWidth: 1, axisLabelVisible: false });
+    c2.addLineSeries({ color: css('--c2'), lineWidth: 1, priceScaleId: 'left', priceLineVisible: false, title: '% Trend Template' }).setData(D.map((d, i) => (isNum((SR.tt || [])[i]) ? { time: d, value: SR.tt[i] } : null)).filter(Boolean));
+    c2.applyOptions({ leftPriceScale: { visible: true } });
+    c2.timeScale().fitContent(); live.lead2 = c2;
+    const sync = (x, y) => x.timeScale().subscribeVisibleLogicalRangeChange((r) => { if (r) y.timeScale().setVisibleLogicalRange(r); });
+    sync(c1, c2); sync(c2, c1);
+    table($('#tb-lead-ev'), [
+      { k: 'd', label: 'Ngày tín hiệu', f: (r) => fdate(r.d) },
+      { k: 'low', label: 'So với đáy QQQ gần nhất', f: (r) => (r.low == null ? 'không gần đáy nào (±40 phiên)' : r.low === 0 ? 'đúng đáy' : r.low > 0 ? `sau đáy ${r.low} phiên` : `trước đáy ${-r.low} phiên`), c: (r) => (r.low == null ? 'muted' : '') },
+      { k: 'q21', label: 'QQQ 1 tháng sau', f: (r) => spct(r.q21), c: (r) => cls(r.q21) },
+      { k: 'q63', label: 'QQQ 3 tháng sau', f: (r) => spct(r.q63), c: (r) => cls(r.q63) },
+      { k: 'dd', label: 'QQQ giảm sâu nhất trong 1 tháng', f: (r) => spct(r.dd), c: (r) => (r.dd < -5 ? 'dn' : '') },
+      { k: 'g21', label: `Nhóm top ${K} 1 tháng sau`, f: (r) => spct(r.g21), c: (r) => cls(r.g21) },
+    ], ev, { sort: 'd' });
+    const done = ev.filter((e) => isNum(e.q21)), av = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+    $('#lead-ev-sum').textContent = done.length ? `top ${K} · ${row.name}: ${ev.length} lần; ${done.filter((e) => e.q21 > 0).length}/${done.length} lần QQQ 1 tháng sau cao hơn (trung bình ${spct(av(done.map((e) => e.q21)))}); ${ev.filter((e) => e.low != null).length} lần nằm gần một đáy QQQ; ${done.filter((e) => e.dd < -5).length} lần QQQ giảm thêm hơn 5% trước khi lên.` : '';
   }
   function drawDecision() {
     const D = (S.latest || {}).decision; if (!D) return;
