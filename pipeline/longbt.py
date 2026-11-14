@@ -21,7 +21,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 CACHE = ROOT / "pipeline" / "cache" / "longbt.json"
-VER = 3
+VER = 4
 START = "2019-01-01"
 N_TICK = 1200
 NAMES = {"mm": "Mark Minervini", "wo": "William O'Neil", "sw": "Stan Weinstein",
@@ -89,7 +89,9 @@ def _fwd_table(rows, t_idx, q, n):
         g = [(q[i + 21] / q[i] - 1) * 100 for i in I if i + 21 < n and np.isfinite(q[i]) and np.isfinite(q[i + 21])]
         dd = [(np.nanmin(t_idx[i + 1:i + 22]) / t_idx[i] - 1) * 100 for i in I if i + 21 < n]
         out.append({"name": name, "days": len(I), "top21": _r(np.mean(f), 1) if f else None, "win": _r(np.mean([x > 0 for x in f]) * 100, 0) if f else None,
-                    "q21": _r(np.mean(g), 1) if g else None, "dd8": _r(np.mean([x < -8 for x in dd]) * 100, 0) if dd else None})
+                    "q21": _r(np.mean(g), 1) if g else None, "dd8": _r(np.mean([x < -8 for x in dd]) * 100, 0) if dd else None,
+                    "q63": _r(np.mean([(q[i + 63] / q[i] - 1) * 100 for i in I if i + 63 < n]), 1) if any(i + 63 < n for i in I) else None,
+                    "q63w": _r(np.mean([q[i + 63] > q[i] for i in I if i + 63 < n]) * 100, 0) if any(i + 63 < n for i in I) else None})
     return out
 
 
@@ -127,15 +129,43 @@ def top_tests(hist: pd.DataFrame, start: int = 260) -> dict:
                         ("Top 100 yếu hơn QQQ (21 phiên)", [i for i in I if m21[i] < 0]),
                         ("Top 100 yếu hơn QQQ trên 5%", [i for i in I if m21[i] < -5]),
                         ("Top 100 mạnh hơn QQQ trên 5%", [i for i in I if m21[i] > 5])], t_idx, q, n)
-    # Ants (David Ryan): số mã có Ants mỗi ngày, theo % số mã thanh khoản (vì số mã trong danh sách khác nhau giữa các nguồn)
-    ap = hist["ants_pct"].astype(float).values if "ants_pct" in hist else np.full(n, np.nan)
-    lo40 = pd.Series(ap).rolling(40, min_periods=20).min().shift(1).values
-    ants = _fwd_table([("Mọi ngày", I)] + [(f"Mã có Ants ≥ {th}% số mã thanh khoản", [i for i in I if np.isfinite(ap[i]) and ap[i] >= th]) for th in (0.5, 1, 1.5, 3)]
-                      + [("Mã có Ants < 0,5% (rất ít mã tăng đều)", [i for i in I if np.isfinite(ap[i]) and ap[i] < 0.5]),
-                         ("Ants vượt lên 1,5% sau khi đã dưới 0,5% trong 40 phiên (bùng lên sau giai đoạn trầm lắng)",
-                          [i for i in I if np.isfinite(ap[i]) and ap[i] >= 1.5 and np.isfinite(lo40[i]) and lo40[i] < 0.5 and not (np.isfinite(ap[i - 1]) and ap[i - 1] >= 1.5)])], t_idx, q, n)
+    # mã tăng/giảm mạnh trong 1–2 tuần: tín hiệu theo SỰ KIỆN (lần đầu, cách nhau ≥ 20 phiên) và độ trễ so với đáy QQQ
+    def events(cond):
+        out, last = [], -99
+        for i in I:
+            if cond(i) and not cond(i - 1) and i - last > 20:
+                out.append(i)
+                last = i
+        return out
+    lows = [i for i in range(max(start, 60), n - 30) if np.isfinite(q[i]) and q[i] == np.nanmin(q[i - 30:i + 31]) and np.nanmax(q[i - 60:i]) / q[i] > 1.10]
+    def lag(E):
+        r = []
+        for lo in lows:
+            k = next((e for e in E if lo - 15 <= e <= lo + 60), None)
+            r.append(None if k is None else int(k - lo))
+        v = [x for x in r if x is not None]
+        return {"med": _r(np.median(v), 0) if v else None, "hit": len(v), "of": len(lows)}
+    short = {}
+    for w, (uk, dk) in (("5", ("w_up5", "w_dn5")), ("10", ("w_up10", "w_dn10"))):
+        if uk not in hist:
+            continue
+        up, dn = hist[uk].astype(float).values, hist[dk].astype(float).values
+        p90u, p90d = np.nanpercentile(up[start:], 90), np.nanpercentile(dn[start:], 90)
+        sig = {"Xanh cắt lên đỏ (tăng mạnh nhiều hơn giảm mạnh)": lambda i: up[i] > dn[i],
+               f"Bán tháo: đỏ ≥ {p90d:.1f}% số mã (10% số ngày cao nhất)": lambda i: dn[i] >= p90d,
+               f"Bùng nổ: xanh ≥ {p90u:.1f}% số mã (10% số ngày cao nhất)": lambda i: up[i] >= p90u,
+               "Đỏ vừa rời vùng bán tháo (sau khi ≥ ngưỡng trên trong 10 phiên, nay dưới một nửa)": lambda i: dn[i] < p90d / 2 and np.nanmax(dn[max(0, i - 10):i]) >= p90d}
+        rows, lags = [("Mọi ngày", I)], {}
+        for name, f in sig.items():
+            E = events(f)
+            rows.append((name, E))
+            lags[name] = lag(E)
+        tb = _fwd_table(rows, t_idx, q, n)
+        for r_ in tb:
+            r_["lag"] = lags.get(r_["name"])
+        short[w] = tb
     return {"phase": phase, "phase_raw": phase_raw, "chg_asym": chg_per_year(ph), "chg_raw": chg_per_year(phr),
-            "speed": speed, "ants": ants, "series": series, "phase_stats": stats}
+            "speed": speed, "short": short, "series": series, "phase_stats": stats}
 
 
 
