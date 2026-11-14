@@ -30,7 +30,6 @@
     </nav>
     <nav class="tabs" role="tablist" aria-label="Các trang">
       <button role="tab" data-g="mkt" data-tab="overview" aria-selected="true">Tổng quan</button>
-      <button role="tab" data-g="mkt" data-tab="flow">Dòng tiền</button>
       <button role="tab" data-g="mkt" data-tab="breadth">Độ rộng</button>
       <button role="tab" data-g="mkt" data-tab="cycle">Chu kỳ &amp; Top 100</button>
       <button role="tab" data-g="stk" data-tab="leaders">Ngành</button>
@@ -124,15 +123,15 @@
       <article class="card"><h3>Stockbee: mã tăng/giảm ≥ 4% kèm khối lượng</h3><p class="note">Xanh: số mã tăng ≥ 4%. Đỏ: số mã giảm ≥ 4%. Đường: tỷ lệ 10 ngày (trên 1 là bên mua mạnh hơn).</p><p class="note" id="sbn-note"></p><div class="range" data-chart="sb"></div><div class="chart" id="ch-sb"></div></article>
       <article class="card"><h3>% cổ phiếu trên các đường trung bình</h3><p class="note">SMA 40 dưới 20% thường là vùng quá bán gần đáy; trên 70% là hưng phấn.</p><div class="range" data-chart="pct"></div><div class="chart" id="ch-pct"></div></article>
       <article class="card"><h3>Đỉnh mới và đáy mới 52 tuần</h3><p class="note">Xanh: số mã lập đỉnh 52 tuần. Đỏ: số mã lập đáy 52 tuần.</p><div class="range" data-chart="nhnl"></div><div class="chart" id="ch-nhnl"></div></article>
-      <article class="card full" id="ants-card">
-        <h3>Số mã có "Ants" mỗi ngày (David Ryan)</h3>
-        <p class="note">Một mã có Ants khi trong 15 phiên có ít nhất 12 phiên tăng, giá tăng ≥ 20% và khối lượng trung bình tăng ≥ 20%: dấu vết quỹ lớn gom hàng liên tục. Cột: số mã có Ants mỗi ngày; đường kẻ: 30 mã. Ý "thị trường uptrend khi có từ 30 mã dẫn dắt tăng liên tục" được kiểm chứng ở bảng dưới; chưa tìm được nguồn ghi lại con số 30 từ chính David Ryan.</p>
-        <p class="note" id="ants-now"></p>
-        <div class="range" data-chart="ants"></div><div class="chart" id="ch-ants"></div>
-        <h4 class="sub-h">Kiểm chứng trên dữ liệu của trang (toàn thị trường, khoảng 2 năm)</h4>
-        <div class="tbl"><table id="tb-ants"></table></div>
-        <h4 class="sub-h">Kiểm chứng dài hạn 2020–2026 (theo % số mã thanh khoản, vì danh sách mã dài hạn nhỏ hơn)</h4>
-        <div class="tbl"><table id="tb-ants-long"></table></div>
+      <article class="card full" id="swk-card">
+        <h3>Mã tăng / giảm mạnh trong 1–2 tuần</h3>
+        <p class="note">Bản nhanh của "tăng / giảm ≥ 25% trong một quý". Xanh: % số mã thanh khoản tăng ≥ 10% trong 5 phiên (hoặc ≥ 15% trong 10 phiên). Đỏ: % số mã giảm tương ứng. Đường đen: QQQ (trục trái). Nhanh hơn thì cũng nhiễu hơn: xem bảng kiểm chứng trước khi dùng.</p>
+        <div class="tools"><span class="muted small">Khung:</span><div class="seg" role="group" aria-label="Khung" id="sw-win"></div></div>
+        <p class="note" id="swk-now"></p>
+        <div class="range" data-chart="swk"></div><div class="chart" id="ch-swk"></div>
+        <h4 class="sub-h">Kiểm chứng 2020–2026: sau mỗi tín hiệu (lần đầu, cách nhau ≥ 20 phiên)</h4>
+        <div class="tbl"><table id="tb-swk"></table></div>
+        <p class="note" id="swk-note"></p>
       </article>
       <article class="card full" id="lb-card" hidden><h3>Độ rộng dài hạn (từ 2020): các chỉ báo kiểu Stockbee</h3>
         <p class="note">Chọn một chỉ báo để xem cùng QQQ (đường đen, trục trái). Kiểm chứng thật 2020–2026: các chỉ báo kiểu này không dự báo được thị trường ở mức bình thường, chỉ có giá trị ở VÙNG CỰC. Bảng bên dưới tự đo lại mỗi ngày: sau mỗi lần chạm ngưỡng, QQQ 1 và 3 tháng sau ra sao so với mua bất kỳ lúc nào. Đã bỏ các chỉ báo không có giá trị (13%/34 phiên, 25%/tháng); đường A/D và đỉnh mới − đáy mới được đổi từ cộng dồn sang % số mã.</p>
@@ -199,6 +198,7 @@
       <button type="button" data-mv="buy" aria-pressed="true">Setup mua (A+)</button>
       <button type="button" data-mv="edge" aria-pressed="false">Theo lợi thế setup</button>
       <button type="button" data-mv="pat" aria-pressed="false">Theo mẫu hình</button>
+      <button type="button" data-mv="flow" aria-pressed="false">Dòng tiền</button>
       <button type="button" data-mv="hold" aria-pressed="false">Giữ sức mạnh</button>
       <button type="button" data-mv="scr" aria-pressed="false">Lọc &amp; tìm mã</button>
     </div>
@@ -247,6 +247,22 @@
       <div class="tbl"><table id="tb-sig"></table></div>
     </article>
     </div>
+    <div class="mv" data-mv="flow" hidden>
+    <p class="note">Chỉ số có thể tăng trong khi phần lớn cổ phiếu vẫn yếu. Phần này tách 4 nhóm bằng chứng độc lập (độ rộng, tích lũy, cổ phiếu dẫn dắt, breakout có giữ được không) để xếp thị trường vào một giai đoạn dòng tiền, rồi chấm 9 bằng chứng dòng tiền cho từng cổ phiếu. Giai đoạn là mô tả, không phải quy luật chắc chắn.</p>
+    <article class="card"><div class="fl-top" id="fl-stage"></div><div id="fl-warn" class="fl-warn"></div></article>
+    <article class="card">
+      <h3>Radar dòng tiền từng cổ phiếu</h3>
+      <p class="note">9 bằng chứng: mạnh hơn thị trường nhiều tuần, đường RS dẫn trước giá, ngành cải thiện, gần pivot với biến động co hẹp, khối lượng tích lũy, vượt pivot có khối lượng, giữ được pivot, nhiều mã cùng ngành có setup, giữ giá khi thị trường giảm. Rê chuột lên chấm để xem chi tiết. "Gap sự kiện": bật mạnh sau tin, cần thêm phiên xác nhận.</p>
+      <div class="tools"><select id="fl-min" aria-label="Số bằng chứng tối thiểu"><option value="0">Mọi mã</option><option value="4">Từ 4 bằng chứng</option><option value="5" selected>Từ 5 bằng chứng</option><option value="6">Từ 6 bằng chứng</option><option value="7">Từ 7 bằng chứng</option></select>
+        <input type="search" id="fl-q" placeholder="Lọc mã hoặc ngành…" aria-label="Lọc"><span class="muted small" id="fl-count"></span></div>
+      <div class="tbl"><table id="tb-fl-radar"></table></div>
+    </article>
+    <article class="card">
+      <h3>Bằng chứng hôm nay</h3>
+      <p class="note" id="fl-miss"></p>
+      <div class="fl-ev" id="fl-ev"></div>
+    </article>
+    </div>
     <div class="mv" data-mv="hold" hidden>
     <article class="card">
       <h3>Mã giữ sức mạnh khi thị trường điều chỉnh</h3>
@@ -288,35 +304,6 @@
   </section>
 
 
-  <!-- DÒNG TIỀN -->
-  <section id="tab-flow" class="tab" role="tabpanel" hidden>
-    <div class="intro">
-      <h2>Thị trường hồi phục hay dòng tiền thật sự quay lại?</h2>
-      <p>Chỉ số có thể tăng trong khi phần lớn cổ phiếu vẫn yếu. Trang này tách 4 nhóm bằng chứng độc lập: độ rộng, tích lũy (giá + khối lượng), cổ phiếu dẫn dắt và breakout có giữ được không. Mỗi điểm 0–100 gồm một nửa theo mức tuyệt đối, một nửa so với 1 năm qua. Từ đó xếp thị trường vào một giai đoạn dòng tiền. Giai đoạn là mô tả, không phải quy luật chắc chắn.</p>
-    </div>
-    <article class="card"><div class="fl-top" id="fl-stage"></div><div id="fl-warn" class="fl-warn"></div></article>
-    <article class="card" id="gate-card" hidden>
-      <h3>Bộ lọc thị trường khi mua cổ phiếu riêng lẻ</h3>
-      <p class="note">Cùng điểm mua, cùng quy tắc bán của các phương pháp huyền thoại, chỉ khác điều kiện được phép mở lệnh mới. Pha top 100 tính không làm mượt (không dùng dữ liệu tương lai). Đã thử và bỏ: lọc bằng SMI tuần (QQQ từ 1999: ngày SMI trên hay dưới đường tín hiệu cho kết quả như nhau, đổi chiều ~26 lần/năm).</p>
-      <p class="note" id="gate-verdict"></p>
-      <div class="tbl"><table id="tb-gate-bt"></table></div>
-      <h4 class="sub-h">QQQ sau đó, theo màu đèn và pha top 100</h4>
-      <div class="tbl"><table id="tb-gate-al"></table></div>
-      <p class="note" id="gate-src"></p>
-    </article>
-    <article class="card">
-      <h3>Bằng chứng hôm nay</h3>
-      <p class="note" id="fl-miss"></p>
-      <div class="fl-ev" id="fl-ev"></div>
-    </article>
-    <article class="card">
-      <h3>Radar dòng tiền từng cổ phiếu</h3>
-      <p class="note">9 bằng chứng: mạnh hơn thị trường nhiều tuần, đường RS dẫn trước giá, ngành cải thiện, gần pivot với biến động co hẹp, khối lượng tích lũy, vượt pivot có khối lượng, giữ được pivot, nhiều mã cùng ngành có setup, giữ giá khi thị trường giảm. Rê chuột lên chấm để xem chi tiết. "Gap sự kiện": bật mạnh sau tin, cần thêm phiên xác nhận.</p>
-      <div class="tools"><select id="fl-min" aria-label="Số bằng chứng tối thiểu"><option value="0">Mọi mã</option><option value="4">Từ 4 bằng chứng</option><option value="5" selected>Từ 5 bằng chứng</option><option value="6">Từ 6 bằng chứng</option><option value="7">Từ 7 bằng chứng</option></select>
-        <input type="search" id="fl-q" placeholder="Lọc mã hoặc ngành…" aria-label="Lọc"><span class="muted small" id="fl-count"></span></div>
-      <div class="tbl"><table id="tb-fl-radar"></table></div>
-    </article>
-  </section>
 
   <!-- HIỆU QUẢ SETUP -->
   <section id="tab-lab" class="tab" role="tabpanel" hidden>
@@ -395,7 +382,7 @@
     <article class="card">
       <div class="card-top"><h3>Lịch sử các pha</h3>
         <div class="seg" role="group" aria-label="Chỉ số"><button type="button" id="cy-qqq" aria-pressed="true">QQQ</button><button type="button" id="cy-top" aria-pressed="false">Nhóm top 100</button></div></div>
-      <p class="note">Đường giá tô màu theo pha; dải màu ở chân biểu đồ cho thấy từng pha kéo dài bao lâu. <b>Màu đúng như ngày hôm đó, không vẽ lại:</b> xấu đi thì đổi màu ngay trong ngày, tốt lên thì phải giữ 3 phiên liên tiếp mới đổi ("lên chậm, xuống nhanh"). Nút "Từ 2020": phần nét đứt là lịch sử dài tính từ giá Yahoo của các mã còn niêm yết (năm xấu như 2022 trông nhẹ hơn thực tế); phần nét liền là dữ liệu của trang. "Nhóm top 100" là chỉ số tự tính từ lợi nhuận bình quân hằng ngày của 100 mã mạnh nhất.</p>
+      <p class="note">Đường giá tô màu theo pha; dải màu ở chân biểu đồ cho thấy từng pha kéo dài bao lâu. <b>Màu đúng như ngày hôm đó, không vẽ lại:</b> xấu đi thì đổi màu ngay trong ngày, tốt lên thì phải giữ 3 phiên liên tiếp mới đổi ("lên chậm, xuống nhanh"). Đường mảnh: EMA 10 (chấm), EMA 20 (gạch), EMA 50 (đậm) của chính đường đang xem. Nút "Từ 2020": phần nét đứt là lịch sử dài tính từ giá Yahoo của các mã còn niêm yết (năm xấu như 2022 trông nhẹ hơn thực tế); phần nét liền là dữ liệu của trang. "Nhóm top 100" là chỉ số tự tính từ lợi nhuận bình quân hằng ngày của 100 mã mạnh nhất.</p>
       <div class="ph-key"><span><i class="ph-t"></i>Tăng</span><span><i class="ph-d"></i>Điều chỉnh</span><span><i class="ph-g"></i>Giằng co</span><span><i class="ph-x"></i>Giảm</span></div>
       <div class="range" data-chart="cyc"></div><div class="chart tall-ch" id="ch-cyc"></div>
       <div class="tbl"><table id="tb-phase"></table></div>
@@ -408,8 +395,9 @@
     <article class="card notes"><h3>Nhận xét về nhóm top 100</h3><ul id="bk-notes"></ul></article>
     <article class="card">
       <h3>Top 100 và QQQ chồng lên nhau</h3>
-      <p class="note">Hai đường đặt bằng 100 ở đầu khoảng đang xem: <b>nhóm top 100</b> (đường đậm) và <b>QQQ</b> (đường xám). Cột: top 100 hơn (xanh) hay kém (đỏ) QQQ bao nhiêu % trong 21 phiên.</p>
+      <p class="note">Hai đường đặt bằng 100 ở đầu khoảng đang xem: <b>nhóm top 100</b> (đường đậm) và <b>QQQ</b> (đường xám). Cột: top 100 hơn (xanh) hay kém (đỏ) QQQ bao nhiêu % trong 5 hoặc 21 phiên (chọn bên dưới). Có thể xem khung 5 ngày, 1 tháng.</p>
       <p class="note" id="tspd-now"></p>
+      <div class="tools"><span class="muted small">Cột so sánh trong:</span><div class="seg" role="group" aria-label="Cửa sổ so sánh" id="ts-win"></div></div>
       <div class="range" data-chart="tspd"></div><div class="chart" id="ch-tspd"></div>
       <h4 class="sub-h">Kiểm chứng dài hạn: sau đó 1 tháng</h4>
       <div class="tbl"><table id="tb-tspd"></table></div>
@@ -448,6 +436,15 @@
       <h3>Kiểm chứng dài hạn theo từng năm: phương pháp nào dương qua nhiều kiểu thị trường?</h3>
       <p class="note" id="lt-leg-note"></p>
       <div class="tbl"><table id="tb-lt-leg"></table></div>
+    </article>
+    <article class="card" id="gate-card" hidden>
+      <h3>Bộ lọc thị trường khi mua cổ phiếu riêng lẻ</h3>
+      <p class="note">Cùng điểm mua, cùng quy tắc bán của các phương pháp huyền thoại, chỉ khác điều kiện được phép mở lệnh mới. Pha top 100 tính không làm mượt (không dùng dữ liệu tương lai). Đã thử và bỏ: lọc bằng SMI tuần (QQQ từ 1999: ngày SMI trên hay dưới đường tín hiệu cho kết quả như nhau, đổi chiều ~26 lần/năm).</p>
+      <p class="note" id="gate-verdict"></p>
+      <div class="tbl"><table id="tb-gate-bt"></table></div>
+      <h4 class="sub-h">QQQ sau đó, theo màu đèn và pha top 100</h4>
+      <div class="tbl"><table id="tb-gate-al"></table></div>
+      <p class="note" id="gate-src"></p>
     </article>
     <article class="card">
       <h3>Bảng tổng hợp</h3>
@@ -607,7 +604,7 @@
       <p><b>Ý tưởng chính:</b> trang này không chỉ tìm cổ phiếu có mẫu hình đẹp. Nó trả lời 3 câu hỏi trước khi mua, và tự kiểm chứng xem các câu trả lời đó trước đây có đúng không:</p>
       <ol>
         <li><b>Thị trường có ủng hộ mua không?</b> Xem nhóm Thị trường: Tổng quan → ô "Hôm nay nên làm gì?" (Mua mới / Chỉ theo dõi / Đứng ngoài, chọn theo kiểm chứng 2020–2026) và bảng Tín hiệu thị trường đã kiểm chứng.</li>
-        <li><b>Tiền đang vào ngành nào, mã nào?</b> Xem tab Ngành → Điểm ngành dẫn, và Radar dòng tiền ở tab Dòng tiền.</li>
+        <li><b>Tiền đang vào ngành nào, mã nào?</b> Xem tab Ngành → Điểm ngành dẫn, và Radar dòng tiền ở tab Mã hôm nay → Dòng tiền.</li>
         <li><b>Mua ở đâu, sai khi nào, và kiểu mua này có lợi thế không?</b> Xem tab Hiệu quả setup → Tín hiệu hôm nay, bấm vào mã để mở "Ba câu hỏi trước khi mua".</li>
       </ol>
       <h4 class="sub-h">7 điểm khác biệt so với các trang lọc cổ phiếu thông thường</h4>
