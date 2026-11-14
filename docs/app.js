@@ -4,7 +4,7 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const LW = window.LightweightCharts;
-  const APP_VERSION = '2026.11.14-f'; // phải trùng với APP_VERSION trong pipeline/build.py
+  const APP_VERSION = '2026.11.15-a'; // phải trùng với APP_VERSION trong pipeline/build.py
   const S = { exits: null, groups: null, flow: null, lab: null, cond: null, paper: null, cycle: null, backtest: null, latest: null, history: [], stocks: [], setups: [], extended: [], themes: [], basket: [], industries: [], patterns: null, charts: null };
   const ranges = {};          // khoảng thời gian của từng biểu đồ
   const built = new Set();    // tab đã vẽ
@@ -276,6 +276,54 @@
     ], T, { sort: null, empty: 'Chưa có: kết quả kiểm chứng dài hạn sẽ có sau lần chạy tới.' });
     const LB = S.longbt || {};
     $('#swk-note').textContent = T.length ? `Đo trên ${fdate(LB.from)} – ${fdate(LB.to)} (${LB.src}). Tín hiệu có giá trị phải hơn dòng "Mọi ngày" ở % lần tăng mà không tăng rủi ro giảm sâu. ${LB.note || ''}` : '';
+  }
+  function drawUp6() {
+    const U = (S.latest || {}).up6; if (!U || !U.items) return;
+    $('#up6-card').hidden = false;
+    const c = U.count, col = c >= 5 ? '--good' : c >= 3 ? '--warn' : '--bad';
+    $('#up6-card').style.setProperty('--dc', `var(${col})`);
+    $('#up6-badge').textContent = `${c}/6`;
+    $('#up6-items').replaceChildren(...U.items.map((x) => el('li', { class: x.ok ? 'ok' : 'no' }, el('span', { class: 'fl-mk', text: x.ok ? '✓' : '✗' }), el('span', { class: 'fl-lb', text: x.name }))));
+    const h = U.hist || [];
+    $('#up6-hist').textContent = h.length ? `20 phiên gần nhất: ${h.slice(-20).join(' ')}. ${c <= 2 ? 'Từ 0–2/6: hình mẫu của giai đoạn điều chỉnh/giảm, chưa phải uptrend.' : c >= 5 ? 'Từ 5/6: hình mẫu của uptrend.' : 'Đang ở giữa: thị trường chưa rõ.'}` : '';
+    table($('#tb-up6'), [
+      { k: 'c', label: 'Số đặc điểm đạt', f: (r) => `${r.c}/6` },
+      { k: 'days', label: 'Số phiên', f: (r) => n0(r.days) },
+      { k: 'q63', label: 'QQQ 3 tháng sau', f: (r) => spct(r.q63), c: (r) => cls(r.q63) },
+      { k: 'win', label: '% lần tăng', f: (r) => pct(r.win, 0) },
+      { k: 'dd10', label: '% lần giảm sâu > 10%', f: (r) => pct(r.dd10, 0), c: (r) => (r.dd10 >= 30 ? 'dn' : r.dd10 <= 15 ? 'up' : '') },
+    ], (S.longbt || {}).up6 || [], { sort: null, empty: 'Chưa có: kết quả kiểm chứng dài hạn sẽ có sau lần chạy tới.' });
+  }
+  function drawLead() {
+    const LN = (S.latest || {}).lead_now, LT = (S.longbt || {}).lead || {};
+    if (!LN) return;
+    $('#lead-card').hidden = false;
+    const B = LT.best, rec = LN.recent || {};
+    const key = (r) => `${r.k}|${r.name}`;
+    if (B) {
+      const ago = rec[key(B)];
+      $('#lead-badge').textContent = ago == null ? 'Chưa bật' : 'ĐANG CÓ';
+      $('#lead-card').style.setProperty('--dc', `var(${ago == null ? '--muted' : '--good'})`);
+      $('#lead-main').replaceChildren(el('b', { text: `Tín hiệu tốt nhất: top ${B.k} · ${B.name}. ` }),
+        `Hôm nay: ${ago == null ? 'chưa xuất hiện trong 10 phiên gần nhất' : 'xuất hiện ' + (ago === 0 ? 'hôm nay' : ago + ' phiên trước')}. Kiểm chứng: báo sau đáy QQQ khoảng ${B.lag ?? '—'} phiên, bắt ${B.caught}/${B.of} đáy, ${B.per_year} lần/năm; QQQ 1 tháng sau tăng ${B.win}% số lần (mọi ngày ${(LT.base || {}).win ?? '—'}%), nhóm top ${B.k} tháng sau ${spct(B.g21)}.`);
+    } else { $('#lead-badge').textContent = '—'; $('#lead-main').textContent = 'Chưa có kết quả kiểm chứng dài hạn (sẽ có sau lần chạy tới).'; }
+    const V = LN.vals || {};
+    $('#lead-vals').textContent = 'Hôm nay — ' + [30, 50, 100, 200].map((k) => { const v = V['k' + k] || {}; return `top ${k}: tốc độ ${isNum(v.sp5) ? n2(v.sp5) : '—'}%/ngày, giai đoạn 2 ${pct(v.st2, 0)}, nhanh hơn QQQ ${pct(v.beat5, 0)}, 10 mã mạnh nhất chiếm ${pct(v.c10, 0)} phần tăng`; }).join(' · ') + `. Toàn thị trường đạt Trend Template: ${pct(LN.pct_tt, 1)}.`;
+    const rows = (LT.rows || []).filter((r) => r.n >= 3).map((r) => Object.assign({}, r, { now: rec[key(r)] }));
+    table($('#tb-lead'), [
+      { k: 'k', label: 'Nhóm', f: (r) => `top ${r.k}` },
+      { k: 'name', label: 'Tín hiệu', l: true, f: (r) => (B && key(r) === key(B) ? el('b', { text: '★ ' + r.name }) : r.name) },
+      { k: 'now', label: 'Hôm nay', f: (r) => (r.now == null ? '—' : r.now === 0 ? 'hôm nay' : `${r.now} phiên trước`), c: (r) => (r.now == null ? 'muted' : 'up') },
+      { k: 'caught', label: 'Bắt đáy', f: (r) => `${r.caught}/${r.of}`, sv: (r) => r.caught },
+      { k: 'lag', label: 'Sau đáy (trung vị)', f: (r) => (isNum(r.lag) ? `${r.lag} phiên` : '—'), sv: (r) => -(r.lag ?? 99) },
+      { k: 'per_year', label: 'Lần/năm', f: (r) => n1(r.per_year) },
+      { k: 'win', label: 'QQQ 1 tháng sau tăng', f: (r) => pct(r.win, 0), c: (r) => (isNum(r.win) && LT.base ? (r.win >= LT.base.win + 5 ? 'up' : r.win < LT.base.win ? 'dn' : '') : '') },
+      { k: 'q21', label: 'QQQ 1 tháng sau', f: (r) => spct(r.q21), c: (r) => cls(r.q21) },
+      { k: 'g21', label: 'Nhóm 1 tháng sau', f: (r) => spct(r.g21), c: (r) => cls(r.g21) },
+      { k: 'dd5', label: '% lần QQQ giảm > 5%', f: (r) => pct(r.dd5, 0) },
+    ], rows, { sort: 'win', empty: 'Chưa có: kết quả kiểm chứng dài hạn sẽ có sau lần chạy tới.' });
+    const LB = S.longbt || {};
+    $('#lead-note').textContent = LT.rows ? `Đo trên ${fdate(LB.from)} – ${fdate(LB.to)} (${LB.src}), ${LT.lows} đáy QQQ (giảm ≥ 10%). "Bật lên" = vượt mức cao (70% số ngày thấp hơn, tính tới hôm đó) sau khi vừa ở mức thấp trong 20 phiên. Mốc so sánh: mọi ngày QQQ 1 tháng sau tăng ${(LT.base || {}).win}% số lần. Tín hiệu tốt nhất được chọn tự động: bắt ít nhất một nửa số đáy, ít nhất 6 lần, tỉ lệ đúng cao nhất. ${LB.note || ''}` : '';
   }
   function drawDecision() {
     const D = (S.latest || {}).decision; if (!D) return;
@@ -686,6 +734,7 @@
       $('#ck-sum').textContent = `${ng}/${ck.length} thuận lợi`;
       $('#ck-sum').className = 'ck-sum ' + (ng >= 6 ? 'up' : ng >= 4 ? 'wa' : 'dn');
       drawHistChart('qqq'); drawSmi(); drawDecision();
+      try { drawUp6(); drawLead(); } catch (e) { console.error(e); }
     },
     basket() {
       const B = S.latest.basket;
