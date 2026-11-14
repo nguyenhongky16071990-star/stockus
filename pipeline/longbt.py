@@ -21,7 +21,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 CACHE = ROOT / "pipeline" / "cache" / "longbt.json"
-VER = 4
+VER = 5
 START = "2019-01-01"
 N_TICK = 1200
 NAMES = {"mm": "Mark Minervini", "wo": "William O'Neil", "sw": "Stan Weinstein",
@@ -169,6 +169,103 @@ def top_tests(hist: pd.DataFrame, start: int = 260) -> dict:
 
 
 
+UP6_NAMES = ["QQQ trên SMA 50 ít nhất 1%", "QQQ cách đỉnh 52 tuần không quá 4%", "SMA 50 của QQQ đang dốc lên",
+             "Mã giảm ≥ 25%/quý không quá 7% số mã", "Mã tăng ≥ 13%/34 phiên nhiều hơn mã giảm ít nhất 1,5% số mã", "Đáy mới 52 tuần không quá 1% số mã"]
+
+
+def uptrend6(hist: pd.DataFrame) -> pd.DataFrame:
+    """6 đặc điểm mà giai đoạn uptrend có còn giai đoạn khác thường không có (chọn trên 2021–2023, kiểm tra lại trên 2024–2026).
+    Chỉ dùng dữ liệu tới từng ngày."""
+    q = hist["qqq"].astype(float)
+    s50 = q.rolling(50, min_periods=40).mean()
+    hi = q.rolling(252, min_periods=60).max()
+    n = hist["n"].replace(0, np.nan).astype(float)
+    cols = [q / s50 - 1 >= 0.01, q / hi - 1 >= -0.04, s50 > s50.shift(10),
+            hist["q_dn25"] / n * 100 <= 7,
+            ((hist["q_up13"] - hist["q_dn13"]) / n * 100 >= 1.5) if "q_up13" in hist else pd.Series(False, index=hist.index),
+            hist["nl52"] / n * 100 <= 1]
+    df = pd.DataFrame({k: c.fillna(False).astype(bool) for k, c in zip(UP6_NAMES, cols)})
+    df["count"] = df[UP6_NAMES].sum(axis=1)
+    return df
+
+
+def _thrust(v: pd.Series, lo=0.3, hi=0.7, minp=120) -> pd.Series:
+    """'Bật lên': vượt mức cao (phân vị hi tính tới hôm đó) sau khi đã ở mức thấp (phân vị lo) trong 20 phiên trước.
+    Phân vị dùng dữ liệu TỚI HÔM ĐÓ (không nhìn trước)."""
+    v = v.astype(float)
+    ph = v.expanding(minp).quantile(hi)
+    pl_ = v.expanding(minp).quantile(lo)
+    was_low = (v <= pl_).astype(float).rolling(20, min_periods=1).max().shift(1).fillna(0).astype(bool)
+    return (v >= ph) & (v.shift(1) < ph.shift(1)) & was_low
+
+
+def lead_signals(hist: pd.DataFrame, sizes=(30, 50, 100, 200)) -> dict:
+    """Tín hiệu 'xác nhận nhanh' từ nhóm dẫn đầu, mỗi cái là chuỗi True vào ngày tín hiệu xuất hiện."""
+    out = {}
+    tt = hist["pct_tt"].astype(float) if "pct_tt" in hist else None
+    for K in sizes:
+        if f"k{K}_sp5" not in hist:
+            continue
+        sp = _thrust(hist[f"k{K}_sp5"])
+        out[(K, "Tốc độ tăng TB 5 phiên bật lên")] = sp
+        out[(K, "Số mã lập đỉnh 20 phiên bật lên")] = _thrust(hist[f"k{K}_nh20"])
+        out[(K, "% mã giai đoạn 2 bật lên")] = _thrust(hist[f"k{K}_st2"])
+        out[(K, "% mã tăng nhanh hơn QQQ bật lên")] = _thrust(hist[f"k{K}_beat5"])
+        out[(K, "Cả nhóm cùng tăng (% mã tăng 5 phiên) bật lên")] = _thrust(hist[f"k{K}_up5"])
+        st2 = hist[f"k{K}_st2"].astype(float)
+        out[(K, "Tốc độ bật + % mã giai đoạn 2 của nhóm tăng ≥ 5 điểm/10 phiên")] = sp & (st2 - st2.shift(10) >= 5)
+        if tt is not None:
+            out[(K, "Tốc độ bật + % mã Trend Template toàn thị trường tăng ≥ 3 điểm/10 phiên")] = sp & (tt - tt.shift(10) >= 3)
+        out[(K, "Tốc độ bật + nhóm tăng đều (10 mã mạnh nhất < 50% phần tăng)")] = sp & (hist[f"k{K}_c10"].astype(float) < 50)
+    return {k: v.fillna(False).astype(bool) for k, v in out.items()}
+
+
+def lead_tests(hist: pd.DataFrame, start: int = 260) -> dict:
+    q = hist["qqq"].astype(float).values
+    n = len(q)
+    lows = [i for i in range(max(start, 60), n - 30) if np.isfinite(q[i]) and q[i] == np.nanmin(q[i - 30:i + 31]) and np.nanmax(q[i - 60:i]) / q[i] > 1.10]
+    rows = []
+    for (K, name), sig in lead_signals(hist).items():
+        v = sig.values
+        E, last = [], -99
+        for i in range(start, n):
+            if v[i] and i - last > 15:
+                E.append(i)
+                last = i
+        g = np.cumprod(1 + np.nan_to_num(hist[f"k{K}_r1"].astype(float).values) / 100)
+        f = [(q[i + 21] / q[i] - 1) * 100 for i in E if i + 21 < n]
+        fg = [(g[i + 21] / g[i] - 1) * 100 for i in E if i + 21 < n]
+        dd = [(np.nanmin(q[i + 1:i + 22]) / q[i] - 1) * 100 for i in E if i + 21 < n]
+        lag = []
+        for lo in lows:
+            k = next((e for e in E if lo - 10 <= e <= lo + 40), None)
+            if k is not None:
+                lag.append(k - lo)
+        rows.append({"k": K, "name": name, "n": len(E), "caught": len(lag), "of": len(lows), "lag": _r(np.median(lag), 0) if lag else None,
+                     "q21": _r(np.mean(f), 1) if f else None, "win": _r(np.mean([x > 0 for x in f]) * 100, 0) if f else None,
+                     "g21": _r(np.mean(fg), 1) if fg else None, "dd5": _r(np.mean([x < -5 for x in dd]) * 100, 0) if dd else None,
+                     "per_year": _r(len(E) / max(1, (n - start) / 252), 1)})
+    base = [(q[i + 21] / q[i] - 1) * 100 for i in range(start, n - 21)]
+    ok = [r for r in rows if r["n"] >= 6 and r["caught"] >= max(1, r["of"] / 2) and r["win"] is not None]
+    best = max(ok, key=lambda r: (r["win"], -(r["lag"] or 99))) if ok else None
+    return {"rows": rows, "best": best, "lows": len(lows), "base": {"q21": _r(np.mean(base), 1), "win": _r(np.mean([x > 0 for x in base]) * 100, 0)}}
+
+
+def up6_test(hist: pd.DataFrame, start: int = 260) -> list:
+    U = uptrend6(hist)
+    q = hist["qqq"].astype(float).values
+    n = len(q)
+    out = []
+    for c in range(7):
+        I = [i for i in range(start, n - 63) if U["count"].iloc[i] == c]
+        if not I:
+            continue
+        f = [(q[i + 63] / q[i] - 1) * 100 for i in I]
+        dd = [(np.nanmin(q[i + 1:i + 64]) / q[i] - 1) * 100 for i in I]
+        out.append({"c": c, "days": len(I), "q63": _r(np.mean(f), 1), "win": _r(np.mean([x > 0 for x in f]) * 100, 0), "dd10": _r(np.mean([x < -10 for x in dd]) * 100, 0)})
+    return out
+
+
 def market_filters(hist: pd.DataFrame) -> dict:
     """Các điều kiện 'được mở lệnh mới' cần so sánh. Mỗi cái là chuỗi True/False theo ngày, chỉ dùng dữ liệu tới ngày đó."""
     q = hist["qqq"].astype(float)
@@ -177,6 +274,10 @@ def market_filters(hist: pd.DataFrame) -> dict:
     hl = (hist["nh52"] - hist["nl52"]) / hist["n"].replace(0, np.nan) * 100
     no_wash = ~(hl < -10).rolling(20, min_periods=1).max().fillna(0).astype(bool)
     f1 = reg != "Xấu"
+    try:
+        U6 = uptrend6(hist)["count"]
+    except Exception:
+        U6 = pd.Series(6, index=hist.index)
     f2 = ~((q < s200) & (s200 < s200.shift(20)))
     return {
         "Mọi ngày (không lọc)": pd.Series(True, index=hist.index),
@@ -186,6 +287,8 @@ def market_filters(hist: pd.DataFrame) -> dict:
         "QQQ trên SMA 50": q > s50,
         "Xu hướng QQQ không Xấu + không dưới SMA 200 dốc xuống": f1 & f2,
         "Xu hướng QQQ không Xấu + không có phiên đáy mới diện rộng 20 phiên": f1 & no_wash,
+        "Đạt ít nhất 3/6 đặc điểm uptrend": U6 >= 3,
+        "Xu hướng QQQ không Xấu + đạt ít nhất 3/6 đặc điểm uptrend": f1 & (U6 >= 3),
     }
 
 
@@ -288,7 +391,17 @@ def compute(raw_recent: dict, universe: pd.DataFrame, demo: bool = False) -> dic
     except Exception as e:
         print("Kiểm chứng dài hạn: lỗi mã giữ sức mạnh", e, file=sys.stderr)
         hold = []
-    out = {"ver": VER, "built": now.isoformat(), "filters": flt, "holders": hold, "src": src, "from": dates[res["start"]].strftime("%Y-%m-%d"), "to": dates[-1].strftime("%Y-%m-%d"),
+    try:
+        lead = lead_tests(res["hist"], res["start"])
+    except Exception as e:
+        print("Kiểm chứng dài hạn: lỗi nhóm dẫn đầu", e, file=sys.stderr)
+        lead = {}
+    try:
+        up6 = up6_test(res["hist"], res["start"])
+    except Exception as e:
+        print("Kiểm chứng dài hạn: lỗi 6 đặc điểm uptrend", e, file=sys.stderr)
+        up6 = []
+    out = {"ver": VER, "built": now.isoformat(), "filters": flt, "holders": hold, "lead": lead, "up6": up6, "src": src, "from": dates[res["start"]].strftime("%Y-%m-%d"), "to": dates[-1].strftime("%Y-%m-%d"),
            "n_stocks": res["n_stocks"], "qqq_years": qy, "legends": legends, "setups": setups, "top": top_tests(res["hist"]),
            "note": "Chỉ gồm các mã còn niêm yết hôm nay nên kết quả đẹp hơn thực tế một chút. Có áp dụng quy tắc phòng thủ như kiểm chứng hằng ngày. Setup: cột 'Khi QQQ không Xấu' là chỉ tính lệnh mở khi xu hướng QQQ không Xấu."}
     if not demo:

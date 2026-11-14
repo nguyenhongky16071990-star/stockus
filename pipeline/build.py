@@ -27,7 +27,7 @@ DATA = ROOT / "docs" / "data"
 CONFIG = json.loads((ROOT / "pipeline" / "config.json").read_text(encoding="utf-8"))
 INDEXES = ["QQQ", "SPY", "IWM", "SMH", "IGV"]
 FIELDS = ["Open", "High", "Low", "Close", "Volume"]
-APP_VERSION = "2026.11.14-f"  # phải trùng với APP_VERSION trong docs/app.js
+APP_VERSION = "2026.11.15-a"  # phải trùng với APP_VERSION trong docs/app.js
 
 
 # ---------------------------------------------------------------- tải dữ liệu
@@ -211,6 +211,75 @@ class _Light(Exception):
     pass
 
 
+LEAD_SIZES = (30, 50, 100, 200)
+
+
+def _lead_metrics(C, ret, rs_pos, stage, hi20, qclose) -> dict:
+    """Mỗi ngày, với nhóm top K (xếp theo sức mạnh giá của hôm trước để không dùng tương lai):
+    sp5   tốc độ tăng trung bình 5 phiên (%/ngày) của các mã đã ở trong nhóm từ 5 phiên trước
+    r1    lợi nhuận trung bình hôm nay của nhóm hôm qua (để dựng chỉ số của nhóm)
+    nh20  % mã trong nhóm lập đỉnh 20 phiên
+    st2   % mã trong nhóm ở giai đoạn 2 (Weinstein)
+    beat5 % mã trong nhóm (từ 5 phiên trước) tăng nhanh hơn QQQ trong 5 phiên
+    up5   % mã trong nhóm (từ 5 phiên trước) tăng trong 5 phiên: cả nhóm cùng lên hay chỉ vài mã
+    c10   % phần tăng của nhóm đến từ 10 mã tăng mạnh nhất (cao = chỉ vài mã kéo)"""
+    import warnings
+    warnings.simplefilter("ignore", RuntimeWarning)
+    out = {}
+    q5 = (qclose / qclose.shift(5) - 1).reindex(C.index).values
+    R5, R1 = ret[5].values, ret[1].values
+    for K in LEAD_SIZES:
+        top = (rs_pos <= K)
+        p1 = top.shift(1, fill_value=False).astype(bool).values
+        p5 = top.shift(5, fill_value=False).astype(bool).values
+        tv = top.values
+        with np.errstate(all="ignore"):
+            r1 = np.where(p1, R1, np.nan)
+            r5 = np.where(p5, R5, np.nan)
+            out[f"k{K}_r1"] = pd.Series(np.nanmean(r1, axis=1) * 100, index=C.index)
+            out[f"k{K}_sp5"] = pd.Series(np.nanmean(r5, axis=1) * 100 / 5, index=C.index)
+            nn = tv.sum(axis=1).astype(float)
+            nn[nn == 0] = np.nan
+            out[f"k{K}_nh20"] = pd.Series(((C >= hi20).values & tv).sum(axis=1) / nn * 100, index=C.index)
+            out[f"k{K}_st2"] = pd.Series(((stage == 2).values & tv).sum(axis=1) / nn * 100, index=C.index)
+            n5 = np.isfinite(r5).sum(axis=1).astype(float)
+            n5[n5 == 0] = np.nan
+            out[f"k{K}_beat5"] = pd.Series((r5 > q5[:, None]).sum(axis=1) / n5 * 100, index=C.index)
+            out[f"k{K}_up5"] = pd.Series((r5 > 0).sum(axis=1) / n5 * 100, index=C.index)
+            pos = np.where(r5 > 0, r5, 0.0)
+            srt = -np.sort(-np.nan_to_num(pos), axis=1)
+            tot = srt.sum(axis=1)
+            tot[tot == 0] = np.nan
+            out[f"k{K}_c10"] = pd.Series(srt[:, :10].sum(axis=1) / tot * 100, index=C.index)
+    return out
+
+
+def _up6_now(hist: pd.DataFrame) -> dict:
+    try:
+        import longbt
+        U = longbt.uptrend6(hist)
+        r = U.iloc[-1]
+        return {"count": int(r["count"]), "items": [{"name": k, "ok": bool(r[k])} for k in longbt.UP6_NAMES],
+                "hist": [int(x) for x in U["count"].iloc[-60:]]}
+    except Exception as e:
+        print("6 đặc điểm uptrend lỗi:", e, file=sys.stderr)
+        return {}
+
+
+def _lead_now(hist: pd.DataFrame) -> dict:
+    """Tín hiệu nhóm dẫn đầu xuất hiện trong 10 phiên gần nhất (trên dữ liệu của trang) và giá trị hôm nay."""
+    try:
+        import longbt
+        S = longbt.lead_signals(hist)
+        rec = {f"{k[0]}|{k[1]}": (int(len(v) - 1 - np.nonzero(v.values)[0][-1]) if v.values[-10:].any() else None) for k, v in S.items()}
+        last = hist.iloc[-1]
+        vals = {f"k{K}": {m: r1(last.get(f"k{K}_{m}"), 2) for m in ("sp5", "nh20", "st2", "beat5", "up5", "c10")} for K in LEAD_SIZES}
+        return {"recent": rec, "vals": vals, "pct_tt": r1(last.get("pct_tt"), 1)}
+    except Exception as e:
+        print("Nhóm dẫn đầu hôm nay lỗi:", e, file=sys.stderr)
+        return {}
+
+
 def _filters_now(hist: pd.DataFrame, t0: int) -> dict:
     try:
         import longbt
@@ -338,6 +407,9 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
     pl = lambda m: (m & liquid).sum(axis=1) / n_liq.replace(0, np.nan) * 100
     w_up5, w_dn5 = pl(ret[5] >= 0.10), pl(ret[5] <= -0.10)
     w_up10, w_dn10 = pl(r10 >= 0.15), pl(r10 <= -0.15)
+    # đặc điểm của nhóm dẫn đầu theo nhiều cỡ nhóm (top 30/50/100/200): để tìm xác nhận nhanh khi thị trường quay lên
+    lead_cols = _lead_metrics(C, ret, rs_pos, stage, hi20, qqq["Close"])
+    r34 = C / C.shift(34) - 1
     # mã giữ sức mạnh: sát đỉnh 1 năm (≤ 10%), đường RS lập đỉnh 52 tuần trong 5 phiên, RS ≥ 80
     rs_nh5 = rs_nh.rolling(5, min_periods=1).max().fillna(0).astype(bool)
     holders = liquid & (dd_hi >= -10) & rs_nh5 & (rs >= 80)
@@ -369,7 +441,8 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
         "leaders": leaders_n,
         "leader_health": cnt(top & (C > e9)) / top.sum(axis=1).replace(0, np.nan) * 100,  # % top 100 còn trên EMA 9
         "pct_tt": cnt(tt) / n * 100,
-        "b_ret1": b_ret1, "w_up5": w_up5, "w_dn5": w_dn5, "w_up10": w_up10, "w_dn10": w_dn10, "n_liq": n_liq, "b_up": b_up * 100, "b_gain": b_gain, "b_loss": b_loss,
+        "b_ret1": b_ret1, "w_up5": w_up5, "w_dn5": w_dn5, "w_up10": w_up10, "w_dn10": w_dn10, "n_liq": n_liq,
+        "q_up13": cnt(r34 >= 0.13), "q_dn13": cnt(r34 <= -0.13), **lead_cols, "b_up": b_up * 100, "b_gain": b_gain, "b_loss": b_loss,
         "b_bigdown": b_bigdown, "b_ret5": b_ret5, "b_above21": b_above21 * 100,
         "b_offhigh": b_offhigh, "b_down2_5d": b_down2_5d,
         "b_ret3": b_ret3, "b_ret21": b_ret21, "b_nh52": b_nh52, "b_nh20": b_nh20,
@@ -1026,6 +1099,8 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
         "qqq_dd60": r1((qc.iloc[-1] / qc.iloc[-60:].max() - 1) * 100, 1),
         "n_liq": int(n_liq.iloc[t0]),
         "filters_now": _filters_now(hist, t0),
+        "up6": _up6_now(hist),
+        "lead_now": _lead_now(hist),
         "n_ind": n_ind, "basket_size": cfg["basket_size"],
         "basket2": {k: r1(hist[k].iloc[t0], 1) for k in ("b_ret1", "b_ret3", "b_ret5", "b_ret21", "b_nh52", "b_nh20", "b_w10", "b_w20", "b_ddmed")} | {k + "_5": r1(hist[k].iloc[t0 - 5], 1) for k in ("b_ret5", "b_nh52", "b_w20", "b_ddmed")}
                     | {k + "_21": r1(hist[k].iloc[t0 - 21], 1) for k in ("b_nh52", "b_w20")},
