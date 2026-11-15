@@ -63,6 +63,9 @@
       <p class="note">6 đặc điểm mà các giai đoạn uptrend 2021–2026 có còn giai đoạn khác thường không có (chọn trên 2021–2023, kiểm tra lại trên 2024–2026). Đây là lớp BẢO VỆ: xác nhận chậm vài tuần sau đáy, nhưng tránh được nhịp hồi giả và năm xấu như 2022.</p>
       <ul class="fl-evl" id="up6-items"></ul>
       <p class="note" id="up6-hist"></p>
+      <p class="note">Biểu đồ: QQQ <b style="color:var(--good)">xanh đậm</b> những ngày ĐẠT điều kiện uptrend (từ 5/6 đặc điểm), <b style="color:var(--good);opacity:.6">xanh nhạt</b> những ngày gần đạt (4/6), <b>xám</b> những ngày không đạt (0–3/6). Màu đúng như ngày hôm đó (không vẽ lại). Phần nét đứt trước khi trang có dữ liệu riêng là lịch sử dài từ 2020.</p>
+      <div class="range" data-chart="up6c"></div><div class="chart tall-ch" id="ch-up6c"></div>
+      <details class="dc-more" open><summary>Các giai đoạn đạt / không đạt (từ 5 phiên trở lên)</summary><div class="tbl"><table id="tb-up6-seg"></table></div><p class="note" id="up6-seg-note"></p></details>
       <details class="dc-more"><summary>Kiểm chứng 2020–2026: QQQ 3 tháng sau theo số đặc điểm đạt</summary><div class="tbl"><table id="tb-up6"></table></div></details>
     </article>
     <article class="card full" id="lead-card" hidden>
@@ -415,6 +418,16 @@
     </article>
     <div class="tiles" id="bk-period"></div>
     <article class="card notes"><h3>Nhận xét về nhóm top 100</h3><ul id="bk-notes"></ul></article>
+    <article class="card" id="slope-card">
+      <h3>Độ dốc của nhóm dẫn đầu (top 30) so với QQQ</h3>
+      <p class="note">Đo xu hướng "tăng dài" bằng ĐỘ DỐC: kẻ đường thẳng khớp nhất qua 1 tháng (21 phiên) hoặc 1 quý (63 phiên) gần nhất, quy ra % mỗi tháng. Khác tốc độ 5 phiên (đổi chiều ~50 lần/năm), độ dốc chỉ đổi khi xu hướng thật sự đổi. <b style="color:var(--good)">Nền xanh</b>: top 30 đang đi lên VÀ dốc hơn QQQ (nhóm dẫn đầu kéo thị trường). Đường đậm: chỉ số top 30; đường xám: QQQ (cùng đặt bằng 100); đường gạch: đường xu hướng của khung đang chọn tại hôm nay.</p>
+      <div class="tools"><span class="muted small">Khung độ dốc:</span><div class="seg" role="group" aria-label="Khung độ dốc" id="sl-win"></div></div>
+      <p class="dc-main" id="slope-now"></p>
+      <div class="range" data-chart="slope"></div><div class="chart tall-ch" id="ch-slope"></div><div class="chart" id="ch-slope2" style="height:150px"></div>
+      <h4 class="sub-h">Kiểm chứng: sau những ngày nền xanh và không xanh</h4>
+      <div class="tbl"><table id="tb-slope"></table></div>
+      <p class="note" id="slope-note"></p>
+    </article>
     <article class="card">
       <h3>Top 100 và QQQ chồng lên nhau</h3>
       <p class="note">Hai đường đặt bằng 100 ở đầu khoảng đang xem: <b>nhóm top 100</b> (đường đậm) và <b>QQQ</b> (đường xám). Cột: top 100 hơn (xanh) hay kém (đỏ) QQQ bao nhiêu % trong 5 hoặc 21 phiên (chọn bên dưới). Có thể xem khung 5 ngày, 1 tháng.</p>

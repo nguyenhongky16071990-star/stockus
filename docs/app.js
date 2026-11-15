@@ -4,12 +4,12 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const LW = window.LightweightCharts;
-  const APP_VERSION = '2026.11.15-b'; // phải trùng với APP_VERSION trong pipeline/build.py
+  const APP_VERSION = '2026.11.15-d'; // phải trùng với APP_VERSION trong pipeline/build.py
   const S = { exits: null, groups: null, flow: null, lab: null, cond: null, paper: null, cycle: null, backtest: null, latest: null, history: [], stocks: [], setups: [], extended: [], themes: [], basket: [], industries: [], patterns: null, charts: null };
-  const ranges = {};          // khoảng thời gian của từng biểu đồ
+  const ranges = { up6c: -1, slope: -1 };   // khoảng thời gian của từng biểu đồ
   const built = new Set();    // tab đã vẽ
   const live = {};            // biểu đồ đang hiển thị
-  let hlScope = 'top', patDone = false, tsWin = 21, swWin = '5', leadSel = null;
+  let hlScope = 'top', patDone = false, tsWin = 21, swWin = '5', leadSel = null, slWin = 21;
   let cyKey = 'qqq';
   const PHC = { 'Tăng': '--good', 'Điều chỉnh': '--warn', 'Giằng co': '--c1', 'Giảm': '--bad' };
   const GDC = { 'Vàng + đầu chu kỳ': '--good', 'Thời điểm vàng': '--good', 'Thuận lợi': '--c4', 'Trung tính': '--warn', 'Bất lợi': '--bad' };
@@ -209,6 +209,39 @@
       c.addLineSeries({ color: css('--ink'), lineWidth: 3, priceLineVisible: false, title: 'Top 100' }).setData(pts.map(([d, a]) => ({ time: d, value: a / a0 * 100 })));
       c.applyOptions({ leftPriceScale: { visible: true } });
     },
+    slope(c, rows) {
+      const P = slopePoints(); if (!P.length) return;
+      const from = ranges.slope === -1 || ranges.slope === 0 ? '' : (rows.length ? rows[0].d : '');
+      const V = P.filter((p) => p.d >= from); if (!V.length) return;
+      const a0 = V[0].t, q0 = V[0].q;
+      c.timeScale().applyOptions({ minBarSpacing: 0.05 });
+      const band = c.addHistogramSeries({ priceScaleId: 'band', priceLineVisible: false, lastValueVisible: false });
+      band.setData(V.map((p) => ({ time: p.d, value: 1, color: p.green ? css('--good') + '33' : 'rgba(0,0,0,0)' })));
+      c.priceScale('band').applyOptions({ scaleMargins: { top: 0, bottom: 0 }, visible: false });
+      c.addLineSeries({ color: css('--muted'), lineWidth: 2, priceLineVisible: false, title: 'QQQ' }).setData(V.map((p) => ({ time: p.d, value: p.q / q0 * 100 })));
+      c.addLineSeries({ color: css('--ink'), lineWidth: 3, priceLineVisible: false, title: 'Top 30' }).setData(V.map((p) => ({ time: p.d, value: p.t / a0 * 100 })));
+      // đường xu hướng của khung đang chọn, tính tại hôm nay
+      for (const [key, base, color] of [['t', a0, '--ink'], ['q', q0, '--muted']]) {
+        const w = slWin, last = P.slice(-w); if (last.length < w) continue;
+        const ys = last.map((p) => Math.log(p[key])), xm = (w - 1) / 2, ym = ys.reduce((s_, v) => s_ + v, 0) / w;
+        let num = 0, den = 0; ys.forEach((y, k) => { num += (k - xm) * (y - ym); den += (k - xm) ** 2; });
+        const b = num / den, a = ym - b * xm;
+        c.addLineSeries({ color: css(color), lineWidth: 2, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false })
+          .setData([{ time: last[0].d, value: Math.exp(a) / base * 100 }, { time: last[w - 1].d, value: Math.exp(a + b * (w - 1)) / base * 100 }]);
+      }
+    },
+    up6c(c, rows) {
+      const pts = up6Points(); if (!pts.length) return;
+      const from = ranges.up6c === -1 || ranges.up6c === 0 ? '' : (rows.length ? rows[0].d : '');
+      const P = pts.filter((p) => p.d >= from);
+      const col = (n) => (n >= 5 ? css('--good') : n === 4 ? css('--good') + '77' : css('--muted') + '99');
+      c.timeScale().applyOptions({ minBarSpacing: 0.05 }); c.priceScale('right').applyOptions({ mode: 1 });
+      c.addLineSeries({ lineWidth: 2, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }).setData(P.filter((p) => p.old).map((p) => ({ time: p.d, value: p.q, color: col(p.c) })));
+      c.addLineSeries({ lineWidth: 2, priceLineVisible: false, title: 'QQQ' }).setData(P.filter((p) => !p.old).map((p) => ({ time: p.d, value: p.q, color: col(p.c) })));
+      const band = c.addHistogramSeries({ priceScaleId: 'band', priceLineVisible: false, lastValueVisible: false });
+      band.setData(P.map((p) => ({ time: p.d, value: 1, color: col(p.c) })));
+      c.priceScale('band').applyOptions({ scaleMargins: { top: 0.93, bottom: 0 }, visible: false });
+    },
     swk(c, rows) {
       const u = 'w_up' + swWin, d = 'w_dn' + swWin;
       const pts = rows.filter((r) => isNum(r[u]) && isNum(r[d]));
@@ -276,6 +309,89 @@
     ], T, { sort: null, empty: 'Chưa có: kết quả kiểm chứng dài hạn sẽ có sau lần chạy tới.' });
     const LB = S.longbt || {};
     $('#swk-note').textContent = T.length ? `Đo trên ${fdate(LB.from)} – ${fdate(LB.to)} (${LB.src}). Tín hiệu có giá trị phải hơn dòng "Mọi ngày" ở % lần tăng mà không tăng rủi ro giảm sâu. ${LB.note || ''}` : '';
+  }
+  // chuỗi số đặc điểm uptrend theo ngày: lịch sử dài (2020, nét đứt) nối với dữ liệu của trang
+  function up6Points() {
+    const H = (S.history || []).filter((r) => isNum(r.up6) && isNum(r.qqq)).map((r) => ({ d: r.d, q: r.qqq, c: r.up6, old: false }));
+    const LS = (S.longbt || {}).up6_series || {};
+    const first = H.length ? H[0].d : '9999';
+    const old = (LS.d || []).map((d, i) => ({ d, q: LS.qqq[i], c: LS.c[i], old: true })).filter((p) => p.d < first && isNum(p.q));
+    return old.concat(H);
+  }
+  // chỉ số top 30 và QQQ theo ngày (lịch sử dài 2020 nối với dữ liệu của trang) kèm độ dốc 21/63 phiên (%/tháng)
+  function slopePoints() {
+    const LS = (((S.longbt || {}).lead || {}).series) || {};
+    const H = (S.history || []).filter((r) => isNum(r.k30_r1) && isNum(r.qqq));
+    const first = H.length ? H[0].d : '9999';
+    const raw = (LS.d || []).map((d, i) => ({ d, r: (LS.g30 || [])[i], q: LS.qqq[i] })).filter((p) => p.d < first && isNum(p.q) && isNum(p.r))
+      .concat(H.map((r) => ({ d: r.d, r: r.k30_r1, q: r.qqq })));
+    let t = 100; const P = raw.map((p) => ({ d: p.d, q: p.q, t: (t *= 1 + p.r / 100) }));
+    const w = slWin, lsl = (key, i) => { if (i < w - 1) return null; let num = 0, den = 0; const xm = (w - 1) / 2; let ym = 0; for (let k = 0; k < w; k++) ym += Math.log(P[i - w + 1 + k][key]); ym /= w;
+      for (let k = 0; k < w; k++) { num += (k - xm) * (Math.log(P[i - w + 1 + k][key]) - ym); den += (k - xm) ** 2; } return (Math.exp(num / den * 21) - 1) * 100; };
+    P.forEach((p, i) => { p.st = lsl('t', i); p.sq = lsl('q', i); p.green = isNum(p.st) && isNum(p.sq) && p.st > 0 && p.st > p.sq; });
+    return P;
+  }
+  function drawSlope() {
+    const sg = $('#sl-win');
+    if (sg && !sg.children.length) sg.replaceChildren(...[[21, '1 tháng (21 phiên)'], [63, '1 quý (63 phiên)']].map(([k, tx]) => { const b = el('button', { type: 'button', 'aria-pressed': String(k === slWin), text: tx });
+      b.addEventListener('click', () => { slWin = k; $$('#sl-win button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); drawHistChart('slope'); drawSlope(); }); return b; }));
+    const P = slopePoints(); if (!P.length) return;
+    const L = P[P.length - 1];
+    $('#slope-now').replaceChildren(el('b', { text: `Hôm nay (độ dốc ${slWin === 21 ? '1 tháng' : '1 quý'}): ` }), `top 30 ${spct(L.st)}/tháng, QQQ ${spct(L.sq)}/tháng — ` + (L.green ? 'NỀN XANH: nhóm dẫn đầu đang đi lên và dốc hơn thị trường.' : L.st > 0 ? 'top 30 đi lên nhưng chậm hơn QQQ.' : L.st > L.sq ? 'top 30 đang đi xuống, chậm hơn QQQ.' : 'top 30 đang đi xuống nhanh hơn QQQ: nhóm dẫn đầu bị bán mạnh.'));
+    // biểu đồ phụ: độ dốc theo ngày
+    if (live.slope2) { live.slope2.remove(); delete live.slope2; }
+    const box = $('#ch-slope2');
+    if (box && !box.closest('.tab').hidden) {
+      const from = ranges.slope === -1 || ranges.slope === 0 ? '' : ((S.history || []).slice(-(ranges.slope ?? 126))[0] || {}).d || '';
+      const V = P.filter((p) => p.d >= from && isNum(p.st));
+      const c2 = baseChart(box); c2.timeScale().applyOptions({ minBarSpacing: 0.05 });
+      const a = c2.addLineSeries({ color: css('--ink'), lineWidth: 2, priceLineVisible: false, title: 'Top 30 %/tháng' }); a.setData(V.map((p) => ({ time: p.d, value: p.st })));
+      c2.addLineSeries({ color: css('--muted'), lineWidth: 1, priceLineVisible: false, title: 'QQQ %/tháng' }).setData(V.filter((p) => isNum(p.sq)).map((p) => ({ time: p.d, value: p.sq })));
+      a.createPriceLine({ price: 0, color: css('--muted'), lineStyle: 2, lineWidth: 1, axisLabelVisible: false });
+      c2.timeScale().fitContent(); live.slope2 = c2;
+      if (live.slope) { const sync = (x, y) => x.timeScale().subscribeVisibleLogicalRangeChange((r) => { if (r) y.timeScale().setVisibleLogicalRange(r); }); sync(live.slope, c2); sync(c2, live.slope); }
+    }
+    // kiểm chứng
+    const n = P.length, q = P.map((p) => p.q), t = P.map((p) => p.t);
+    const st = (name, f) => { const I = []; for (let i = 0; i < n; i++) if (isNum(P[i].st) && f(P[i])) I.push(i);
+      const fw = (a_, h) => I.filter((i) => i + h < n).map((i) => (a_[i + h] / a_[i] - 1) * 100), av = (x) => (x.length ? x.reduce((u, v) => u + v, 0) / x.length : null);
+      const q21 = fw(q, 21), q63 = fw(q, 63), t21 = fw(t, 21);
+      const dd = I.filter((i) => i + 21 < n).map((i) => { let m = 0; for (let j = i + 1; j <= i + 21; j++) m = Math.min(m, t[j] / t[i] - 1); return m * 100; });
+      return { name, days: I.length, q21: av(q21), q63: av(q63), win: q63.length ? q63.filter((x) => x > 0).length / q63.length * 100 : null, t21: av(t21), tw: t21.length ? t21.filter((x) => x > 0).length / t21.length * 100 : null, dd8: dd.length ? dd.filter((x) => x < -8).length / dd.length * 100 : null }; };
+    let flips = 0; for (let i = 1; i < n; i++) if (isNum(P[i].st) && isNum(P[i - 1].st) && P[i].green !== P[i - 1].green) flips++;
+    const yrs = P.filter((p) => isNum(p.st)).length / 252;
+    table($('#tb-slope'), [
+      { k: 'name', label: 'Hôm đó', l: true },
+      { k: 'days', label: 'Số phiên', f: (r) => n0(r.days) },
+      { k: 't21', label: 'Top 30 1 tháng sau', f: (r) => spct(r.t21), c: (r) => cls(r.t21) },
+      { k: 'tw', label: '% lần top 30 tăng', f: (r) => pct(r.tw, 0) },
+      { k: 'dd8', label: '% lần top 30 giảm sâu > 8%', f: (r) => pct(r.dd8, 0) },
+      { k: 'q21', label: 'QQQ 1 tháng sau', f: (r) => spct(r.q21), c: (r) => cls(r.q21) },
+      { k: 'q63', label: 'QQQ 3 tháng sau', f: (r) => spct(r.q63), c: (r) => cls(r.q63) },
+      { k: 'win', label: '% lần QQQ tăng (3 tháng)', f: (r) => pct(r.win, 0) },
+    ], [st('Mọi ngày', () => true), st('Nền xanh (top 30 đi lên và dốc hơn QQQ)', (p) => p.green), st('Không xanh', (p) => !p.green), st('Top 30 đi xuống nhanh hơn QQQ', (p) => p.st < 0 && p.st < p.sq)], { sort: null });
+    $('#slope-note').textContent = `Đo trên ${fdate((P.find((p) => isNum(p.st)) || {}).d)} – ${fdate(L.d)} với độ dốc ${slWin} phiên; nền đổi màu khoảng ${n1(flips / Math.max(1, yrs))} lần/năm. Phần trước khi trang có dữ liệu riêng dùng lịch sử dài (chỉ các mã còn niêm yết, nên năm xấu trông nhẹ hơn thực tế).`;
+  }
+  function drawUp6Seg() {
+    const P = up6Points(); if (!P.length) return;
+    const st = (n) => (n >= 5 ? 'Đạt uptrend (≥ 5/6)' : n === 4 ? 'Gần đạt (4/6)' : 'Không đạt');
+    const segs = []; let cur = null;
+    P.forEach((p, i) => { const s_ = st(p.c); if (!cur || cur.s !== s_) { cur = { s: s_, a: i, b: i }; segs.push(cur); } else cur.b = i; });
+    const q = P.map((p) => p.q);
+    const rows = segs.filter((g) => g.b - g.a + 1 >= 5).map((g) => ({ s: g.s, from: P[g.a].d, to: g.b === P.length - 1 ? null : P[g.b].d, days: g.b - g.a + 1,
+      chg: (q[g.b] / q[g.a] - 1) * 100, hi: (Math.max(...q.slice(g.a, g.b + 1)) / q[g.a] - 1) * 100, lo: (Math.min(...q.slice(g.a, g.b + 1)) / q[g.a] - 1) * 100 }));
+    table($('#tb-up6-seg'), [
+      { k: 'from', label: 'Từ', f: (r) => fdate(r.from) },
+      { k: 'to', label: 'Đến', f: (r) => (r.to ? fdate(r.to) : 'đang diễn ra') },
+      { k: 's', label: 'Trạng thái', l: true, c: (r) => (r.s.startsWith('Đạt') ? 'up' : r.s.startsWith('Gần') ? 'warn' : 'muted') },
+      { k: 'days', label: 'Số phiên', f: (r) => n0(r.days) },
+      { k: 'chg', label: 'QQQ trong giai đoạn', f: (r) => spct(r.chg), c: (r) => cls(r.chg) },
+      { k: 'hi', label: 'Cao nhất', f: (r) => spct(r.hi) },
+      { k: 'lo', label: 'Thấp nhất', f: (r) => spct(r.lo), c: (r) => (r.lo < -8 ? 'dn' : '') },
+    ], rows, { sort: 'from' });
+    const g = rows.filter((r) => r.s.startsWith('Đạt')), b = rows.filter((r) => r.s.startsWith('Không'));
+    const av = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+    $('#up6-seg-note').textContent = `Từ ${fdate(P[0].d)}: ${g.length} giai đoạn ĐẠT (QQQ trung bình ${spct(av(g.map((r) => r.chg)))} mỗi giai đoạn, ${g.filter((r) => r.chg > 0).length}/${g.length} giai đoạn tăng); ${b.length} giai đoạn không đạt (QQQ trung bình ${spct(av(b.map((r) => r.chg)))}, ${b.filter((r) => r.chg < 0).length}/${b.length} giai đoạn giảm). Giai đoạn ngắn hơn 5 phiên không liệt kê (đổi qua lại liên tục).`;
   }
   function drawUp6() {
     const U = (S.latest || {}).up6; if (!U || !U.items) return;
@@ -661,7 +777,7 @@
     $$('.range').forEach((r) => {
       const key = r.dataset.chart;
       ranges[key] = ranges[key] ?? 126;
-      r.replaceChildren(...(key === 'tspd' ? [[5, '5 ngày'], [21, '1T']] : []).concat([[63, '3T'], [126, '6T'], [252, '1N'], [0, 'Tất cả']]).concat((key === 'q25f' && ((S.q25long || {}).rows || []).length) || (key === 'cyc' && ((((S.longbt || {}).top || {}).series) || {}).d) ? [[-1, 'Từ 2020']] : []).map(([d, t]) =>
+      r.replaceChildren(...(key === 'tspd' ? [[5, '5 ngày'], [21, '1T']] : []).concat([[63, '3T'], [126, '6T'], [252, '1N'], [0, 'Tất cả']]).concat((key === 'q25f' && ((S.q25long || {}).rows || []).length) || (key === 'slope' && ((((S.longbt || {}).lead || {}).series) || {}).g30) || (key === 'cyc' && ((((S.longbt || {}).top || {}).series) || {}).d) || (key === 'up6c' && (((S.longbt || {}).up6_series) || {}).d) ? [[-1, 'Từ 2020']] : []).map(([d, t]) =>
         el('button', { type: 'button', 'aria-pressed': String(ranges[key] === d), text: t, onclick: (ev) => {
           ranges[key] = d; $$('button', r).forEach((b) => b.setAttribute('aria-pressed', String(b === ev.currentTarget))); drawHistChart(key);
         } })));
@@ -783,7 +899,7 @@
       $('#ck-sum').textContent = `${ng}/${ck.length} thuận lợi`;
       $('#ck-sum').className = 'ck-sum ' + (ng >= 6 ? 'up' : ng >= 4 ? 'wa' : 'dn');
       drawHistChart('qqq'); drawSmi(); drawDecision();
-      try { drawUp6(); drawLead(); } catch (e) { console.error(e); }
+      try { drawUp6(); drawLead(); drawHistChart('up6c'); drawUp6Seg(); } catch (e) { console.error(e); }
     },
     basket() {
       const B = S.latest.basket;
@@ -1121,6 +1237,7 @@
         { k: 'chg', label: 'Thay đổi', f: (r) => spct(r.chg), c: (r) => cls(r.chg) },
       ], (Q.swings || []).slice().reverse(), {});
       try { BUILD.basket(); } catch (e) { console.error(e); }
+      try { drawHistChart('slope'); drawSlope(); } catch (e) { console.error(e); }
       ['tspd', 'turn'].forEach(drawHistChart);
       const LT = (S.longbt || {}).top || {};
       const tcols = [
