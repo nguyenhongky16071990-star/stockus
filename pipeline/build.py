@@ -27,7 +27,7 @@ DATA = ROOT / "docs" / "data"
 CONFIG = json.loads((ROOT / "pipeline" / "config.json").read_text(encoding="utf-8"))
 INDEXES = ["QQQ", "SPY", "IWM", "SMH", "IGV"]
 FIELDS = ["Open", "High", "Low", "Close", "Volume"]
-APP_VERSION = "2026.11.15-b"  # phải trùng với APP_VERSION trong docs/app.js
+APP_VERSION = "2026.11.15-d"  # phải trùng với APP_VERSION trong docs/app.js
 
 
 # ---------------------------------------------------------------- tải dữ liệu
@@ -466,6 +466,12 @@ def compute(raw: dict[str, pd.DataFrame], universe: pd.DataFrame, light: bool = 
             if c_ in hist:
                 hist.iloc[:cut_, hist.columns.get_loc(c_)] = np.nan
     warm_all = min(len(dates) - 1, ds + 210)   # từ đây mọi chỉ báo tổng hợp mới đủ dữ liệu
+    try:
+        import longbt as _lbt
+        hist["up6"] = _lbt.uptrend6(hist)["count"].astype(float)
+        hist.iloc[:warm_all, hist.columns.get_loc("up6")] = np.nan
+    except Exception as e:
+        print("6 đặc điểm uptrend theo ngày lỗi:", e, file=sys.stderr)
 
     # ---- cảnh báo và điểm sức khỏe theo từng ngày
     lead_pct = hist["leaders"].rolling(120, min_periods=20).apply(lambda w: (w <= w[-1]).mean(), raw=True)

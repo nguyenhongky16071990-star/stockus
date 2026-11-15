@@ -21,7 +21,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 CACHE = ROOT / "pipeline" / "cache" / "longbt.json"
-VER = 6
+VER = 7
 START = "2019-01-01"
 N_TICK = 1200
 NAMES = {"mm": "Mark Minervini", "wo": "William O'Neil", "sw": "Stan Weinstein",
@@ -407,7 +407,15 @@ def compute(raw_recent: dict, universe: pd.DataFrame, demo: bool = False) -> dic
     except Exception as e:
         print("Kiểm chứng dài hạn: lỗi 6 đặc điểm uptrend", e, file=sys.stderr)
         up6 = []
-    out = {"ver": VER, "built": now.isoformat(), "filters": flt, "holders": hold, "lead": lead, "up6": up6, "src": src, "from": dates[res["start"]].strftime("%Y-%m-%d"), "to": dates[-1].strftime("%Y-%m-%d"),
+    try:
+        U = uptrend6(res["hist"])
+        st0 = res["start"]
+        up6s = {"d": [x.strftime("%Y-%m-%d") for x in res["hist"].index[st0:]], "qqq": [_r(x, 2) for x in res["hist"]["qqq"].astype(float).values[st0:]],
+                "c": [int(x) for x in U["count"].values[st0:]]}
+    except Exception as e:
+        print("Kiểm chứng dài hạn: lỗi chuỗi 6 đặc điểm", e, file=sys.stderr)
+        up6s = {}
+    out = {"ver": VER, "built": now.isoformat(), "filters": flt, "holders": hold, "lead": lead, "up6": up6, "up6_series": up6s, "src": src, "from": dates[res["start"]].strftime("%Y-%m-%d"), "to": dates[-1].strftime("%Y-%m-%d"),
            "n_stocks": res["n_stocks"], "qqq_years": qy, "legends": legends, "setups": setups, "top": top_tests(res["hist"]),
            "note": "Chỉ gồm các mã còn niêm yết hôm nay nên kết quả đẹp hơn thực tế một chút. Có áp dụng quy tắc phòng thủ như kiểm chứng hằng ngày. Setup: cột 'Khi QQQ không Xấu' là chỉ tính lệnh mở khi xu hướng QQQ không Xấu."}
     if not demo:
