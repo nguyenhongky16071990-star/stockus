@@ -27,7 +27,7 @@ DATA = ROOT / "docs" / "data"
 CONFIG = json.loads((ROOT / "pipeline" / "config.json").read_text(encoding="utf-8"))
 INDEXES = ["QQQ", "SPY", "IWM", "SMH", "IGV"]
 FIELDS = ["Open", "High", "Low", "Close", "Volume"]
-APP_VERSION = "2026.11.15-d"  # phải trùng với APP_VERSION trong docs/app.js
+APP_VERSION = "2026.11.18-a"  # phải trùng với APP_VERSION trong docs/app.js
 
 
 # ---------------------------------------------------------------- tải dữ liệu
@@ -228,6 +228,7 @@ def _lead_metrics(C, ret, rs_pos, stage, hi20, qclose) -> dict:
     out = {}
     q5 = (qclose / qclose.shift(5) - 1).reindex(C.index).values
     R5, R1 = ret[5].values, ret[1].values
+    above = {m: (C > C.rolling(m, min_periods=m).mean()).values for m in (10, 20, 50)}
     for K in LEAD_SIZES:
         top = (rs_pos <= K)
         p1 = top.shift(1, fill_value=False).astype(bool).values
@@ -242,6 +243,9 @@ def _lead_metrics(C, ret, rs_pos, stage, hi20, qclose) -> dict:
             nn[nn == 0] = np.nan
             out[f"k{K}_nh20"] = pd.Series(((C >= hi20).values & tv).sum(axis=1) / nn * 100, index=C.index)
             out[f"k{K}_st2"] = pd.Series(((stage == 2).values & tv).sum(axis=1) / nn * 100, index=C.index)
+            # độ rộng bên trong nhóm: % mã trong nhóm (xếp hạng hôm nay) đang trên MA10 / MA20 / MA50 của chính nó
+            for m, ab in above.items():
+                out[f"k{K}_m{m}"] = pd.Series((ab & tv).sum(axis=1) / nn * 100, index=C.index)
             n5 = np.isfinite(r5).sum(axis=1).astype(float)
             n5[n5 == 0] = np.nan
             out[f"k{K}_beat5"] = pd.Series((r5 > q5[:, None]).sum(axis=1) / n5 * 100, index=C.index)

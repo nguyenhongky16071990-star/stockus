@@ -21,7 +21,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 CACHE = ROOT / "pipeline" / "cache" / "longbt.json"
-VER = 7
+VER = 8
 START = "2019-01-01"
 N_TICK = 1200
 NAMES = {"mm": "Mark Minervini", "wo": "William O'Neil", "sw": "Stan Weinstein",
@@ -253,6 +253,7 @@ def lead_tests(hist: pd.DataFrame, start: int = 260) -> dict:
            "tt": [_r(x, 1) for x in hist["pct_tt"].astype(float).values[start:]] if "pct_tt" in hist else [],
            **{f"sp{K}": [_r(x, 2) for x in hist[f"k{K}_sp5"].astype(float).values[start:]] for K in (30, 50, 100, 200) if f"k{K}_sp5" in hist},
            **{f"g{K}": [_r(x, 3) for x in hist[f"k{K}_r1"].astype(float).values[start:]] for K in (30, 50, 100, 200) if f"k{K}_r1" in hist},
+           **{f"m{m}_{K}": [_r(x, 0) for x in hist[f"k{K}_m{m}"].astype(float).values[start:]] for K in (30, 100) for m in (10, 20, 50) if f"k{K}_m{m}" in hist},
            "lows": [idx[i].strftime("%Y-%m-%d") for i in lows]}
     return {"rows": rows, "best": best, "lows": len(lows), "series": ser, "base": {"q21": _r(np.mean(base), 1), "win": _r(np.mean([x > 0 for x in base]) * 100, 0)}}
 
