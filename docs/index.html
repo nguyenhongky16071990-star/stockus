@@ -418,6 +418,16 @@
     </article>
     <div class="tiles" id="bk-period"></div>
     <article class="card notes"><h3>Nhận xét về nhóm top 100</h3><ul id="bk-notes"></ul></article>
+    <article class="card" id="brma-card">
+      <h3>Bao nhiêu mã dẫn đầu còn trên đường trung bình?</h3>
+      <p class="note">Mỗi ngày đếm trong nhóm dẫn đầu có bao nhiêu % mã đang nằm trên MA10, MA20, MA50 của CHÍNH nó (khác đường EMA của chỉ số top 100, vốn chỉ là trung bình giá của cả nhóm). Cho biết bao nhiêu mã cùng tham gia: giá trung bình còn cao mà số mã trên MA giảm dần là nhóm đang gãy từ bên trong. Đường kẻ: 50% và 80%.</p>
+      <div class="tools"><span class="muted small">Nhóm:</span><div class="seg" role="group" aria-label="Nhóm" id="brma-k"></div></div>
+      <p class="dc-main" id="brma-now"></p>
+      <div class="range" data-chart="brma"></div><div class="chart tall-ch" id="ch-brma"></div>
+      <h4 class="sub-h">Kiểm chứng: sau mỗi tình huống (lần đầu, cách nhau ≥ 15 phiên)</h4>
+      <div class="tbl"><table id="tb-brma"></table></div>
+      <p class="note" id="brma-note"></p>
+    </article>
     <article class="card" id="slope-card">
       <h3>Độ dốc của nhóm dẫn đầu (top 30) so với QQQ</h3>
       <p class="note">Đo xu hướng "tăng dài" bằng ĐỘ DỐC: kẻ đường thẳng khớp nhất qua 1 tháng (21 phiên) hoặc 1 quý (63 phiên) gần nhất, quy ra % mỗi tháng. Khác tốc độ 5 phiên (đổi chiều ~50 lần/năm), độ dốc chỉ đổi khi xu hướng thật sự đổi. <b style="color:var(--good)">Nền xanh</b>: top 30 đang đi lên VÀ dốc hơn QQQ (nhóm dẫn đầu kéo thị trường). Đường đậm: chỉ số top 30; đường xám: QQQ (cùng đặt bằng 100); đường gạch: đường xu hướng của khung đang chọn tại hôm nay.</p>

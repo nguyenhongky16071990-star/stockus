@@ -4,12 +4,12 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const LW = window.LightweightCharts;
-  const APP_VERSION = '2026.11.15-d'; // phải trùng với APP_VERSION trong pipeline/build.py
+  const APP_VERSION = '2026.11.18-a'; // phải trùng với APP_VERSION trong pipeline/build.py
   const S = { exits: null, groups: null, flow: null, lab: null, cond: null, paper: null, cycle: null, backtest: null, latest: null, history: [], stocks: [], setups: [], extended: [], themes: [], basket: [], industries: [], patterns: null, charts: null };
-  const ranges = { up6c: -1, slope: -1 };   // khoảng thời gian của từng biểu đồ
+  const ranges = { up6c: -1, slope: -1, brma: -1 };   // khoảng thời gian của từng biểu đồ
   const built = new Set();    // tab đã vẽ
   const live = {};            // biểu đồ đang hiển thị
-  let hlScope = 'top', patDone = false, tsWin = 21, swWin = '5', leadSel = null, slWin = 21;
+  let hlScope = 'top', patDone = false, tsWin = 21, swWin = '5', leadSel = null, slWin = 21, brK = 30;
   let cyKey = 'qqq';
   const PHC = { 'Tăng': '--good', 'Điều chỉnh': '--warn', 'Giằng co': '--c1', 'Giảm': '--bad' };
   const GDC = { 'Vàng + đầu chu kỳ': '--good', 'Thời điểm vàng': '--good', 'Thuận lợi': '--c4', 'Trung tính': '--warn', 'Bất lợi': '--bad' };
@@ -209,6 +209,18 @@
       c.addLineSeries({ color: css('--ink'), lineWidth: 3, priceLineVisible: false, title: 'Top 100' }).setData(pts.map(([d, a]) => ({ time: d, value: a / a0 * 100 })));
       c.applyOptions({ leftPriceScale: { visible: true } });
     },
+    brma(c, rows) {
+      const P = brmaPoints(); if (!P.length) return;
+      const from = ranges.brma === -1 || ranges.brma === 0 ? '' : (rows.length ? rows[0].d : '');
+      const V = P.filter((p) => p.d >= from);
+      c.timeScale().applyOptions({ minBarSpacing: 0.05 });
+      const ln = (key, color, w, t) => c.addLineSeries({ color: css(color), lineWidth: w, priceLineVisible: false, title: t }).setData(V.filter((p) => isNum(p[key])).map((p) => ({ time: p.d, value: p[key] })));
+      ln('m10', '--c3', 1, 'Trên MA10 %'); ln('m20', '--c2', 1, 'Trên MA20 %');
+      const s50 = c.addLineSeries({ color: css('--ink'), lineWidth: 2, priceLineVisible: false, title: 'Trên MA50 %' }); s50.setData(V.filter((p) => isNum(p.m50)).map((p) => ({ time: p.d, value: p.m50 })));
+      s50.createPriceLine({ price: 50, color: css('--muted'), lineStyle: 2, lineWidth: 1, title: '50%' }); s50.createPriceLine({ price: 80, color: css('--good'), lineStyle: 2, lineWidth: 1, title: '80%' });
+      c.addLineSeries({ color: css('--muted'), lineWidth: 1, priceScaleId: 'left', priceLineVisible: false, title: 'QQQ' }).setData(V.filter((p) => isNum(p.q)).map((p) => ({ time: p.d, value: p.q })));
+      c.applyOptions({ leftPriceScale: { visible: true } }); c.priceScale('left').applyOptions({ mode: 1 });
+    },
     slope(c, rows) {
       const P = slopePoints(); if (!P.length) return;
       const from = ranges.slope === -1 || ranges.slope === 0 ? '' : (rows.length ? rows[0].d : '');
@@ -371,6 +383,54 @@
       { k: 'win', label: '% lần QQQ tăng (3 tháng)', f: (r) => pct(r.win, 0) },
     ], [st('Mọi ngày', () => true), st('Nền xanh (top 30 đi lên và dốc hơn QQQ)', (p) => p.green), st('Không xanh', (p) => !p.green), st('Top 30 đi xuống nhanh hơn QQQ', (p) => p.st < 0 && p.st < p.sq)], { sort: null });
     $('#slope-note').textContent = `Đo trên ${fdate((P.find((p) => isNum(p.st)) || {}).d)} – ${fdate(L.d)} với độ dốc ${slWin} phiên; nền đổi màu khoảng ${n1(flips / Math.max(1, yrs))} lần/năm. Phần trước khi trang có dữ liệu riêng dùng lịch sử dài (chỉ các mã còn niêm yết, nên năm xấu trông nhẹ hơn thực tế).`;
+  }
+  // % mã của nhóm top K trên MA10/20/50: lịch sử dài (2020) nối với dữ liệu của trang
+  function brmaPoints() {
+    const LS = (((S.longbt || {}).lead || {}).series) || {}, K = brK;
+    const H = (S.history || []).filter((r) => isNum(r[`k${K}_m50`]) && isNum(r.qqq));
+    const first = H.length ? H[0].d : '9999';
+    const old = (LS.d || []).map((d, i) => ({ d, q: LS.qqq[i], r: (LS['g' + K] || [])[i], m10: (LS[`m10_${K}`] || [])[i], m20: (LS[`m20_${K}`] || [])[i], m50: (LS[`m50_${K}`] || [])[i] }))
+      .filter((p) => p.d < first && isNum(p.m50) && isNum(p.q));
+    const P = old.concat(H.map((r) => ({ d: r.d, q: r.qqq, r: r[`k${K}_r1`], m10: r[`k${K}_m10`], m20: r[`k${K}_m20`], m50: r[`k${K}_m50`] })));
+    let g = 100; P.forEach((p) => { p.g = (g *= 1 + (isNum(p.r) ? p.r : 0) / 100); });
+    return P;
+  }
+  function drawBrma() {
+    const sg = $('#brma-k');
+    if (sg && !sg.children.length) sg.replaceChildren(...[[30, 'Top 30'], [100, 'Top 100']].map(([k, tx]) => { const b = el('button', { type: 'button', 'aria-pressed': String(k === brK), text: tx });
+      b.addEventListener('click', () => { brK = k; $$('#brma-k button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); drawHistChart('brma'); drawBrma(); }); return b; }));
+    const P = brmaPoints(); if (!P.length) { $('#brma-now').textContent = 'Chưa có dữ liệu (có sau lần chạy tới).'; return; }
+    const L = P[P.length - 1], L5 = P[P.length - 6] || {};
+    $('#brma-now').replaceChildren(el('b', { text: `Hôm nay, top ${brK}: ` }), `${pct(L.m10, 0)} mã trên MA10, ${pct(L.m20, 0)} trên MA20, ${pct(L.m50, 0)} trên MA50 (5 phiên trước: ${pct(L5.m10, 0)} / ${pct(L5.m20, 0)} / ${pct(L5.m50, 0)}).`);
+    const n = P.length, q = P.map((p) => p.q), g = P.map((p) => p.g);
+    const minPrev = (key, i, k) => { let m = Infinity; for (let j = Math.max(0, i - k); j < i; j++) if (isNum(P[j][key])) m = Math.min(m, P[j][key]); return m; };
+    const maxPrev = (key, i, k) => { let m = -Infinity; for (let j = Math.max(0, i - k); j < i; j++) if (isNum(P[j][key])) m = Math.max(m, P[j][key]); return m; };
+    const evs = (f) => { const E = []; let last = -99; for (let i = 41; i < n; i++) if (f(i) && !f(i - 1) && i - last > 15) { E.push(i); last = i; } return E; };
+    const row = (name, I) => { const fw = (a, h) => I.filter((i) => i + h < n).map((i) => (a[i + h] / a[i] - 1) * 100), av = (x) => (x.length ? x.reduce((u, v) => u + v, 0) / x.length : null);
+      const q21 = fw(q, 21), q63 = fw(q, 63), g21 = fw(g, 21);
+      const dd = I.filter((i) => i + 21 < n).map((i) => { let m = 0; for (let j = i + 1; j <= i + 21; j++) m = Math.min(m, q[j] / q[i] - 1); return m * 100; });
+      return { name, n: I.length, last: I.length ? P[I[I.length - 1]].d : null, q21: av(q21), q63: av(q63), win: q63.length ? q63.filter((x) => x > 0).length / q63.length * 100 : null, g21: av(g21), gw: g21.length ? g21.filter((x) => x > 0).length / g21.length * 100 : null, dd5: dd.length ? dd.filter((x) => x < -5).length / dd.length * 100 : null }; };
+    const all = []; for (let i = 41; i < n; i++) all.push(i);
+    const st = (f) => all.filter(f);
+    const rows = [row('Mọi ngày (để so sánh)', all),
+      row('% trên MA50 vượt lại 50% sau khi đã dưới 30% (trong 40 phiên)', evs((i) => P[i].m50 >= 50 && minPrev('m50', i, 40) < 30)),
+      row('% trên MA20 vượt 80% sau khi đã dưới 40% (trong 40 phiên): bùng nổ diện rộng', evs((i) => P[i].m20 >= 80 && minPrev('m20', i, 40) < 40)),
+      row('% trên MA10 dưới 20% (quá bán ngắn)', evs((i) => P[i].m10 < 20)),
+      row('% trên MA50 rơi xuống dưới 50% sau khi đã trên 80% (trong 40 phiên): nhóm gãy', evs((i) => P[i].m50 < 50 && maxPrev('m50', i, 40) > 80)),
+      row('Trạng thái: % trên MA50 từ 50% trở lên', st((i) => P[i].m50 >= 50)),
+      row('Trạng thái: % trên MA50 dưới 50%', st((i) => P[i].m50 < 50))];
+    table($('#tb-brma'), [
+      { k: 'name', label: 'Tình huống', l: true },
+      { k: 'n', label: 'Số lần / phiên', f: (r) => n0(r.n) },
+      { k: 'last', label: 'Gần nhất', f: (r) => (r.name.startsWith('Mọi') || r.name.startsWith('Trạng') ? '—' : fdate(r.last)) },
+      { k: 'g21', label: `Top ${brK} 1 tháng sau`, f: (r) => spct(r.g21), c: (r) => cls(r.g21) },
+      { k: 'gw', label: `% lần top ${brK} tăng`, f: (r) => pct(r.gw, 0) },
+      { k: 'q21', label: 'QQQ 1 tháng sau', f: (r) => spct(r.q21), c: (r) => cls(r.q21) },
+      { k: 'q63', label: 'QQQ 3 tháng sau', f: (r) => spct(r.q63), c: (r) => cls(r.q63) },
+      { k: 'win', label: '% lần QQQ tăng (3 tháng)', f: (r) => pct(r.win, 0) },
+      { k: 'dd5', label: '% lần QQQ giảm > 5% trong tháng', f: (r) => pct(r.dd5, 0) },
+    ], rows, { sort: null });
+    $('#brma-note').textContent = `Đo trên ${fdate(P[0].d)} – ${fdate(L.d)}. Phần trước khi trang có dữ liệu riêng dùng lịch sử dài (chỉ các mã còn niêm yết hôm nay, nên năm xấu như 2022 trông nhẹ hơn thực tế). Tình huống có giá trị phải hơn dòng "Mọi ngày".`;
   }
   function drawUp6Seg() {
     const P = up6Points(); if (!P.length) return;
@@ -777,7 +837,7 @@
     $$('.range').forEach((r) => {
       const key = r.dataset.chart;
       ranges[key] = ranges[key] ?? 126;
-      r.replaceChildren(...(key === 'tspd' ? [[5, '5 ngày'], [21, '1T']] : []).concat([[63, '3T'], [126, '6T'], [252, '1N'], [0, 'Tất cả']]).concat((key === 'q25f' && ((S.q25long || {}).rows || []).length) || (key === 'slope' && ((((S.longbt || {}).lead || {}).series) || {}).g30) || (key === 'cyc' && ((((S.longbt || {}).top || {}).series) || {}).d) || (key === 'up6c' && (((S.longbt || {}).up6_series) || {}).d) ? [[-1, 'Từ 2020']] : []).map(([d, t]) =>
+      r.replaceChildren(...(key === 'tspd' ? [[5, '5 ngày'], [21, '1T']] : []).concat([[63, '3T'], [126, '6T'], [252, '1N'], [0, 'Tất cả']]).concat((key === 'q25f' && ((S.q25long || {}).rows || []).length) || ((key === 'slope' || key === 'brma') && ((((S.longbt || {}).lead || {}).series) || {}).g30) || (key === 'cyc' && ((((S.longbt || {}).top || {}).series) || {}).d) || (key === 'up6c' && (((S.longbt || {}).up6_series) || {}).d) ? [[-1, 'Từ 2020']] : []).map(([d, t]) =>
         el('button', { type: 'button', 'aria-pressed': String(ranges[key] === d), text: t, onclick: (ev) => {
           ranges[key] = d; $$('button', r).forEach((b) => b.setAttribute('aria-pressed', String(b === ev.currentTarget))); drawHistChart(key);
         } })));
@@ -1238,6 +1298,7 @@
       ], (Q.swings || []).slice().reverse(), {});
       try { BUILD.basket(); } catch (e) { console.error(e); }
       try { drawHistChart('slope'); drawSlope(); } catch (e) { console.error(e); }
+      try { drawBrma(); drawHistChart('brma'); } catch (e) { console.error(e); }
       ['tspd', 'turn'].forEach(drawHistChart);
       const LT = (S.longbt || {}).top || {};
       const tcols = [
