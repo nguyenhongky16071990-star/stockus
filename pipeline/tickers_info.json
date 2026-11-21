@@ -1283,6 +1283,12 @@ null,
 39242104,
 "2026-11-10"
 ],
+"ANT": [
+"Anthropic, PBC Class A Common Stock",
+"",
+13086672591,
+"2026-11-21"
+],
 "AON": [
 "Aon plc Class A",
 "INSURANCE AGENTS, BROKERS & SERVICE",
@@ -2813,6 +2819,12 @@ null,
 28986847,
 "2026-10-29"
 ],
+"BMM": [
+"Blue Moon Metals Inc. Common Shares",
+"",
+104980832,
+"2026-11-21"
+],
 "BMNR": [
 "BitMine Immersion Technologies, Inc.",
 "FINANCE SERVICES",
@@ -3647,6 +3659,12 @@ null,
 131317488,
 "2026-11-17"
 ],
+"CCD": [
+"Calamos Dynamic Convertible & Income Fund",
+"",
+28619559,
+"2026-11-21"
+],
 "CCEP": [
 "Coca-Cola Europacific Partners plc Ordinary Shares",
 "",
@@ -3821,6 +3839,12 @@ null,
 98993295,
 "2026-10-29"
 ],
+"CEPF": [
+"Cantor Equity Partners IV, Inc. Class A Ordinary Shares",
+"BLANK CHECKS",
+57150000,
+"2026-11-21"
+],
 "CEPU": [
 "Central Puerto S.A. American Depositary Shares (each represents ten Common Shares)",
 "",
@@ -3958,6 +3982,12 @@ null,
 "HOTELS & MOTELS",
 45008622,
 "2026-10-31"
+],
+"CHI": [
+"Calamos Convertible Opportunities and Income Fund",
+"",
+80871314,
+"2026-11-21"
 ],
 "CHKP": [
 "Check Point Software Technologies Ltd",
@@ -4630,6 +4660,12 @@ null,
 "SERVICES-LEGAL SERVICES",
 6277118,
 "2026-11-07"
+],
+"CRAN": [
+"Crane Harbor Acquisition Corp. II Class A Ordinary Shares",
+"BLANK CHECKS",
+46900000,
+"2026-11-21"
 ],
 "CRBG": [
 "Corebridge Financial, Inc.",
@@ -6718,6 +6754,12 @@ null,
 "REAL ESTATE INVESTMENT TRUSTS",
 75672895,
 "2026-11-12"
+],
+"FCAP": [
+"First Capital Inc",
+"SAVINGS INSTITUTION, FEDERALLY CHARTERED",
+3344625,
+"2026-11-21"
 ],
 "FCBC": [
 "First Community Bankshares, Inc. (VA)",
@@ -8962,6 +9004,12 @@ null,
 "GOLD AND SILVER ORES",
 93183554,
 "2026-11-05"
+],
+"HZN": [
+"Bright Horizon Energy Corporation",
+"ELECTRIC SERVICES",
+76524804,
+"2026-11-21"
 ],
 "HZO": [
 "MarineMax, Inc.",
@@ -18239,6 +18287,12 @@ null,
 110125757,
 "2026-10-30"
 ],
+"TXR": [
+"Torex Resources Inc.",
+"",
+90250383,
+"2026-11-21"
+],
 "TXRH": [
 "Texas Roadhouse, Inc.",
 "RETAIL-EATING PLACES",
@@ -18580,6 +18634,12 @@ null,
 "",
 338157614,
 "2026-11-10"
+],
+"USAU": [
+"U.S. Gold Corp. Common Stock",
+"METAL MINING",
+16528663,
+"2026-11-21"
 ],
 "USB": [
 "U.S. Bancorp",
@@ -18929,6 +18989,12 @@ null,
 129578739,
 "2026-10-24"
 ],
+"VMD": [
+"Viemed Healthcare, Inc. Common Shares",
+"SERVICES-MISC HEALTH & ALLIED SERVICES, NEC",
+37893094,
+"2026-11-21"
+],
 "VMET": [
 "Versamet Royalties Corporation Common Stock",
 "",
@@ -19048,6 +19114,12 @@ null,
 "TRANSPORTATION SERVICES",
 152009343,
 "2026-11-10"
+],
+"VRSA": [
+"Versa Bancorp Common Stock",
+"",
+32419079,
+"2026-11-21"
 ],
 "VRSK": [
 "Verisk Analytics, Inc. Common Stock",
@@ -19727,6 +19799,12 @@ null,
 9998760,
 "2026-11-14"
 ],
+"WWB": [
+"Windward Bio Group AG Common Shares",
+"",
+58038748,
+"2026-11-21"
+],
 "WWD": [
 "Woodward, Inc.",
 "ELECTRICAL INDUSTRIAL APPARATUS",
@@ -20134,5 +20212,11 @@ null,
 "PHARMACEUTICAL PREPARATIONS",
 71899919,
 "2026-11-04"
+],
+"ZYN": [
+"PTL LTD Class A Ordinary Shares",
+"",
+6281122,
+"2026-11-21"
 ]
 }
